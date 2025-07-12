@@ -1,4 +1,9 @@
+use std::env;
+
+use rs_gb::emu_run;
+
 fn main() {
-    println!("Hello, world!");
-    let register = CPU::new();
+    let args: Vec<String> = env::args()
+        .collect();
+    emu_run(args)
 }
