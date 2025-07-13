@@ -1,4 +1,6 @@
-use std::{error::Error, fmt, fs, io};
+use std::{error::Error, fmt, fs};
+
+use crate::NO_IMPL;
 
 const ROM_TYPES: [&str; 0x23] = [
     "ROM ONLY",
@@ -104,12 +106,82 @@ static LIC_CODES: [Option<&'static str>; 0xA5] = {
     codes
 };
 
+pub fn get_new_license_name(code: &str) -> &'static str {
+    match code {
+        "00" => "None",
+        "01" => "Nintendo Research & Development 1",
+        "08" => "Capcom",
+        "13" => "EA (Electronic Arts)",
+        "18" => "Hudson Soft",
+        "19" => "B-AI",
+        "20" => "KSS",
+        "22" => "Planning Office WADA",
+        "24" => "PCM Complete",
+        "25" => "San-X",
+        "28" => "Kemco",
+        "29" => "SETA Corporation",
+        "30" => "Viacom",
+        "31" => "Nintendo",
+        "32" => "Bandai",
+        "33" => "Ocean Software/Acclaim Entertainment",
+        "34" => "Konami",
+        "35" => "HectorSoft",
+        "37" => "Taito",
+        "38" => "Hudson Soft",
+        "39" => "Banpresto",
+        "41" => "Ubi Soft1",
+        "42" => "Atlus",
+        "44" => "Malibu Interactive",
+        "46" => "Angel",
+        "47" => "Bullet-Proof Software2",
+        "49" => "Irem",
+        "50" => "Absolute",
+        "51" => "Acclaim Entertainment",
+        "52" => "Activision",
+        "53" => "Sammy USA Corporation",
+        "54" => "Konami",
+        "55" => "Hi Tech Expressions",
+        "56" => "LJN",
+        "57" => "Matchbox",
+        "58" => "Mattel",
+        "59" => "Milton Bradley Company",
+        "60" => "Titus Interactive",
+        "61" => "Virgin Games Ltd.3",
+        "64" => "Lucasfilm Games4",
+        "67" => "Ocean Software",
+        "69" => "EA (Electronic Arts)",
+        "70" => "Infogrames5",
+        "71" => "Interplay Entertainment",
+        "72" => "Broderbund",
+        "73" => "Sculptured Software6",
+        "75" => "The Sales Curve Limited7",
+        "78" => "THQ",
+        "79" => "Accolade",
+        "80" => "Misawa Entertainment",
+        "83" => "lozc",
+        "86" => "Tokuma Shoten",
+        "87" => "Tsukuda Original",
+        "91" => "Chunsoft Co.8",
+        "92" => "Video System",
+        "93" => "Ocean Software/Acclaim Entertainment",
+        "95" => "Varie",
+        "96" => "Yonezawa/s’pal",
+        "97" => "Kaneko",
+        "99" => "Pack-In-Video",
+        "9H" => "Bottom Up",
+        "A4" => "Konami (Yu-Gi-Oh!)",
+        "BL" => "MTO",
+        "DK" => "Kodansha",
+        _ => "Unknown",
+    }
+}
+
 
 struct CartridgeHeader {
     entry: [u8; 4],
     logo: [u8; 0x30],
-    title: [u8; 16],
-    new_lic_code: u16,
+    title: String,
+    new_lic_code: [u8; 2],
     sgb_flag: u8,
     cart_type: u8,
     rom_size: u8,
@@ -118,14 +190,14 @@ struct CartridgeHeader {
     lic_code: u8,
     version: u8,
     checksum: u8,
-    global_checksum: u16,
+    _global_checksum: u16,
 }
 
 impl CartridgeHeader {
     fn from_bytes(data: &[u8]) -> Result<CartridgeHeader, InvalidCartridge> {
         if data.len() < 0x150 {
             eprintln!("Not enough data!");
-            return Err(InvalidCartridge {  });
+            return Err(InvalidCartridge::new());
         }
 
         let mut checksum: u8 = 0;
@@ -135,14 +207,25 @@ impl CartridgeHeader {
 
         if (checksum & 0xFF) != data[0x14D] {
             eprintln!("Incorrect checksum!");
-            return Err(InvalidCartridge {  })
+            return Err(InvalidCartridge::new())
+        }
+
+        let title: String;
+
+        if data[0x143] < 127 { // ASCII max
+            title = String::from_utf8(data[0x134..0x144].to_vec()).unwrap();
+            println!("This is a DMG game")
+        } else {
+            if data[0x143] == 0x80 { println!("This game supports CGB enhancements") }
+            else if data[0x143] == 0xC0 { println!("This is a CGB game") }
+            title = String::from_utf8(data[0x134..0x143].to_vec()).unwrap()
         }
 
         Ok(Self {
             entry: data[0x100..0x104].try_into().unwrap(),
             logo: data[0x104..0x134].try_into().unwrap(),
-            title: data[0x134..0x144].try_into().unwrap(),
-            new_lic_code: u16::from_be_bytes(data[0x144..0x146].try_into().unwrap()),
+            title, //data[0x134..0x144].try_into().unwrap(),
+            new_lic_code: data[0x144..0x146].try_into().unwrap(),
             sgb_flag: data[0x146],
             cart_type: data[0x147],
             rom_size: data[0x148],
@@ -151,8 +234,34 @@ impl CartridgeHeader {
             lic_code: data[0x14B],
             version: data[0x14C],
             checksum,
-            global_checksum: u16::from_be_bytes(data[0x14E..0x150].try_into().unwrap()),
+            _global_checksum: u16::from_be_bytes(data[0x14E..0x150].try_into().unwrap()),
         })
+    }
+
+    fn get_lic_name(&self) -> &str {
+        let lic_code = self.lic_code as usize;
+        if lic_code >= LIC_CODES.len() {
+            return "UNKNOWN"
+        }
+        if lic_code != 0x33 {
+            match LIC_CODES[lic_code] {
+                Some(lic) => lic,
+                None => "UNKNOWN"
+            }
+        } else {
+            let code = str::from_utf8(&self.new_lic_code).unwrap();
+            get_new_license_name(code)
+        }
+        
+    }
+
+    fn get_cart_type(&self) -> &str{
+        let cart_type = self.cart_type as usize;
+        if cart_type >= ROM_TYPES.len() {
+            return "UNKNOWN"
+        } else {
+            return ROM_TYPES[cart_type]
+        }
     }
 }
 
@@ -170,6 +279,17 @@ impl Cartridge {
 
         let header = CartridgeHeader::from_bytes(&rom_data)?;
 
+        println!("Cartridge successfully loaded");
+        println!("\t Title    : {}", header.title);
+        println!("\t Type     : {0} ({1})", header.cart_type, header.get_cart_type());
+        println!("\t ROM Size : {} KiB", 32 << header.rom_size);
+        println!("\t RAM Size : {}", header.ram_size);
+        println!("\t LIC Code : {0} ({1})", 
+            if header.lic_code != 0x33 { header.lic_code.to_string() } 
+            else { str::from_utf8(&header.new_lic_code).unwrap().to_string()},
+            header.get_lic_name());
+        println!("\t ROM Vers : {}", header.version);
+
         Ok(Cartridge {
             filename: path.to_string(),
             rom_size,
@@ -179,24 +299,14 @@ impl Cartridge {
 
     }
 
-    fn get_lic_name(&self) -> &str {
-        let lic_code = self.header.lic_code as usize;
-        if lic_code >= LIC_CODES.len() {
-            return "UNKNOWN"
-        }
-        match LIC_CODES[lic_code] {
-            Some(lic) => lic,
-            None => "UNKNOWN"
-        }
+    pub fn read(&self, address: u16) -> u8 {
+        // for now ROM Only type supported
+        self.rom_data[address as usize]
     }
 
-    fn get_cart_type(&self) -> &str{
-        let cart_type = self.header.cart_type as usize;
-        if cart_type >= ROM_TYPES.len() {
-            return "UNKNOWN"
-        } else {
-            return ROM_TYPES[cart_type]
-        }
+    pub fn write(&self, address: u16, value: u8) {
+        //for now, ROM only...
+        NO_IMPL!()
     }
 }
 
@@ -204,6 +314,12 @@ impl Cartridge {
 /// but the cartridge is invalid
 #[derive(Debug)]
 struct InvalidCartridge {}
+
+impl InvalidCartridge {
+    fn new() -> InvalidCartridge {
+        InvalidCartridge {  }
+    }
+}
 
 impl fmt::Display for InvalidCartridge {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
