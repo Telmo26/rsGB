@@ -1,9 +1,8 @@
 use std::env;
 
-use rs_gb::emu_run;
+use rs_gb::run;
 
 fn main() {
-    let args: Vec<String> = env::args()
-        .collect();
-    emu_run(args)
+    let args: Vec<String> = env::args().collect();
+    run(args)
 }

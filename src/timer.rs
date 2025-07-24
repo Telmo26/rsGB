@@ -5,7 +5,5 @@ impl Timer {
         Timer {}
     }
 
-    pub fn tick(&self) {
-        
-    }
+    pub fn tick(&self) {}
 }

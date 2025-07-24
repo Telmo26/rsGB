@@ -176,7 +176,6 @@ pub fn get_new_license_name(code: &str) -> &'static str {
     }
 }
 
-
 struct CartridgeHeader {
     entry: [u8; 4],
     logo: [u8; 0x30],
@@ -207,17 +206,21 @@ impl CartridgeHeader {
 
         if (checksum & 0xFF) != data[0x14D] {
             eprintln!("Incorrect checksum!");
-            return Err(InvalidCartridge::new())
+            return Err(InvalidCartridge::new());
         }
 
         let title: String;
 
-        if data[0x143] < 127 { // ASCII max
+        if data[0x143] < 127 {
+            // ASCII max
             title = String::from_utf8(data[0x134..0x144].to_vec()).unwrap();
             println!("This is a DMG game")
         } else {
-            if data[0x143] == 0x80 { println!("This game supports CGB enhancements") }
-            else if data[0x143] == 0xC0 { println!("This is a CGB game") }
+            if data[0x143] == 0x80 {
+                println!("This game supports CGB enhancements")
+            } else if data[0x143] == 0xC0 {
+                println!("This is a CGB game")
+            }
             title = String::from_utf8(data[0x134..0x143].to_vec()).unwrap()
         }
 
@@ -241,26 +244,25 @@ impl CartridgeHeader {
     fn get_lic_name(&self) -> &str {
         let lic_code = self.lic_code as usize;
         if lic_code >= LIC_CODES.len() {
-            return "UNKNOWN"
+            return "UNKNOWN";
         }
         if lic_code != 0x33 {
             match LIC_CODES[lic_code] {
                 Some(lic) => lic,
-                None => "UNKNOWN"
+                None => "UNKNOWN",
             }
         } else {
             let code = str::from_utf8(&self.new_lic_code).unwrap();
             get_new_license_name(code)
         }
-        
     }
 
-    fn get_cart_type(&self) -> &str{
+    fn get_cart_type(&self) -> &str {
         let cart_type = self.cart_type as usize;
         if cart_type >= ROM_TYPES.len() {
-            return "UNKNOWN"
+            return "UNKNOWN";
         } else {
-            return ROM_TYPES[cart_type]
+            return ROM_TYPES[cart_type];
         }
     }
 }
@@ -269,7 +271,7 @@ pub struct Cartridge {
     filename: String,
     rom_size: u32,
     rom_data: Vec<u8>,
-    header: CartridgeHeader
+    header: CartridgeHeader,
 }
 
 impl Cartridge {
@@ -281,22 +283,30 @@ impl Cartridge {
 
         println!("Cartridge successfully loaded");
         println!("\t Title    : {}", header.title);
-        println!("\t Type     : {0} ({1})", header.cart_type, header.get_cart_type());
+        println!(
+            "\t Type     : {0} ({1})",
+            header.cart_type,
+            header.get_cart_type()
+        );
         println!("\t ROM Size : {} KiB", 32 << header.rom_size);
         println!("\t RAM Size : {}", header.ram_size);
-        println!("\t LIC Code : {0} ({1})", 
-            if header.lic_code != 0x33 { header.lic_code.to_string() } 
-            else { str::from_utf8(&header.new_lic_code).unwrap().to_string()},
-            header.get_lic_name());
+        println!(
+            "\t LIC Code : {0} ({1})",
+            if header.lic_code != 0x33 {
+                header.lic_code.to_string()
+            } else {
+                str::from_utf8(&header.new_lic_code).unwrap().to_string()
+            },
+            header.get_lic_name()
+        );
         println!("\t ROM Vers : {}", header.version);
 
         Ok(Cartridge {
             filename: path.to_string(),
             rom_size,
             rom_data,
-            header
+            header,
         })
-
     }
 
     pub fn read(&self, address: u16) -> u8 {
@@ -310,14 +320,14 @@ impl Cartridge {
     }
 }
 
-/// This error is returned when the reading has succeeded 
+/// This error is returned when the reading has succeeded
 /// but the cartridge is invalid
 #[derive(Debug)]
 struct InvalidCartridge {}
 
 impl InvalidCartridge {
     fn new() -> InvalidCartridge {
-        InvalidCartridge {  }
+        InvalidCartridge {}
     }
 }
 

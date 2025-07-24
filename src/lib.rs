@@ -1,15 +1,22 @@
 mod cart;
 mod cpu;
+mod interconnect;
+mod ppu;
+mod timer;
 mod utils;
 
-use std::{sync::RwLock, thread, time::Duration};
+use std::{sync::{Arc, Mutex, MutexGuard}, thread, time::Duration};
 
-use cart::Cartridge;
-use cpu::CPU;
+use crate::{
+    cart::Cartridge, 
+    cpu::Cpu, 
+    ppu::Ppu,
+    interconnect::Interconnect,
+};
 
-use minifb;
+// use minifb;
 
-/* 
+/*
     Emu components :
 
     |Cart|
@@ -20,55 +27,96 @@ use minifb;
 
 */
 
-pub struct EmuContext {
+struct EmuContext {
     paused: bool,
     running: bool,
     ticks: u64,
 }
 
-static EMU_CONTEXT: RwLock<EmuContext> = RwLock::new(EmuContext {
-    paused: false,
-    running: false,
-    ticks: 0,
-});
-
-pub fn emu_run(args: Vec<String>) {
-    if args.len() < 2 {
-        println!("Usage: rsgb <rom_file>");
-        return
+impl EmuContext {
+    fn new() -> EmuContext {
+        EmuContext {
+            paused: false,
+            running: false,
+            ticks: 0
+        }
     }
 
-    let cart = match Cartridge::load(&args[1]) {
-        Ok(cart) => cart,
-        Err(e) => {
-            eprintln!("Failed to load the ROM file: {}", args[1]);
-            eprintln!("Error: {e}");
-            return
+    fn incr_cycle(&mut self, cycles: u64) {
+        self.ticks += cycles;
+    }
+
+    fn start(&mut self) {
+        self.running = true;
+    }
+
+    fn is_running(&self) -> bool {
+        self.running
+    }
+
+    fn is_paused(&self) -> bool {
+        self.paused
+    }
+}
+
+struct Emulator {
+    bus: Interconnect,
+    cpu: Cpu,
+    ppu: Ppu,
+}
+
+impl Emulator {
+    fn new() -> Emulator {
+        Emulator {
+            bus: Interconnect::new(),
+            cpu: Cpu::new(),
+            ppu: Ppu::new(),
         }
-    };
+    }
+
+    fn load_cart(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let cartridge = Cartridge::load(path)?;
+        self.bus.set_cart(cartridge);
+        Ok(())
+    }
+
+    fn step(&mut self, mut ctx: MutexGuard<'_, EmuContext>) -> bool {
+        self.cpu.step(&mut self.bus, &mut ctx)
+    }
+}
+
+pub fn run(args: Vec<String>) {
+    if args.len() < 2 {
+        println!("Usage: rsgb <rom_file>");
+        return;
+    }
+
+    let ctx = Arc::new(Mutex::new(EmuContext::new()));
+
+    let mut emulator = Emulator::new();
+
+    emulator.load_cart(&args[1])
+        .expect(&format!("Failed to load the ROM file: {}", args[1]));
 
     println!("Cart loaded...");
 
-    // Framebuffer init
+    ctx.lock().unwrap() // This should never fail, it is the first call
+        .start();
 
-    let cpu = CPU::new();
-
-    let mut ctx = EMU_CONTEXT.write()
-        .expect("The context has been poisoned");
-
-    ctx.running = true;
-    ctx.paused = false;
-    ctx.ticks = 0;
-
-    while ctx.running {
-        if ctx.paused {
-            thread::sleep(Duration::from_millis(10));
-            continue
+    loop {
+        let context = ctx.lock().unwrap();
+        if !context.is_running() {
+            break
         }
 
-        if !cpu.step() {
+        if context.is_paused() {
+            thread::sleep(Duration::from_millis(10));
+            continue;
+        }
+
+        if !emulator.step(context) {
             println!("CPU Stopped");
-            return
+            break;
         }
     }
 }

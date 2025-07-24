@@ -1,11 +1,13 @@
-struct PPU {}
+pub struct Ppu {
 
-impl PPU {
-    pub fn new() -> PPU {
-        PPU {}
+}
+
+impl Ppu {
+    pub fn new() -> Ppu {
+        Ppu {
+            
+        }
     }
 
-    pub fn tick(&self) {
-        
-    }
+    pub fn tick(&self) {}
 }

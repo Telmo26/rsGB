@@ -1,7 +1,7 @@
-use crate::NO_IMPL;
-
-
-
+use crate::{
+    cart::Cartridge, 
+    NO_IMPL,
+};
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
@@ -17,26 +17,33 @@ use crate::NO_IMPL;
 // 0xFF00 - 0xFF7F : I/O Registers
 // 0xFF80 - 0xFFFE : Zero Page
 
-struct Bus {}
+pub struct Interconnect {
+    cart: Option<Cartridge>,
+}
 
-impl Bus {
-    pub fn new() -> Bus {
-        Bus {}
+impl Interconnect {
+    pub fn new() -> Interconnect {
+        Interconnect { cart: None}
+    }
+
+    pub fn set_cart(&mut self, cart: Cartridge) {
+        self.cart = Some(cart);
     }
 
     pub fn read(&self, address: u16) -> u8 {
         // ROM only for now
         match address {
-            0x0000..=0x3FFF => cartridge::read(address),
-            _ => NO_IMPL(),
+            0x0000..=0x3FFF => self.cart.as_ref().unwrap().read(address),
+            _ => NO_IMPL!(),
         }
     }
 
-    pub fn write(&self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) {
         // ROM only for now
         match address {
-            0x0000..=0x3FFF => cartridge::write(address),
-            _ => NO_IMPL(),
+            0x0000..=0x3FFF => self.cart.as_mut().unwrap().write(address, value),
+            _ => NO_IMPL!(),
         }
     }
 }
+
