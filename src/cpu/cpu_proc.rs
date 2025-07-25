@@ -16,17 +16,6 @@ pub fn cpu_proc(instruction: InType) -> impl FnMut(&mut Cpu, &mut Interconnect, 
 fn proc_nop(_cpu: &mut Cpu, _bus: &mut Interconnect, _ctx: &mut EmuContext) {}
 
 fn proc_ld(cpu: &mut Cpu, bus: &mut Interconnect, ctx: &mut EmuContext) {
-    if cpu.dest_is_mem {
-        if cpu.curr_inst.reg_2 >= RegType::AF {
-            // If 16-bit register
-            bus.write16(cpu.mem_dest, cpu.fetched_data);
-        } else {
-            bus.write(cpu.mem_dest, cpu.fetched_data as u8);
-        }
-    } else {
-        cpu.registers.set(cpu.curr_inst.reg_1, cpu.fetched_data);
-    }
-
     if cpu.curr_inst.mode == AddrMode::HL_SP {
         // Check if overflow from bit 3
         let hflag: bool = ((cpu.registers.read(cpu.curr_inst.reg_2) as u8 & 0xF) + 
@@ -39,6 +28,15 @@ fn proc_ld(cpu: &mut Cpu, bus: &mut Interconnect, ctx: &mut EmuContext) {
         cpu.set_flags(0, 0, hflag as u8, cflag as u8);
         cpu.registers.set(cpu.curr_inst.reg_1,
             cpu.registers.read(cpu.curr_inst.reg_2) + cpu.fetched_data);
+    } else if cpu.dest_is_mem {
+        if cpu.curr_inst.reg_2 >= RegType::AF {
+            // If 16-bit register
+            bus.write16(cpu.mem_dest, cpu.fetched_data);
+        } else {
+            bus.write(cpu.mem_dest, cpu.fetched_data as u8);
+        }
+    } else {
+        cpu.registers.set(cpu.curr_inst.reg_1, cpu.fetched_data);
     }
 }
 

@@ -63,12 +63,26 @@ impl Cpu {
         self.curr_opcode = bus.read(self.registers.pc);
         self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
-        println!("PC: {0:04X} \t {1:?} {2:?} ({3:02X} {4:02X} {5:02X}) A: {6:02X} BC: {7:02X}{8:02X} DE: {9:02X}{10:02X} HL: {11:02X}{12:02X}", 
-            self.registers.pc, self.curr_inst.in_type, self.curr_inst.mode, self.curr_opcode, 
-            bus.read(self.registers.pc + 1), bus.read(self.registers.pc+ 2),
-            self.registers.a, self.registers.b, self.registers.c,
-            self.registers.d, self.registers.e, self.registers.h, self.registers.l
+        let inst_part = format!(
+            "PC: {0:04X} \t {1:?} {2:?} ({3:02X} {4:02X} {5:02X})",
+            self.registers.pc, 
+            self.curr_inst.in_type, 
+            self.curr_inst.mode, 
+            self.curr_opcode, 
+            bus.read(self.registers.pc + 1), 
+            bus.read(self.registers.pc+ 2),
         );
+
+        let reg_part = format!(
+            "A: {0:02X} BC: {1:02X}{2:02X} DE: {3:02X}{4:02X} HL: {5:02X}{6:02X} SP: {7:04X}", 
+            self.registers.a, 
+            self.registers.b, self.registers.c,
+            self.registers.d, self.registers.e, 
+            self.registers.h, self.registers.l,
+            self.registers.sp
+        );
+
+        println!("{:<35} {}", inst_part, reg_part);
 
         self.registers.pc += 1;
     }
