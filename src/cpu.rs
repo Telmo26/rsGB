@@ -1,19 +1,18 @@
 use std::sync::MutexGuard;
 
-mod cpu_proc;
+mod proc;
 mod instruction;
 mod registers;
+mod stack;
 
 use crate::{
     EmuContext, Interconnect, utils::{bit_set, BIT_IGNORE}
 };
 
-use cpu_proc::cpu_proc;
 use instruction::*;
 use registers::*;
 
-
-pub struct Cpu {
+pub struct CPU {
     registers: CpuRegisters,
 
     // Current fetch
@@ -29,10 +28,10 @@ pub struct Cpu {
     en_master_interrupt: bool
 }
 
-impl Cpu {
-    pub fn new() -> Cpu {
+impl CPU {
+    pub fn new() -> CPU {
         let registers = CpuRegisters::new();
-        Cpu {
+        CPU {
             registers,
 
             fetched_data: 0,
@@ -53,7 +52,7 @@ impl Cpu {
         if !self.halted {
             self.fetch_instruction(bus);
             self.fetch_data(bus, ctx);
-            self.execute(bus, ctx);
+            self.execute(bus, ctx, self.curr_inst.in_type);
         }
 
         true
@@ -212,16 +211,13 @@ impl Cpu {
                 self.fetched_data = bus.read(addr) as u16;
                 ctx.incr_cycle();
             }
-
-            // _ => println!("Unknown addressing mode: {0:?} ({1:X})", 
-            //         self.curr_inst.mode, self.curr_opcode)
         }
     }
 
-    fn execute(&mut self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
-        let mut process_instruction = cpu_proc(self.curr_inst.in_type);
-        process_instruction(self, bus, ctx)
-    }
+    // fn execute(&mut self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
+    //     let mut process_instruction = cpu_proc(self.curr_inst.in_type);
+    //     process_instruction(self, bus, ctx)
+    // }
 
     fn z_flag(&self) -> bool {
         (self.registers.f & 0b10000000) >> 7 == 1
@@ -229,6 +225,19 @@ impl Cpu {
 
     fn c_flag(&self) -> bool {
         (self.registers.f & 0b00010000) >> 7 == 1
+    }
+
+    fn check_cond(&self) -> bool {
+        let z = self.z_flag();
+        let c = self.c_flag();
+
+        match self.curr_inst.cond {
+            CondType::NONE => true,
+            CondType::Z => z,
+            CondType::NZ => !z,
+            CondType::C => c,
+            CondType::NC => !c
+        }
     }
 
     fn set_flags(&mut self, z: u8, n: u8, h: u8, c: u8) {

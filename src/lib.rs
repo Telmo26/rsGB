@@ -9,7 +9,7 @@ use std::{sync::{Arc, Mutex, MutexGuard}, thread, time::Duration};
 
 use crate::{
     cart::Cartridge, 
-    cpu::Cpu, 
+    cpu::CPU, 
     ppu::Ppu,
     interconnect::Interconnect,
 };
@@ -61,7 +61,7 @@ impl EmuContext {
 
 struct Emulator {
     bus: Interconnect,
-    cpu: Cpu,
+    cpu: CPU,
     ppu: Ppu,
 }
 
@@ -69,7 +69,7 @@ impl Emulator {
     fn new() -> Emulator {
         Emulator {
             bus: Interconnect::new(),
-            cpu: Cpu::new(),
+            cpu: CPU::new(),
             ppu: Ppu::new(),
         }
     }
