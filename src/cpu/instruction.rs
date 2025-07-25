@@ -21,7 +21,7 @@ pub enum AddrMode {
     D8,
     D16_R,
     MR_D8,
-    M_R,
+    MR,
     A16_R,
     R_A16,
 }

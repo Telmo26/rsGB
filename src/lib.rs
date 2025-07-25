@@ -42,8 +42,8 @@ impl EmuContext {
         }
     }
 
-    fn incr_cycle(&mut self, cycles: u64) {
-        self.ticks += cycles;
+    fn incr_cycle(&mut self) {
+        self.ticks += 1;
     }
 
     fn start(&mut self) {

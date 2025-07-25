@@ -6,6 +6,7 @@ pub fn cpu_proc(instruction: InType) -> impl FnMut(&mut Cpu, &mut Interconnect, 
     match instruction {
         InType::NOP => proc_nop,
         InType::LD => proc_ld,
+        InType::LDH => proc_ldh,
         InType::JP => proc_jp,
         InType::DI => proc_di,
         InType::XOR => proc_xor,
@@ -40,6 +41,18 @@ fn proc_ld(cpu: &mut Cpu, bus: &mut Interconnect, ctx: &mut EmuContext) {
     }
 }
 
+fn proc_ldh(cpu: &mut Cpu, bus: &mut Interconnect, ctx: &mut EmuContext) {
+    if cpu.curr_inst.reg_1 == RegType::A {
+        // Loading into register A
+        cpu.registers.set(RegType::A, cpu.fetched_data);
+    } else {
+        // Loading A into a memory region
+        bus.write(cpu.mem_dest, cpu.fetched_data as u8)
+    }
+
+    ctx.incr_cycle();
+}
+
 fn check_cond(cpu: &mut Cpu) -> bool {
     let z = cpu.z_flag();
     let c = cpu.c_flag();
@@ -56,7 +69,7 @@ fn check_cond(cpu: &mut Cpu) -> bool {
 fn proc_jp(cpu: &mut Cpu, _bus: &mut Interconnect, ctx: &mut EmuContext) {
     if check_cond(cpu) {
         cpu.registers.pc = cpu.fetched_data;
-        ctx.incr_cycle(1);
+        ctx.incr_cycle();
     }
 }
 

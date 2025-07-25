@@ -23,11 +23,12 @@ use ram::*;
 pub struct Interconnect {
     cart: Option<Cartridge>,
     ram: RAM,
+    ie_register: u8
 }
 
 impl Interconnect {
     pub fn new() -> Interconnect {
-        Interconnect { cart: None, ram: RAM::new() }
+        Interconnect { cart: None, ram: RAM::new(), ie_register: 0 }
     }
 
     pub fn set_cart(&mut self, cart: Cartridge) {
@@ -58,14 +59,14 @@ impl Interconnect {
             // Reserved - Unusable
             0xFEA0..0xFF00 => 0,
 
-            // IO Registers
+            // I/O Registers
             0xFF00..0xFF80 => panic!("Read at address {address:X} not implemented!"),
 
             // HRAM (High RAM) / Zero Page
             0xFF80..0xFFFF => self.ram.hram_read(address),
 
             // CPU Enable Register
-            0xFFFF => panic!("Read at address {address:X} not implemented!"),
+            0xFFFF => self.ie_register,
         }
     }
 
@@ -99,14 +100,14 @@ impl Interconnect {
             // Reserved - Unusable
             0xFEA0..0xFF00 => (),
 
-            // IO Registers
-            0xFF00..0xFF80 => panic!("Write at address {address:X} not implemented!"),
+            // I/O Registers
+            0xFF00..0xFF80 => println!("Write at address {address:X} not implemented!"),
 
             // HRAM (High RAM) / Zero Page
             0xFF80..0xFFFF => self.ram.hram_write(address, value),
 
             // CPU Enable Register
-            0xFFFF => panic!("Write at address {address:X} not implemented!"),
+            0xFFFF => self.ie_register = value,
         }
     }
 
