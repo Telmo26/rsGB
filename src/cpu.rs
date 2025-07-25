@@ -2,6 +2,7 @@ use std::sync::MutexGuard;
 
 mod cpu_proc;
 mod instruction;
+mod registers;
 
 use crate::{
     EmuContext, Interconnect, utils::{bit_set, BIT_IGNORE}
@@ -9,82 +10,8 @@ use crate::{
 
 use cpu_proc::cpu_proc;
 use instruction::*;
+use registers::*;
 
-struct CpuRegisters {
-    a: u8,
-    f: u8,
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    h: u8,
-    l: u8,
-    pc: u16,
-    sp: u16,
-}
-
-impl CpuRegisters {
-    fn new() -> CpuRegisters {
-        CpuRegisters { a: 0x01, f: 0, b: 0, c: 0, d: 0, e: 0, h: 0, l: 0, pc: 0x100, sp: 0 }
-    }
-
-    fn read(&self, register: RegType) -> u16 {
-        match register {
-            RegType::NONE => 0,
-
-            RegType::A => self.a as u16,
-            RegType::F => self.f as u16,
-            RegType::B => self.b as u16,
-            RegType::C => self.c as u16,
-            RegType::D => self.d as u16,
-            RegType::E => self.e as u16,
-            RegType::H => self.h as u16,
-            RegType::L => self.l as u16,
-
-            RegType::AF => (self.a as u16) << 8 | self.f as u16,
-            RegType::BC => (self.b as u16) << 8 | self.c as u16,
-            RegType::DE => (self.d as u16) << 8 | self.e as u16,
-            RegType::HL => (self.h as u16) << 8 | self.l as u16,
-
-            RegType::SP => self.sp as u16,
-            RegType::PC => self.pc as u16,
-        }
-    }
-
-    fn set(&mut self, register: RegType, value: u16) {
-        match register {
-            RegType::NONE => (),
-
-            RegType::A => self.a = value as u8,
-            RegType::F => self.f = value as u8,
-            RegType::B => self.b = value as u8,
-            RegType::C => self.c = value as u8,
-            RegType::D => self.d = value as u8,
-            RegType::E => self.e = value as u8,
-            RegType::H => self.h = value as u8,
-            RegType::L => self.l = value as u8,
-
-            RegType::AF => {
-                self.a = ((value & 0xFF00) >> 8) as u8;
-                self.f = value as u8;
-            },
-            RegType::BC => {
-                self.b = ((value & 0xFF00) >> 8) as u8;
-                self.c = value as u8;
-            },
-            RegType::DE => {
-                self.d = ((value & 0xFF00) >> 8) as u8;
-                self.e = value as u8;
-            },
-            RegType::HL => {
-                self.h = ((value & 0xFF00) >> 8) as u8;
-                self.l = value as u8;
-            },
-            RegType::SP => self.sp = value,
-            RegType::PC => self.pc = value,
-        }
-    }
-}
 
 pub struct Cpu {
     registers: CpuRegisters,
@@ -126,7 +53,7 @@ impl Cpu {
         if !self.halted {
             self.fetch_instruction(bus);
             self.fetch_data(bus, ctx);
-            self.execute(ctx);
+            self.execute(bus, ctx);
         }
 
         true
@@ -136,11 +63,12 @@ impl Cpu {
         self.curr_opcode = bus.read(self.registers.pc);
         self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
-        println!("PC: {0:04X} \t {1:?} ({2:X} {3:X} {4:X}) A: {5} B: {6} C: {7}", 
-        self.registers.pc, self.curr_inst.in_type, self.curr_opcode, 
-        bus.read(self.registers.pc + 1), bus.read(self.registers.pc+ 2),
-        self.registers.a, self.registers.b, self.registers.c,
-    );
+        println!("PC: {0:04X} \t {1:?} {2:?} ({3:02X} {4:02X} {5:02X}) A: {6:02X} BC: {7:02X}{8:02X} DE: {9:02X}{10:02X} HL: {11:02X}{12:02X}", 
+            self.registers.pc, self.curr_inst.in_type, self.curr_inst.mode, self.curr_opcode, 
+            bus.read(self.registers.pc + 1), bus.read(self.registers.pc+ 2),
+            self.registers.a, self.registers.b, self.registers.c,
+            self.registers.d, self.registers.e, self.registers.h, self.registers.l
+        );
 
         self.registers.pc += 1;
     }
@@ -152,24 +80,24 @@ impl Cpu {
         match self.curr_inst.mode {
             AddrMode::IMP => (),
             AddrMode::R => self.fetched_data = self.registers.read(self.curr_inst.reg_1),
-            AddrMode::RR => self.fetched_data = self.registers.read(self.curr_inst.reg_2),
-            AddrMode::RD8 => {
+            AddrMode::R_R => self.fetched_data = self.registers.read(self.curr_inst.reg_2),
+            AddrMode::R_D8 => {
                 self.fetched_data = bus.read(self.registers.pc) as u16;
                 ctx.incr_cycle(1);
                 self.registers.pc += 1;
             },
-            AddrMode::D16 | AddrMode::RD16 => {
+            AddrMode::D16 | AddrMode::R_D16 => {
                 let low: u8 = bus.read(self.registers.pc);
                 ctx.incr_cycle(1);
+                self.registers.pc += 1;
 
-                let high: u8 = bus.read(self.registers.pc + 1);
+                let high: u8 = bus.read(self.registers.pc);
                 ctx.incr_cycle(1);
+                self.registers.pc += 1;
 
                 self.fetched_data = (high as u16) << 8 | low as u16;
-
-                self.registers.pc += 2;
             }
-            AddrMode::MRR => {
+            AddrMode::MR_R => {
                 self.fetched_data = self.registers.read(self.curr_inst.reg_2);
                 self.mem_dest = self.registers.read(self.curr_inst.reg_1);
                 self.dest_is_mem = true;
@@ -178,7 +106,7 @@ impl Cpu {
                     self.mem_dest |= 0xFF00;
                 }
             }
-            AddrMode::RMR => {
+            AddrMode::R_MR => {
                 let mut addr = self.registers.read(self.curr_inst.reg_2);
                 if self.curr_inst.reg_2 == RegType::C {
                     addr |= 0xFF00;
@@ -187,39 +115,40 @@ impl Cpu {
                 self.fetched_data = bus.read(addr) as u16;
                 ctx.incr_cycle(1);
             }
-            AddrMode::RHLD => {
+            AddrMode::R_HLD => {
                 self.fetched_data = bus.read(self.registers.read(self.curr_inst.reg_2)) as u16;
                 ctx.incr_cycle(1);
                 self.registers.set(RegType::HL, self.registers.read(RegType::HL) - 1);
             }
-            AddrMode::RHLI => {
+            AddrMode::R_HLI => {
                 self.fetched_data = bus.read(self.registers.read(self.curr_inst.reg_2)) as u16;
                 ctx.incr_cycle(1);
                 self.registers.set(RegType::HL, self.registers.read(RegType::HL) + 1);
             }
-            AddrMode::HLDR => {
+            AddrMode::HLD_R => {
                 self.fetched_data = self.registers.read(self.curr_inst.reg_2);
                 self.mem_dest = self.registers.read(self.curr_inst.reg_1);
                 self.dest_is_mem = true;
                 self.registers.set(RegType::HL, self.registers.read(RegType::HL) - 1);
             }
-            AddrMode::HLIR => {
+            AddrMode::HLI_R => {
                 self.fetched_data = self.registers.read(self.curr_inst.reg_2);
                 self.mem_dest = self.registers.read(self.curr_inst.reg_1);
                 self.dest_is_mem = true;
                 self.registers.set(RegType::HL, self.registers.read(RegType::HL) + 1);
             }
-            AddrMode::RA8 => {
+            AddrMode::R_A8 => {
                 self.fetched_data = bus.read(self.registers.pc) as u16;
                 ctx.incr_cycle(1);
                 self.registers.pc += 1;
             }
-            AddrMode::A8R => {
+            AddrMode::A8_R => {
+                self.fetched_data = self.registers.read(self.curr_inst.reg_2);
                 self.mem_dest = bus.read(self.registers.pc) as u16 | 0xFF00;
                 self.dest_is_mem = true;
                 ctx.incr_cycle(1);
             }
-            AddrMode::HLSPR => {
+            AddrMode::HL_SP => {
                 self.fetched_data = bus.read(self.registers.pc) as u16;
                 ctx.incr_cycle(1);
                 self.registers.pc += 1;
@@ -229,7 +158,7 @@ impl Cpu {
                 ctx.incr_cycle(1);
                 self.registers.pc += 1;
             }
-            AddrMode::D16R | AddrMode::A16R => {
+            AddrMode::D16_R | AddrMode::A16_R => {
                 let low: u8 = bus.read(self.registers.pc);
                 ctx.incr_cycle(1);
 
@@ -242,20 +171,20 @@ impl Cpu {
                 self.registers.pc += 2;
                 self.fetched_data = self.registers.read(self.curr_inst.reg_2);
             }
-            AddrMode::MRD8 => {
+            AddrMode::MR_D8 => {
                 self.fetched_data = bus.read(self.registers.pc) as u16;
                 ctx.incr_cycle(1);
                 self.registers.pc += 1;
                 self.mem_dest = self.registers.read(self.curr_inst.reg_1);
                 self.dest_is_mem = true;
             }
-            AddrMode::MR => {
+            AddrMode::M_R => {
                 self.mem_dest = self.registers.read(self.curr_inst.reg_1);
                 self.dest_is_mem = true;
                 self.fetched_data = bus.read(self.registers.read(self.curr_inst.reg_1)) as u16;
                 ctx.incr_cycle(1);
             }
-            AddrMode::RA16 => {
+            AddrMode::R_A16 => {
                 let low: u8 = bus.read(self.registers.pc);
                 ctx.incr_cycle(1);
 
@@ -274,9 +203,9 @@ impl Cpu {
         }
     }
 
-    fn execute(&mut self, ctx: &mut MutexGuard<'_, EmuContext>) {
+    fn execute(&mut self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
         let mut process_instruction = cpu_proc(self.curr_inst.in_type);
-        process_instruction(self, ctx)
+        process_instruction(self, bus, ctx)
     }
 
     fn z_flag(&self) -> bool {

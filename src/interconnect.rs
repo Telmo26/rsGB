@@ -1,7 +1,10 @@
 use crate::{
-    cart::Cartridge, 
-    NO_IMPL,
+    cart::Cartridge,
 };
+
+mod ram;
+
+use ram::*;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
@@ -19,11 +22,12 @@ use crate::{
 
 pub struct Interconnect {
     cart: Option<Cartridge>,
+    ram: RAM,
 }
 
 impl Interconnect {
     pub fn new() -> Interconnect {
-        Interconnect { cart: None}
+        Interconnect { cart: None, ram: RAM::new() }
     }
 
     pub fn set_cart(&mut self, cart: Cartridge) {
@@ -33,17 +37,82 @@ impl Interconnect {
     pub fn read(&self, address: u16) -> u8 {
         // ROM only for now
         match address {
-            0x0000..=0x3FFF => self.cart.as_ref().unwrap().read(address),
-            _ => NO_IMPL!(),
+            // ROM Data
+            0x0000..0x8000 => self.cart.as_ref().unwrap().read(address),
+
+            // Char/Map Data
+            0x8000..0xA000 => panic!("Read at address {address:X} not implemented!"),
+
+            // Cartridge RAM
+            0xA000..0xC000 => self.cart.as_ref().unwrap().read(address),
+
+            // WRAM (Working RAM)
+            0xC000..0xE000 => self.ram.wram_read(address),
+
+            // Reserved echo RAM
+            0xE000..0xFE00 => 0,
+
+            // OAM
+            0xFE00..0xFEA0 => panic!("Read at address {address:X} not implemented!"),
+
+            // Reserved - Unusable
+            0xFEA0..0xFF00 => 0,
+
+            // IO Registers
+            0xFF00..0xFF80 => panic!("Read at address {address:X} not implemented!"),
+
+            // HRAM (High RAM) / Zero Page
+            0xFF80..0xFFFF => self.ram.hram_read(address),
+
+            // CPU Enable Register
+            0xFFFF => panic!("Read at address {address:X} not implemented!"),
         }
+    }
+
+    pub fn read16(&self, address: u16) -> u16 {
+        let low: u16 = self.read(address) as u16;
+        let high: u16 = self.read(address + 1) as u16;
+
+        high << 8 | low
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
         // ROM only for now
         match address {
-            0x0000..=0x3FFF => self.cart.as_mut().unwrap().write(address, value),
-            _ => NO_IMPL!(),
+            0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),
+
+           // Char/Map Data
+            0x8000..0xA000 => panic!("Write at address {address:X} not implemented!"),
+
+            // Cartridge RAM
+            0xA000..0xC000 => self.cart.as_mut().unwrap().write(address, value),
+
+            // WRAM (Working RAM)
+            0xC000..0xE000 => self.ram.wram_write(address, value),
+
+            // Reserved echo RAM
+            0xE000..0xFE00 => (),
+
+            // OAM
+            0xFE00..0xFEA0 => panic!("Write at address {address:X} not implemented!"),
+
+            // Reserved - Unusable
+            0xFEA0..0xFF00 => (),
+
+            // IO Registers
+            0xFF00..0xFF80 => panic!("Write at address {address:X} not implemented!"),
+
+            // HRAM (High RAM) / Zero Page
+            0xFF80..0xFFFF => self.ram.hram_write(address, value),
+
+            // CPU Enable Register
+            0xFFFF => panic!("Write at address {address:X} not implemented!"),
         }
+    }
+
+    pub fn write16(&mut self, address: u16, value: u16) {
+        self.write(address, value as u8);
+        self.write(address + 1, (value >> 8) as u8);
     }
 }
 

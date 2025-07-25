@@ -1,8 +1,7 @@
 #[macro_export]
 macro_rules! NO_IMPL {
     () => {{
-        eprintln!("NOT YET IMPLEMENTED");
-        std::process::exit(-5);
+        panic!("NOT YET IMPLEMENTED");
     }};
 }
 
