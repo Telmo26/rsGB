@@ -11,6 +11,7 @@ impl CPU {
             InType::JP => proc_jp(self, bus, ctx),
             InType::JR => proc_jr(self, bus, ctx),
             InType::CALL => proc_call(self, bus, ctx),
+            InType::RST => proc_rst(self, bus, ctx),
             InType::RET => proc_ret(self, bus, ctx),
             InType::RETI => proc_reti(self, bus, ctx),
             InType::DI => proc_di(self, bus, ctx),
@@ -88,6 +89,10 @@ fn proc_call(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     goto_addr(cpu, bus, ctx, cpu.fetched_data, true);
 }
 
+fn proc_rst(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
+    goto_addr(cpu, bus, ctx, cpu.curr_inst.param as u16, true);
+}
+
 fn proc_ret(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     if cpu.curr_inst.cond != CondType::NONE {
         ctx.incr_cycle();
@@ -104,8 +109,6 @@ fn proc_ret(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
 
         ctx.incr_cycle();
     }
-
-    goto_addr(cpu, bus, ctx, cpu.fetched_data, false);
 }
 
 fn proc_reti(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
@@ -129,7 +132,7 @@ fn proc_pop(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     if cpu.curr_inst.reg_1 == RegType::AF {
         cpu.registers.set(RegType::AF, data & 0xFFF0);
     } else {
-        cpu.registers.set(RegType::AF, data);
+        cpu.registers.set(cpu.curr_inst.reg_1, data);
     }
 }
 

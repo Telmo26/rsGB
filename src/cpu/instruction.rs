@@ -244,12 +244,14 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0xC3] = Some(Instruction { in_type: JP, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xC4] = Some(Instruction { in_type: CALL, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::NZ, param: 0 });
     inst[0xC5] = Some(Instruction { in_type: PUSH, mode: IMP, reg_1: BC, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0xC7] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x00 });
 
     inst[0xC8] = Some(Instruction { in_type: RET, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::Z, param: 0 });
     inst[0xC9] = Some(Instruction { in_type: RET, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xCA] = Some(Instruction { in_type: JP, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::Z, param: 0 });
     inst[0xCC] = Some(Instruction { in_type: CALL, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::Z, param: 0 });
     inst[0xCD] = Some(Instruction { in_type: CALL, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0xCF] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x08 });
     
     // --- 0xD0 - 0xDF ---
     inst[0xD0] = Some(Instruction { in_type: RET, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NC, param: 0 });
@@ -257,20 +259,24 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0xD2] = Some(Instruction { in_type: JP, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::NC, param: 0 });
     inst[0xD4] = Some(Instruction { in_type: CALL, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::NC, param: 0 });
     inst[0xD5] = Some(Instruction { in_type: PUSH, mode: IMP, reg_1: DE, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0xD7] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x10 });
 
     inst[0xD8] = Some(Instruction { in_type: RET, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::C, param: 0 });
     inst[0xD9] = Some(Instruction { in_type: RETI, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xDA] = Some(Instruction { in_type: JP, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::C, param: 0 });
     inst[0xDC] = Some(Instruction { in_type: CALL, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::C, param: 0 });
+    inst[0xDF] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x18 });
 
     // --- 0xE0 - 0xEF ---
     inst[0xE0] = Some(Instruction { in_type: LDH, mode: A8_R, reg_1: NONE, reg_2: A, cond: CondType::NONE, param: 0 });
     inst[0xE1] = Some(Instruction { in_type: POP, mode: IMP, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xE2] = Some(Instruction { in_type: LDH, mode: MR_R, reg_1: A, reg_2: C, cond: CondType::NONE, param: 0 });
     inst[0xE5] = Some(Instruction { in_type: PUSH, mode: IMP, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });    
-    
+    inst[0xE7] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x20 });
+
     inst[0xE9] = Some(Instruction { in_type: JP, mode: MR, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xEA] = Some(Instruction { in_type: LD, mode: A16_R, reg_1: NONE, reg_2: A, cond: CondType::NONE, param: 0 });
+    inst[0xEF] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x28 });
 
     // --- 0xF0 - 0xFF ---
     inst[0xF0] = Some(Instruction { in_type: LDH, mode: R_A8, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
@@ -278,8 +284,10 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0xF2] = Some(Instruction { in_type: LDH, mode: R_MR, reg_1: A, reg_2: C, cond: CondType::NONE, param: 0 });
     inst[0xF3] = Some(Instruction { in_type: DI, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xF5] = Some(Instruction { in_type: PUSH, mode: IMP, reg_1: AF, reg_2: NONE, cond: CondType::NONE, param: 0 });    
-    
+    inst[0xF7] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x30 });
+
     inst[0xFA] = Some(Instruction { in_type: LD, mode: R_A16, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0xFF] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x38 });
 
     inst
 };
