@@ -17,13 +17,16 @@ impl CPU {
             InType::DI => proc_di(self, bus, ctx),
             InType::POP => proc_pop(self, bus, ctx),
             InType::PUSH => proc_push(self, bus, ctx),
-            InType::XOR => proc_xor(self, bus, ctx),
             InType::INC => proc_inc(self, bus, ctx),
             InType::DEC => proc_dec(self, bus, ctx),
             InType::ADD => proc_add(self, bus, ctx),
             InType::ADC => proc_adc(self, bus, ctx),
             InType::SUB => proc_sub(self, bus, ctx),
             InType::SBC => proc_sbc(self, bus, ctx),
+            InType::AND => proc_and(self, bus, ctx),
+            InType::XOR => proc_xor(self, bus, ctx),
+            InType::OR => proc_or(self, bus, ctx),
+            InType::CP => proc_cp(self, bus, ctx),
             x => panic!("Instruction {x:?} not implemented")
         }
     }
@@ -154,12 +157,6 @@ fn proc_push(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     ctx.incr_cycle();
 }
 
-fn proc_xor(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
-    cpu.registers.a ^= (cpu.fetched_data & 0xFF) as u8;
-    let z_flag = if cpu.registers.a == 0 { 1 } else { 0 };
-    cpu.set_flags(z_flag, 0, 0, 0)
-}
-
 fn proc_inc(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     let mut val = cpu.fetched_data;
     
@@ -262,4 +259,26 @@ fn proc_sbc(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
 
     cpu.registers.a = value;
     cpu.set_flags((value == 0) as u8, 1, h as u8, (overflow1 || overflow2) as u8);
+}
+
+fn proc_and(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    cpu.registers.a &= cpu.fetched_data as u8;
+    cpu.set_flags((cpu.registers.a == 0) as u8, 0, 1, 0);
+}
+
+fn proc_xor(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    cpu.registers.a ^= (cpu.fetched_data & 0xFF) as u8;
+    cpu.set_flags((cpu.registers.a == 0) as u8, 0, 0, 0);
+}
+
+fn proc_or(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    cpu.registers.a |= (cpu.fetched_data & 0xFF) as u8;
+    cpu.set_flags((cpu.registers.a == 0) as u8, 0, 0, 0);
+}
+
+fn proc_cp(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    let (n, overflow) = cpu.registers.a.overflowing_sub(cpu.fetched_data as u8);
+    let h = (cpu.registers.a & 0xF) < (cpu.fetched_data as u8 & 0xF);
+
+    cpu.set_flags((n == 0) as u8, 1, h as u8, overflow as u8);
 }

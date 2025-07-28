@@ -50,7 +50,7 @@ impl CPU {
     pub fn step(&mut self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) -> bool {
         
         if !self.halted {
-            self.fetch_instruction(bus);
+            self.fetch_instruction(bus, ctx);
             self.fetch_data(bus, ctx);
             self.execute(bus, ctx, self.curr_inst.in_type);
         }
@@ -58,12 +58,21 @@ impl CPU {
         true
     }
 
-    fn fetch_instruction(&mut self, bus: &mut Interconnect) {
+    fn fetch_instruction(&mut self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
         self.curr_opcode = bus.read(self.registers.pc);
         self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
+        let flags = format!(
+            "Flags : {}{}{}{}",
+            if self.registers.f & 1 << 7 != 0 { 'Z' } else { '-' },
+            if self.registers.f & 1 << 6 != 0 { 'N' } else { '-' },
+            if self.registers.f & 1 << 5 != 0 { 'H' } else { '-' },
+            if self.registers.f & 1 << 4 != 0 { 'C' } else { '-' },
+        );
+
         let inst_part = format!(
-            "PC: {0:04X} \t {1:?} {2:?} ({3:02X} {4:02X} {5:02X})",
+            "Ticks: {:08X} PC: {:04X} \t {:?} {:?} ({:02X} {:02X} {:02X})",
+            ctx.ticks,
             self.registers.pc, 
             self.curr_inst.in_type, 
             self.curr_inst.mode, 
@@ -73,7 +82,7 @@ impl CPU {
         );
 
         let reg_part = format!(
-            "A: {0:02X} BC: {1:02X}{2:02X} DE: {3:02X}{4:02X} HL: {5:02X}{6:02X} SP: {7:04X}", 
+            "A: {:02X} BC: {:02X}{:02X} DE: {:02X}{:02X} HL: {:02X}{:02X} SP: {:04X}", 
             self.registers.a, 
             self.registers.b, self.registers.c,
             self.registers.d, self.registers.e, 
@@ -82,6 +91,7 @@ impl CPU {
         );
 
         println!("{:<35} {}", inst_part, reg_part);
+        println!("{:<50} {}", "", flags);
 
         self.registers.pc += 1;
     }
