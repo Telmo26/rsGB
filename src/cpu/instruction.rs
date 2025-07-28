@@ -172,7 +172,7 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0x3A] = Some(Instruction { in_type: LD, mode: R_MR, reg_1: A, reg_2: HL, cond: CondType::NONE, param: 0 });
     inst[0x3B] = Some(Instruction { in_type: DEC, mode: R, reg_1: SP, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x3C] = Some(Instruction { in_type: INC, mode: R, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
-    inst[0x3D] = Some(Instruction { in_type: INC, mode: A, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0x3D] = Some(Instruction { in_type: INC, mode: R, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x3E] = Some(Instruction { in_type: LD, mode: R_D8, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
 
     // --- 0x40 - 0x4F ---
