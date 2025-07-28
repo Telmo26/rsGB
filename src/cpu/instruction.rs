@@ -45,6 +45,12 @@ pub enum RegType {
     PC,
 }
 
+impl RegType {
+    pub fn is_16bit(&self) -> bool {
+        *self >= RegType::AF
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum InType {
     NOP,
@@ -153,7 +159,7 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0x26] = Some(Instruction { in_type: LD, mode: R_D8, reg_1: H, reg_2: NONE, cond: CondType::NONE, param: 0 });
     
     inst[0x28] = Some(Instruction { in_type: JR, mode: D8, reg_1: NONE, reg_2: NONE, cond: CondType::Z, param: 0 });
-    inst[0x2A] = Some(Instruction { in_type: LD, mode: R_MR, reg_1: A, reg_2: HL, cond: CondType::NONE, param: 0 });
+    inst[0x2A] = Some(Instruction { in_type: LD, mode: R_HLI, reg_1: A, reg_2: HL, cond: CondType::NONE, param: 0 });
     inst[0x2B] = Some(Instruction { in_type: DEC, mode: R, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x2C] = Some(Instruction { in_type: INC, mode: R, reg_1: L, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x2D] = Some(Instruction { in_type: DEC, mode: R, reg_1: L, reg_2: NONE, cond: CondType::NONE, param: 0 });
@@ -169,7 +175,7 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0x36] = Some(Instruction { in_type: LD, mode: MR_D8, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
     
     inst[0x38] = Some(Instruction { in_type: JR, mode: D8, reg_1: NONE, reg_2: NONE, cond: CondType::C, param: 0 });
-    inst[0x3A] = Some(Instruction { in_type: LD, mode: R_MR, reg_1: A, reg_2: HL, cond: CondType::NONE, param: 0 });
+    inst[0x3A] = Some(Instruction { in_type: LD, mode: R_HLD, reg_1: A, reg_2: HL, cond: CondType::NONE, param: 0 });
     inst[0x3B] = Some(Instruction { in_type: DEC, mode: R, reg_1: SP, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x3C] = Some(Instruction { in_type: INC, mode: R, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x3D] = Some(Instruction { in_type: INC, mode: R, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });

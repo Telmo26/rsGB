@@ -1,6 +1,6 @@
 use super::{instruction::*, CPU};
 
-use crate::{Interconnect, EmuContext};
+use crate::{utils::BIT_IGNORE, EmuContext, Interconnect};
 
 impl CPU {
     pub fn execute(&mut self, bus: &mut Interconnect, ctx: &mut EmuContext, instruction: InType) { // -> impl FnMut(&mut CPU, &mut Interconnect, &mut EmuContext) {
@@ -18,6 +18,8 @@ impl CPU {
             InType::POP => proc_pop(self, bus, ctx),
             InType::PUSH => proc_push(self, bus, ctx),
             InType::XOR => proc_xor(self, bus, ctx),
+            InType::INC => proc_inc(self, bus, ctx),
+            InType::DEC => proc_dec(self, bus, ctx),
             x => panic!("Instruction {x:?} not implemented")
         }
     }
@@ -25,7 +27,7 @@ impl CPU {
 
 fn proc_nop(_cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {}
 
-fn proc_ld(cpu: &mut CPU, bus: &mut Interconnect, _ctx: &mut EmuContext) {
+fn proc_ld(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     if cpu.curr_inst.mode == AddrMode::HL_SP {
         // Check if overflow from bit 3
         let hflag: bool = ((cpu.registers.read(cpu.curr_inst.reg_2) as u8 & 0xF) + 
@@ -39,8 +41,8 @@ fn proc_ld(cpu: &mut CPU, bus: &mut Interconnect, _ctx: &mut EmuContext) {
         cpu.registers.set(cpu.curr_inst.reg_1,
             cpu.registers.read(cpu.curr_inst.reg_2) + cpu.fetched_data);
     } else if cpu.dest_is_mem {
-        if cpu.curr_inst.reg_2 >= RegType::AF {
-            // If 16-bit register
+        if cpu.curr_inst.reg_2.is_16bit() {
+            ctx.incr_cycle();
             bus.write16(cpu.mem_dest, cpu.fetched_data);
         } else {
             bus.write(cpu.mem_dest, cpu.fetched_data as u8);
@@ -152,4 +154,44 @@ fn proc_xor(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
     cpu.registers.a ^= (cpu.fetched_data & 0xFF) as u8;
     let z_flag = if cpu.registers.a == 0 { 1 } else { 0 };
     cpu.set_flags(z_flag, 0, 0, 0)
+}
+
+fn proc_inc(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
+    let mut val = cpu.fetched_data;
+    
+    if cpu.curr_inst.reg_1.is_16bit() {
+        ctx.incr_cycle();
+    }
+
+    if cpu.dest_is_mem {
+        let val = (cpu.fetched_data as u8).wrapping_add(1);
+        bus.write(cpu.registers.read(cpu.curr_inst.reg_1), val);
+    } else {
+        val = val.wrapping_add(1);
+        cpu.registers.set(cpu.curr_inst.reg_1, val);
+    }
+
+    if !cpu.curr_inst.reg_1.is_16bit() {
+        cpu.set_flags(if val == 0 { 1 } else { 0 }, 0, if (val & 0x0F) == 0 {1} else {0}, BIT_IGNORE);
+    }
+}
+
+fn proc_dec(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
+    let mut val = cpu.fetched_data;
+    
+    if cpu.curr_inst.reg_1.is_16bit() {
+        ctx.incr_cycle();
+    }
+
+    if cpu.dest_is_mem {
+        let val = (cpu.fetched_data as u8).wrapping_sub(1);
+        bus.write(cpu.registers.read(cpu.curr_inst.reg_1), val);
+    } else {
+        val = val.wrapping_sub(1);
+        cpu.registers.set(cpu.curr_inst.reg_1, val);
+    }
+
+    if !cpu.curr_inst.reg_1.is_16bit() {
+        cpu.set_flags((val == 0) as u8, 1, ((val & 0x0F) == 0xF) as u8, BIT_IGNORE);
+    }
 }
