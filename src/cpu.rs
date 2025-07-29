@@ -25,8 +25,10 @@ pub struct CPU {
     halted: bool,
     stepping: bool,
 
-    en_master_interrupt: bool,
+    int_master_enabled: bool,
     enabling_ime: bool,
+
+    int_flags: u8,
 }
 
 impl CPU {
@@ -44,8 +46,10 @@ impl CPU {
             halted: false,
             stepping: false,
 
-            en_master_interrupt: true,
+            int_master_enabled: true,
             enabling_ime: false,
+
+            int_flags: 0,
         }
     }
 
@@ -55,8 +59,21 @@ impl CPU {
             self.fetch_instruction(bus, ctx);
             self.fetch_data(bus, ctx);
             self.execute(bus, ctx, self.curr_inst.in_type);
+        } else {
+            ctx.incr_cycle();
+            if self.int_flags != 0 {
+                self.halted = false;
+            }
         }
 
+        if self.int_master_enabled {
+            // TODO self.handle_interrupts();
+            self.enabling_ime = false;
+        }
+
+        if self.enabling_ime {
+            self.int_master_enabled = true;
+        }
         true
     }
 
@@ -243,8 +260,6 @@ impl CPU {
         (self.registers.f & 0b00010000) >> 7 == 1
     }
 
-    
-
     fn check_cond(&self) -> bool {
         let z = self.z_flag();
         let c = self.c_flag();
@@ -274,5 +289,13 @@ impl CPU {
         if c != BIT_IGNORE {
             bit_set(&mut self.registers.f, 4, c == 1);
         }
+    }
+
+    fn get_int_flags(&self) -> u8 {
+        self.int_flags
+    }
+
+    fn set_int_flags(&mut self, value: u8) {
+        self.int_flags = value;
     }
 }

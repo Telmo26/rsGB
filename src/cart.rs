@@ -316,7 +316,7 @@ impl Cartridge {
 
     pub fn write(&self, address: u16, value: u8) {
         //for now, ROM only...
-        NO_IMPL!()
+        println!("Writing to cart not implemented!")
     }
 }
 

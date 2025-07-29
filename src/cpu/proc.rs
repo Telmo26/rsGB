@@ -146,12 +146,12 @@ fn proc_ret(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
 }
 
 fn proc_reti(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
-    cpu.en_master_interrupt = true;
+    cpu.int_master_enabled = true;
     proc_ret(cpu, bus, ctx);
 }
 
 fn proc_di(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
-    cpu.en_master_interrupt = false;
+    cpu.int_master_enabled = false;
 }
 
 fn proc_pop(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {

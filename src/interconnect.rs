@@ -42,7 +42,7 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_ref().unwrap().read(address),
 
             // Char/Map Data
-            0x8000..0xA000 => panic!("Read at address {address:X} not implemented!"),
+            0x8000..0xA000 => 0, // panic!("Read at address {address:X} not implemented!"),
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_ref().unwrap().read(address),
@@ -54,13 +54,13 @@ impl Interconnect {
             0xE000..0xFE00 => 0,
 
             // OAM
-            0xFE00..0xFEA0 => panic!("Read at address {address:X} not implemented!"),
+            0xFE00..0xFEA0 => 0, // panic!("Read at address {address:X} not implemented!"),
 
             // Reserved - Unusable
             0xFEA0..0xFF00 => 0,
 
             // I/O Registers
-            0xFF00..0xFF80 => panic!("Read at address {address:X} not implemented!"),
+            0xFF00..0xFF80 => 0, // panic!("Read at address {address:X} not implemented!"),
 
             // HRAM (High RAM) / Zero Page
             0xFF80..0xFFFF => self.ram.hram_read(address),
@@ -83,7 +83,7 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),
 
            // Char/Map Data
-            0x8000..0xA000 => panic!("Write at address {address:X} not implemented!"),
+            0x8000..0xA000 => println!("Write at address {address:X} not implemented!"),
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_mut().unwrap().write(address, value),
@@ -95,7 +95,7 @@ impl Interconnect {
             0xE000..0xFE00 => (),
 
             // OAM
-            0xFE00..0xFEA0 => panic!("Write at address {address:X} not implemented!"),
+            0xFE00..0xFEA0 => println!("Write at address {address:X} not implemented!"),
 
             // Reserved - Unusable
             0xFEA0..0xFF00 => (),
