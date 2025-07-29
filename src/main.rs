@@ -1,4 +1,4 @@
-use std::{env, sync::{Arc, Mutex, MutexGuard}, thread};
+use std::{env, sync::{Arc, Mutex}, thread};
 
 use rs_gb::{run, EmuContext};
 
