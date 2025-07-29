@@ -27,15 +27,17 @@ use crate::{
 
 */
 
-struct EmuContext {
+pub struct EmuContext {
+    file_path: String,
     paused: bool,
     running: bool,
     ticks: u64,
 }
 
 impl EmuContext {
-    fn new() -> EmuContext {
+    pub fn new(path: &str) -> EmuContext {
         EmuContext {
+            file_path: path.to_string(),
             paused: false,
             running: false,
             ticks: 0
@@ -48,6 +50,10 @@ impl EmuContext {
 
     fn start(&mut self) {
         self.running = true;
+    }
+
+    pub fn stop(&mut self) {
+        self.running = false;
     }
 
     fn is_running(&self) -> bool {
@@ -80,43 +86,40 @@ impl Emulator {
         Ok(())
     }
 
-    fn step(&mut self, mut ctx: MutexGuard<'_, EmuContext>) -> bool {
-        self.cpu.step(&mut self.bus, &mut ctx)
+    fn step(&mut self, ctx: &mut MutexGuard<'_, EmuContext>) -> bool {
+        self.cpu.step(&mut self.bus, ctx)
     }
 }
 
-pub fn run(args: Vec<String>) {
-    if args.len() < 2 {
-        println!("Usage: rsgb <rom_file>");
-        return;
-    }
-
-    let ctx = Arc::new(Mutex::new(EmuContext::new()));
-
+pub fn run(context: Arc<Mutex<EmuContext>>) {
+    let ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
     let mut emulator = Emulator::new();
 
-    emulator.load_cart(&args[1])
-        .expect(&format!("Failed to load the ROM file: {}", args[1]));
+    emulator.load_cart(&ctx.file_path)
+        .expect(&format!("Failed to load the ROM file: {}", &ctx.file_path));
 
     println!("Cart loaded...");
 
-    ctx.lock().unwrap() // This should never fail, it is the first call
-        .start();
+    start_emulation(ctx);
 
     loop {
-        let context = ctx.lock().unwrap();
-        if !context.is_running() {
+        let mut ctx = context.lock().unwrap();
+        if !ctx.is_running() {
             break
         }
 
-        if context.is_paused() {
+        if ctx.is_paused() {
             thread::sleep(Duration::from_millis(10));
             continue;
         }
 
-        if !emulator.step(context) {
+        if !emulator.step(&mut ctx) {
             println!("CPU Stopped");
             break;
         }
     }
+}
+
+fn start_emulation(mut ctx: MutexGuard<'_, EmuContext>) {
+    ctx.start();
 }
