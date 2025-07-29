@@ -13,7 +13,7 @@ fn main() {
         println!("Usage: rsgb <rom_file>");
         return;
     }
-    let context = Arc::new(Mutex::new(EmuContext::new(&args[1])));
+    let context = Arc::new(Mutex::new(EmuContext::new(&args[1], true)));
     
     let context1 = Arc::clone(&context);
     let emulator_handle = thread::spawn(move || 

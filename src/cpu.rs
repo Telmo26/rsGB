@@ -58,8 +58,13 @@ impl CPU {
     pub fn step(&mut self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) -> bool {
         
         if !self.halted {
-            self.fetch_instruction(bus, ctx);
+            self.fetch_instruction(bus);
             self.fetch_data(bus, ctx);
+
+            if ctx.debug {
+                self.show_instruction(bus, ctx);
+            }
+
             self.execute(bus, ctx, self.curr_inst.in_type);
         } else {
             ctx.incr_cycle();
@@ -79,10 +84,7 @@ impl CPU {
         true
     }
 
-    fn fetch_instruction(&mut self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
-        self.curr_opcode = bus.read(self.registers.pc);
-        self.curr_inst = Instruction::from_opcode(self.curr_opcode);
-
+    fn show_instruction(&self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
         let flags = format!(
             "Flags : {}{}{}{}",
             if self.registers.f & 1 << 7 != 0 { 'Z' } else { '-' },
@@ -92,11 +94,10 @@ impl CPU {
         );
 
         let inst_part = format!(
-            "Ticks: {:08X} PC: {:04X} \t {:?} {:?} ({:02X} {:02X} {:02X})",
+            "Ticks: {:08X} PC: {:04X} \t {} ({:02X} {:02X} {:02X})",
             ctx.ticks,
             self.registers.pc, 
-            self.curr_inst.in_type, 
-            self.curr_inst.mode, 
+            self.curr_inst.to_str(self), 
             self.curr_opcode, 
             bus.read(self.registers.pc + 1), 
             bus.read(self.registers.pc+ 2),
@@ -112,7 +113,12 @@ impl CPU {
         );
 
         println!("{:<35} {}", inst_part, reg_part);
-        println!("{:<50} {}", "", flags);
+        println!("{:<32} {}", "", flags);
+    }
+
+    fn fetch_instruction(&mut self, bus: &mut Interconnect) {
+        self.curr_opcode = bus.read(self.registers.pc);
+        self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
         self.registers.pc += 1;
     }

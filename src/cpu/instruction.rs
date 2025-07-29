@@ -1,4 +1,4 @@
-use crate::{NO_IMPL};
+use crate::cpu::CPU;
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -389,7 +389,7 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0xE7] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x20 });
 
     inst[0xE8] = Some(Instruction { in_type: ADD, mode: R_D8, reg_1: SP, reg_2: NONE, cond: CondType::NONE, param: 0 });
-    inst[0xE9] = Some(Instruction { in_type: JP, mode: MR, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0xE9] = Some(Instruction { in_type: JP, mode: R, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xEA] = Some(Instruction { in_type: LD, mode: A16_R, reg_1: NONE, reg_2: A, cond: CondType::NONE, param: 0 });
     inst[0xEE] = Some(Instruction { in_type: XOR, mode: R_D8, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xEF] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x28 });
@@ -427,5 +427,30 @@ impl Instruction {
     pub fn from_opcode(opcode: u8) -> Instruction {
         INSTRUCTIONS[opcode as usize]
             .expect(&format!("Opcode {opcode:X} not implemented!"))
+    }
+
+    pub fn to_str(&self, cpu: &CPU) -> String {
+        use AddrMode::*;
+        match self.mode {
+            IMP => format!("{:?}", self.in_type),
+            R_D16 | R_A16 => format!("{:?} {:?}, {:04X}", self.in_type, self.reg_1, cpu.fetched_data),
+            R_R => format!("{:?} {:?}, {:?}", self.in_type, self.reg_1, self.reg_2),
+            MR_R => format!("{:?} ({:?}), {:?}", self.in_type, self.reg_1, self.reg_2),
+            R => format!("{:?} {:?}", self.in_type, self.reg_1),
+            R_D8 | R_A8 => format!("{:?} {:?}, {:02X}", self.in_type, self.reg_1, cpu.fetched_data),
+            R_MR => format!("{:?} {:?}, ({:?})", self.in_type, self.reg_1, self.reg_2),
+            R_HLI => format!("{:?} {:?}, ({}+)", self.in_type, self.reg_1, cpu.fetched_data),
+            R_HLD => format!("{:?} {:?}, ({}-)", self.in_type, self.reg_1, cpu.fetched_data),
+            HLI_R => format!("{:?} ({:?}+), {:?}", self.in_type, self.reg_1, self.reg_2),
+            HLD_R => format!("{:?} ({:?}-), {:?}", self.in_type, self.reg_1, self.reg_2),
+            A8_R => format!("{:?} ({:02X}), {:?}", self.in_type, cpu.fetched_data, self.reg_2),
+            HL_SP => format!("{:?} {:?}, SP+{}", self.in_type, self.reg_1, cpu.fetched_data),
+            D16 => format!("{:?} {:04X}", self.in_type, cpu.fetched_data),
+            D8 => format!("{:?} {:02X}", self.in_type, cpu.fetched_data),
+            D16_R => format!("{:?} {:04X}, {:?}", self.in_type, cpu.fetched_data, self.reg_2),
+            MR_D8 => format!("{:?} ({:?}), {:02X}", self.in_type, self.reg_1, cpu.fetched_data),
+            MR => format!("{:?} ({:?})", self.in_type, self.reg_1),
+            A16_R => format!("{:?} ({:04X}), {:?}", self.in_type, cpu.fetched_data, self.reg_2),
+        }
     }
 }

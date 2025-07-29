@@ -29,15 +29,19 @@ use crate::{
 
 pub struct EmuContext {
     file_path: String,
+
+    debug: bool,
     paused: bool,
     running: bool,
     ticks: u64,
 }
 
 impl EmuContext {
-    pub fn new(path: &str) -> EmuContext {
+    pub fn new(path: &str, debug: bool) -> EmuContext {
         EmuContext {
             file_path: path.to_string(),
+
+            debug,
             paused: false,
             running: false,
             ticks: 0
