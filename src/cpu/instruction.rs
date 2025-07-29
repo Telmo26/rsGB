@@ -377,7 +377,7 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0xD9] = Some(Instruction { in_type: RETI, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xDA] = Some(Instruction { in_type: JP, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::C, param: 0 });
     inst[0xDC] = Some(Instruction { in_type: CALL, mode: D16, reg_1: NONE, reg_2: NONE, cond: CondType::C, param: 0 });
-    inst[0xD6] = Some(Instruction { in_type: ADC, mode: R_D8, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0xDE] = Some(Instruction { in_type: SBC, mode: R_D8, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0xDF] = Some(Instruction { in_type: RST, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0x18 });
 
     // --- 0xE0 - 0xEF ---
