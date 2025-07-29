@@ -164,7 +164,8 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0x24] = Some(Instruction { in_type: INC, mode: R, reg_1: H, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x25] = Some(Instruction { in_type: DEC, mode: R, reg_1: H, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x26] = Some(Instruction { in_type: LD, mode: R_D8, reg_1: H, reg_2: NONE, cond: CondType::NONE, param: 0 });
-    
+    inst[0x27] = Some(Instruction { in_type: DAA, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
+
     inst[0x28] = Some(Instruction { in_type: JR, mode: D8, reg_1: NONE, reg_2: NONE, cond: CondType::Z, param: 0 });
     inst[0x29] = Some(Instruction { in_type: ADD, mode: R_R, reg_1: HL, reg_2: HL, cond: CondType::NONE, param: 0 });
     inst[0x2A] = Some(Instruction { in_type: LD, mode: R_HLI, reg_1: A, reg_2: HL, cond: CondType::NONE, param: 0 });
@@ -172,6 +173,7 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0x2C] = Some(Instruction { in_type: INC, mode: R, reg_1: L, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x2D] = Some(Instruction { in_type: DEC, mode: R, reg_1: L, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x2E] = Some(Instruction { in_type: LD, mode: R_D8, reg_1: L, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0x2F] = Some(Instruction { in_type: CPL, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
 
     // --- 0x30 - 0x3F ---
     inst[0x30] = Some(Instruction { in_type: JR, mode: D8, reg_1: NONE, reg_2: NONE, cond: CondType::NC, param: 0 });
@@ -181,7 +183,8 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0x34] = Some(Instruction { in_type: INC, mode: MR, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x35] = Some(Instruction { in_type: DEC, mode: MR, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x36] = Some(Instruction { in_type: LD, mode: MR_D8, reg_1: HL, reg_2: NONE, cond: CondType::NONE, param: 0 });
-    
+    inst[0x37] = Some(Instruction { in_type: SCF, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
+
     inst[0x38] = Some(Instruction { in_type: JR, mode: D8, reg_1: NONE, reg_2: NONE, cond: CondType::C, param: 0 });
     inst[0x39] = Some(Instruction { in_type: ADD, mode: R_R, reg_1: HL, reg_2: SP, cond: CondType::NONE, param: 0 });
     inst[0x3A] = Some(Instruction { in_type: LD, mode: R_HLD, reg_1: A, reg_2: HL, cond: CondType::NONE, param: 0 });
@@ -189,6 +192,7 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0x3C] = Some(Instruction { in_type: INC, mode: R, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x3D] = Some(Instruction { in_type: INC, mode: R, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x3E] = Some(Instruction { in_type: LD, mode: R_D8, reg_1: A, reg_2: NONE, cond: CondType::NONE, param: 0 });
+    inst[0x3F] = Some(Instruction { in_type: CCF, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
 
     // --- 0x40 - 0x4F ---
     inst[0x40] = Some(Instruction { in_type: LD, mode: R_R, reg_1: B, reg_2: B, cond: CondType::NONE, param: 0 });
