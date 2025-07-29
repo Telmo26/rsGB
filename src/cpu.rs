@@ -25,7 +25,8 @@ pub struct CPU {
     halted: bool,
     stepping: bool,
 
-    en_master_interrupt: bool
+    en_master_interrupt: bool,
+    enabling_ime: bool,
 }
 
 impl CPU {
@@ -43,7 +44,8 @@ impl CPU {
             halted: false,
             stepping: false,
 
-            en_master_interrupt: true
+            en_master_interrupt: true,
+            enabling_ime: false,
         }
     }
 

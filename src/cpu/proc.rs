@@ -38,6 +38,7 @@ impl CPU {
             InType::SCF => proc_scf(self, bus, ctx),
             InType::CCF => proc_ccf(self, bus, ctx),
             InType::HALT => proc_halt(self, bus, ctx),
+            InType::EI => proc_ei(self, bus, ctx),
             x => panic!("Instruction {x:?} not implemented")
         }
     }
@@ -484,4 +485,8 @@ fn proc_ccf(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
 
 fn proc_halt(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
     cpu.halted = true;
+}
+
+fn proc_ei(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    cpu.enabling_ime = true;
 }
