@@ -3,8 +3,10 @@ use crate::{
 };
 
 mod ram;
+mod io;
 
 use ram::*;
+use io::*;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
@@ -23,12 +25,17 @@ use ram::*;
 pub struct Interconnect {
     cart: Option<Cartridge>,
     ram: RAM,
+    io: IO,
     ie_register: u8
 }
 
 impl Interconnect {
     pub fn new() -> Interconnect {
-        Interconnect { cart: None, ram: RAM::new(), ie_register: 0 }
+        Interconnect { 
+            cart: None,
+            ram: RAM::new(),
+            io: IO::new(),
+            ie_register: 0 }
     }
 
     pub fn set_cart(&mut self, cart: Cartridge) {
@@ -60,7 +67,7 @@ impl Interconnect {
             0xFEA0..0xFF00 => 0,
 
             // I/O Registers
-            0xFF00..0xFF80 => 0, // panic!("Read at address {address:X} not implemented!"),
+            0xFF00..0xFF80 => self.io.read(address), // panic!("Read at address {address:X} not implemented!"),
 
             // HRAM (High RAM) / Zero Page
             0xFF80..0xFFFF => self.ram.hram_read(address),
@@ -101,7 +108,7 @@ impl Interconnect {
             0xFEA0..0xFF00 => (),
 
             // I/O Registers
-            0xFF00..0xFF80 => println!("Write at address {address:X} not implemented!"),
+            0xFF00..0xFF80 => self.io.write(address, value),
 
             // HRAM (High RAM) / Zero Page
             0xFF80..0xFFFF => self.ram.hram_write(address, value),
