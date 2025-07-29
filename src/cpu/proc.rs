@@ -33,6 +33,10 @@ impl CPU {
             InType::RLA => proc_rla(self, bus, ctx),
             InType::RRA => proc_rra(self, bus, ctx),
             InType::STOP => proc_stop(self, bus, ctx),
+            InType::DAA => proc_daa(self, bus, ctx),
+            InType::CPL => proc_cpl(self, bus, ctx),
+            InType::SCF => proc_scf(self, bus, ctx),
+            InType::CCF => proc_ccf(self, bus, ctx),
             x => panic!("Instruction {x:?} not implemented")
         }
     }
@@ -439,4 +443,40 @@ fn proc_rra(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
 
 fn proc_stop(_cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
     panic!("STOP instruction received!")
+}
+
+fn proc_daa(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    let mut adjustment: u8 = 0;
+    let (n, h, c) = (cpu.n_flag(), cpu.h_flag(), cpu.c_flag());
+    let mut cflag: u8 = 0;
+    
+    if h || (!n && cpu.registers.a & 0xF > 0x9) {
+        adjustment += 0x6;
+    }
+    if c || (!n && cpu.registers.a > 0x99) {
+        adjustment += 0x60;
+        cflag = 1;
+    }
+
+    if n {
+        cpu.registers.a = cpu.registers.a.wrapping_sub(adjustment);
+    } else {
+        cpu.registers.a = cpu.registers.a.wrapping_add(adjustment);
+    }
+
+    cpu.set_flags((cpu.registers.a == 0) as u8, BIT_IGNORE, 0, cflag);
+}
+
+fn proc_cpl(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    cpu.registers.a = !cpu.registers.a;
+    cpu.set_flags(BIT_IGNORE, 1, 1, BIT_IGNORE);
+}
+
+fn proc_scf(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    cpu.set_flags(BIT_IGNORE, 0, 0, 1);
+}
+
+fn proc_ccf(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    let cflag = !cpu.c_flag() as u8;
+    cpu.set_flags(BIT_IGNORE, 0, 0, cflag);
 }

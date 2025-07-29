@@ -228,9 +228,19 @@ impl CPU {
         (self.registers.f & 0b10000000) >> 7 == 1
     }
 
+    fn n_flag(&self) -> bool {
+        (self.registers.f & 0b01000000) >> 7 == 1
+    }
+
+    fn h_flag(&self) -> bool {
+        (self.registers.f & 0b00100000) >> 7 == 1
+    }
+
     fn c_flag(&self) -> bool {
         (self.registers.f & 0b00010000) >> 7 == 1
     }
+
+    
 
     fn check_cond(&self) -> bool {
         let z = self.z_flag();
