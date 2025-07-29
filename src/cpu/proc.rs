@@ -1,6 +1,6 @@
 use super::{instruction::*, CPU};
 
-use crate::{utils::BIT_IGNORE, EmuContext, Interconnect};
+use crate::{utils::*, EmuContext, Interconnect};
 
 impl CPU {
     pub fn execute(&mut self, bus: &mut Interconnect, ctx: &mut EmuContext, instruction: InType) { // -> impl FnMut(&mut CPU, &mut Interconnect, &mut EmuContext) {
@@ -27,10 +27,25 @@ impl CPU {
             InType::XOR => proc_xor(self, bus, ctx),
             InType::OR => proc_or(self, bus, ctx),
             InType::CP => proc_cp(self, bus, ctx),
+            InType::CB => proc_cb(self, bus, ctx),
             x => panic!("Instruction {x:?} not implemented")
         }
     }
 }
+
+/* These are local helper functions and lookup tables */
+const REGISTER_LOOKUP: [RegType; 7] = [RegType::B, RegType::C, RegType::D, RegType::E, RegType::L, RegType::HL, RegType::A];
+
+fn decode_register(register: u8) -> Option<RegType>{
+    let reg = register as usize;
+    if reg >= REGISTER_LOOKUP.len() {
+        None
+    } else {
+        Some(REGISTER_LOOKUP[reg])
+    }
+}
+
+/* These are the processing functions */
 
 fn proc_nop(_cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {}
 
@@ -70,7 +85,6 @@ fn proc_ldh(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
 
     ctx.incr_cycle();
 }
-
 
 fn goto_addr(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext, address: u16, push_pc: bool) {
     if cpu.check_cond() {
@@ -281,4 +295,103 @@ fn proc_cp(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
     let h = (cpu.registers.a & 0xF) < (cpu.fetched_data as u8 & 0xF);
 
     cpu.set_flags((n == 0) as u8, 1, h as u8, overflow as u8);
+}
+
+fn proc_cb(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
+    let op = cpu.fetched_data as u8;
+    let register = decode_register(op & 0b111).unwrap();
+
+    let bit = (op >> 3) & 0b111;
+    let bit_op = (op >> 6) & 0b11;
+
+    let mut reg_val = cpu.registers.read_reg8(bus, register);
+
+    ctx.incr_cycle();
+
+    if register == RegType::HL {
+        ctx.incr_cycle();
+        ctx.incr_cycle();
+    }
+
+    match bit_op {
+        1 => cpu.set_flags(!(reg_val & (1 << bit)) as u8, 0, 1, BIT_IGNORE),
+        2 => {
+            reg_val &= !(1 << bit);
+            cpu.registers.set_reg8(bus, register, reg_val);
+        },
+        3 => {
+            reg_val |= (1 << bit);
+            cpu.registers.set_reg8(bus, register, reg_val);
+        },
+        _ => panic!("Invalid bit operator in CB")
+    }
+
+    let cflag = cpu.c_flag() as u8;
+
+    match bit {
+        0 => { // RLC
+            let mut set_c = false;
+            let mut value = (reg_val << 1) & 0xFF;
+
+            if reg_val & (1 << 7) != 0 {
+                value |= 1;
+                set_c = true
+            }
+            cpu.registers.set_reg8(bus, register, value);
+            cpu.set_flags((value == 0) as u8, 0, 0, set_c as u8);
+        },
+        1 => { // RRC
+            let old = reg_val;
+            reg_val >>= 1;
+            reg_val |= old << 7;
+
+            cpu.registers.set_reg8(bus, register, reg_val);
+            cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
+        }
+        2 => { // RL
+            let old = reg_val;
+            reg_val <<= 1;
+            reg_val |= cflag;
+
+            cpu.registers.set_reg8(bus, register, reg_val);
+            cpu.set_flags((reg_val == 0) as u8, 0, 0, (old & 0x80 != 0) as u8);
+        },
+        3 => { // RR
+            let old = reg_val;
+            reg_val >>= 1;
+            reg_val |= cflag << 7;
+
+            cpu.registers.set_reg8(bus, register, reg_val);
+            cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
+        },
+        4 => { // SLA,
+            let old = reg_val;
+            reg_val <<= 1;
+
+            cpu.registers.set_reg8(bus, register, reg_val);
+            cpu.set_flags((reg_val == 0) as u8, 0, 0, (old & 0x80 != 0) as u8);
+        }
+        5 => { // SRA,
+            let mut u = reg_val >> 1;
+
+            u |= (reg_val >> 7) << 7;
+
+            cpu.registers.set_reg8(bus, register, u);
+            cpu.set_flags((u == 0) as u8, 0, 0, reg_val & 1);
+        } 
+        6 => { // SWAP
+            reg_val = ((reg_val & 0xF0) >> 4) | ((reg_val & 0x0F) << 4);
+
+            cpu.registers.set_reg8(bus, register, reg_val);
+            cpu.set_flags((reg_val == 0) as u8, 0, 0, 0);
+        },
+        7 => { // SRL
+            let old = reg_val;
+            reg_val >>= 1;
+
+            cpu.registers.set_reg8(bus, register, reg_val);
+            cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
+        },
+        _ => panic!("Unknown CB-prefixed command {op}")
+    }
 }

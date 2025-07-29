@@ -224,11 +224,6 @@ impl CPU {
         }
     }
 
-    // fn execute(&mut self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
-    //     let mut process_instruction = cpu_proc(self.curr_inst.in_type);
-    //     process_instruction(self, bus, ctx)
-    // }
-
     fn z_flag(&self) -> bool {
         (self.registers.f & 0b10000000) >> 7 == 1
     }
