@@ -28,6 +28,10 @@ impl CPU {
             InType::OR => proc_or(self, bus, ctx),
             InType::CP => proc_cp(self, bus, ctx),
             InType::CB => proc_cb(self, bus, ctx),
+            InType::RLCA => proc_rlca(self, bus, ctx),
+            InType::RRCA => proc_rrca(self, bus, ctx),
+            InType::RLA => proc_rla(self, bus, ctx),
+            InType::RRA => proc_rra(self, bus, ctx),
             x => panic!("Instruction {x:?} not implemented")
         }
     }
@@ -394,4 +398,40 @@ fn proc_cb(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
         },
         _ => panic!("Unknown CB-prefixed command {op}")
     }
+}
+
+fn proc_rlca(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    let mut u = cpu.registers.a;
+    let c = (u >> 7) & 1; // MSB
+    u = u << 1 | c;
+    cpu.registers.a = u;
+
+    cpu.set_flags(0, 0, 0, c);
+}
+
+fn proc_rrca(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    let b = cpu.registers.a & 1; // LSB
+    cpu.registers.a >>= 1;
+    cpu.registers.a |= b << 7;
+    
+    cpu.set_flags(0, 0, 0, b);
+}
+
+fn proc_rla(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    let mut u = cpu.registers.a;
+    let cflag = cpu.c_flag() as u8;
+    let c = (u >> 7) & 1; // MSB
+
+    cpu.registers.a = u << 1 | cflag;
+    cpu.set_flags(0, 0, 0, c);
+}
+
+fn proc_rra(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    let carry = cpu.c_flag() as u8;
+    let c = cpu.registers.a & 1; // LSB
+
+    cpu.registers.a >>= 1;
+    cpu.registers.a |= carry << 7;
+
+    cpu.set_flags(0, 0, 0, c);
 }
