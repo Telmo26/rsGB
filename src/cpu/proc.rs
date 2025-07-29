@@ -37,6 +37,7 @@ impl CPU {
             InType::CPL => proc_cpl(self, bus, ctx),
             InType::SCF => proc_scf(self, bus, ctx),
             InType::CCF => proc_ccf(self, bus, ctx),
+            InType::HALT => proc_halt(self, bus, ctx),
             x => panic!("Instruction {x:?} not implemented")
         }
     }
@@ -479,4 +480,8 @@ fn proc_scf(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
 fn proc_ccf(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
     let cflag = !cpu.c_flag() as u8;
     cpu.set_flags(BIT_IGNORE, 0, 0, cflag);
+}
+
+fn proc_halt(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    cpu.halted = true;
 }

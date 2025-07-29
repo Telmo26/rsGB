@@ -254,7 +254,7 @@ pub static INSTRUCTIONS: [Option<Instruction>; 0x100] = {
     inst[0x73] = Some(Instruction { in_type: LD, mode: MR_R, reg_1: HL, reg_2: E, cond: CondType::NONE, param: 0 });
     inst[0x74] = Some(Instruction { in_type: LD, mode: MR_R, reg_1: HL, reg_2: H, cond: CondType::NONE, param: 0 });
     inst[0x75] = Some(Instruction { in_type: LD, mode: MR_R, reg_1: HL, reg_2: L, cond: CondType::NONE, param: 0 });
-    inst[0x76] = None; // HALT instruction
+    inst[0x76] = Some(Instruction { in_type: HALT, mode: IMP, reg_1: NONE, reg_2: NONE, cond: CondType::NONE, param: 0 });
     inst[0x77] = Some(Instruction { in_type: LD, mode: MR_R, reg_1: HL, reg_2: A, cond: CondType::NONE, param: 0 });
 
     inst[0x78] = Some(Instruction { in_type: LD, mode: R_R, reg_1: A, reg_2: B, cond: CondType::NONE, param: 0 });
