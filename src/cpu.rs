@@ -4,6 +4,7 @@ mod proc;
 mod instruction;
 mod registers;
 mod stack;
+mod interrupts;
 
 use crate::{
     EmuContext, Interconnect, utils::{bit_set, BIT_IGNORE}
@@ -11,6 +12,7 @@ use crate::{
 
 use instruction::*;
 use registers::*;
+use interrupts::*;
 
 pub struct CPU {
     registers: CpuRegisters,
@@ -67,7 +69,7 @@ impl CPU {
         }
 
         if self.int_master_enabled {
-            // TODO self.handle_interrupts();
+            self.handle_interrupts(bus);
             self.enabling_ime = false;
         }
 

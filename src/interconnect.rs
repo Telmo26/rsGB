@@ -115,5 +115,9 @@ impl Interconnect {
         self.write(address, value as u8);
         self.write(address + 1, (value >> 8) as u8);
     }
+
+    pub fn get_ie_register(&self) -> u8 {
+        self.ie_register
+    }
 }
 
