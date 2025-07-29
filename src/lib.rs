@@ -4,14 +4,16 @@ mod interconnect;
 mod ppu;
 mod timer;
 mod utils;
+mod dbg;
 
 use std::{sync::{Arc, Mutex, MutexGuard}, thread, time::Duration};
 
 use crate::{
     cart::Cartridge, 
     cpu::CPU, 
-    ppu::Ppu,
+    ppu::PPU,
     interconnect::Interconnect,
+    dbg::Debugger,
 };
 
 // use minifb;
@@ -34,6 +36,8 @@ pub struct EmuContext {
     paused: bool,
     running: bool,
     ticks: u64,
+
+    debugger: Option<Debugger>
 }
 
 impl EmuContext {
@@ -44,7 +48,9 @@ impl EmuContext {
             debug,
             paused: false,
             running: false,
-            ticks: 0
+            ticks: 0,
+
+            debugger: if debug { Some(Debugger::new()) } else { None },
         }
     }
 
@@ -72,7 +78,7 @@ impl EmuContext {
 struct Emulator {
     bus: Interconnect,
     cpu: CPU,
-    ppu: Ppu,
+    ppu: PPU,
 }
 
 impl Emulator {
@@ -80,7 +86,7 @@ impl Emulator {
         Emulator {
             bus: Interconnect::new(),
             cpu: CPU::new(),
-            ppu: Ppu::new(),
+            ppu: PPU::new(),
         }
     }
 

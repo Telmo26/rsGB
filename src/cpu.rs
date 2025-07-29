@@ -62,7 +62,7 @@ impl CPU {
             self.fetch_data(bus, ctx);
 
             if ctx.debug {
-                self.show_instruction(bus, ctx);
+                self.debugger(bus, ctx);
             }
 
             self.execute(bus, ctx, self.curr_inst.in_type);
@@ -84,7 +84,7 @@ impl CPU {
         true
     }
 
-    fn show_instruction(&self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
+    fn debugger(&self, bus: &mut Interconnect, ctx: &mut MutexGuard<'_, EmuContext>) {
         let flags = format!(
             "Flags : {}{}{}{}",
             if self.registers.f & 1 << 7 != 0 { 'Z' } else { '-' },
@@ -114,6 +114,10 @@ impl CPU {
 
         println!("{:<35} {}", inst_part, reg_part);
         println!("{:<32} {}", "", flags);
+
+        ctx.debugger.as_mut().unwrap().update(bus);
+        ctx.debugger.as_ref().unwrap().print();
+
     }
 
     fn fetch_instruction(&mut self, bus: &mut Interconnect) {

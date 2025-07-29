@@ -1,10 +1,10 @@
-pub struct Ppu {
+pub struct PPU {
 
 }
 
-impl Ppu {
-    pub fn new() -> Ppu {
-        Ppu {
+impl PPU {
+    pub fn new() -> PPU {
+        PPU {
             
         }
     }
