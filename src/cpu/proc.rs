@@ -32,6 +32,7 @@ impl CPU {
             InType::RRCA => proc_rrca(self, bus, ctx),
             InType::RLA => proc_rla(self, bus, ctx),
             InType::RRA => proc_rra(self, bus, ctx),
+            InType::STOP => proc_stop(self, bus, ctx),
             x => panic!("Instruction {x:?} not implemented")
         }
     }
@@ -324,7 +325,7 @@ fn proc_cb(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
             cpu.registers.set_reg8(bus, register, reg_val);
         },
         3 => {
-            reg_val |= (1 << bit);
+            reg_val |= 1 << bit;
             cpu.registers.set_reg8(bus, register, reg_val);
         },
         _ => panic!("Invalid bit operator in CB")
@@ -418,7 +419,7 @@ fn proc_rrca(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
 }
 
 fn proc_rla(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
-    let mut u = cpu.registers.a;
+    let u = cpu.registers.a;
     let cflag = cpu.c_flag() as u8;
     let c = (u >> 7) & 1; // MSB
 
@@ -434,4 +435,8 @@ fn proc_rra(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
     cpu.registers.a |= carry << 7;
 
     cpu.set_flags(0, 0, 0, c);
+}
+
+fn proc_stop(_cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
+    panic!("STOP instruction received!")
 }
