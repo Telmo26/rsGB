@@ -71,8 +71,9 @@ fn proc_ld(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
             .overflowing_add(cpu.fetched_data as u8);
 
         cpu.set_flags(0, 0, hflag as u8, cflag as u8);
+        let e: i16 = (cpu.fetched_data as u8).cast_signed() as i16;
         cpu.registers.set(cpu.curr_inst.reg_1,
-            cpu.registers.read(cpu.curr_inst.reg_2) + cpu.fetched_data);
+            cpu.registers.read(cpu.curr_inst.reg_2).wrapping_add_signed(e));
     } else if cpu.dest_is_mem {
         if cpu.curr_inst.reg_2.is_16bit() {
             ctx.incr_cycle();

@@ -445,7 +445,7 @@ impl Instruction {
             HLI_R => format!("{:?} ({:?}+), {:?}", self.in_type, self.reg_1, self.reg_2),
             HLD_R => format!("{:?} ({:?}-), {:?}", self.in_type, self.reg_1, self.reg_2),
             A8_R => format!("{:?} ({:02X}), {:?}", self.in_type, cpu.mem_dest, self.reg_2),
-            HL_SP => format!("{:?} {:?}, SP+{}", self.in_type, self.reg_1, cpu.fetched_data),
+            HL_SP => format!("{:?} {:?}, SP+{:X}", self.in_type, self.reg_1, cpu.fetched_data),
             D16 => format!("{:?} {:04X}", self.in_type, cpu.fetched_data),
             D8 => format!("{:?} {:02X}", self.in_type, cpu.fetched_data),
             D16_R => format!("{:?} {:04X}, {:?}", self.in_type, cpu.mem_dest, self.reg_2),

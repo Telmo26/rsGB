@@ -173,8 +173,7 @@ impl CPU {
                 self.registers.pc += 1;
             }
             AddrMode::HL_SP => {
-                let e = bus.read(self.registers.pc).cast_signed();
-                self.fetched_data = self.registers.sp.wrapping_add_signed(e as i16);
+                self.fetched_data = bus.read(self.registers.pc) as u16;
                 ctx.incr_cycle();
                 self.registers.pc += 1;
             }
