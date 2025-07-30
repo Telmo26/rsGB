@@ -45,7 +45,7 @@ impl CPU {
 }
 
 /* These are local helper functions and lookup tables */
-const REGISTER_LOOKUP: [RegType; 7] = [RegType::B, RegType::C, RegType::D, RegType::E, RegType::L, RegType::HL, RegType::A];
+const REGISTER_LOOKUP: [RegType; 8] = [RegType::B, RegType::C, RegType::D, RegType::E, RegType::H, RegType::L, RegType::HL, RegType::A];
 
 fn decode_register(register: u8) -> Option<RegType>{
     let reg = register as usize;
@@ -115,7 +115,7 @@ fn proc_jp(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
 
 fn proc_jr(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     let rel = cpu.fetched_data as i8;
-    let (addr, _) = cpu.registers.pc.overflowing_add_signed(rel as i16);
+    let addr = cpu.registers.pc.wrapping_add_signed(rel as i16);
     goto_addr(cpu, bus, ctx, addr, false);
 }
 
@@ -187,18 +187,19 @@ fn proc_inc(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     
     if cpu.curr_inst.reg_1.is_16bit() {
         ctx.incr_cycle();
+        val = val.wrapping_add(1);
+    } else {
+        val = (cpu.fetched_data as u8).wrapping_add(1) as u16;
     }
 
     if cpu.dest_is_mem {
-        let val = (cpu.fetched_data as u8).wrapping_add(1);
-        bus.write(cpu.registers.read(cpu.curr_inst.reg_1), val);
+        bus.write(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
     } else {
-        val = val.wrapping_add(1);
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
 
     if !cpu.curr_inst.reg_1.is_16bit() {
-        cpu.set_flags(if val == 0 { 1 } else { 0 }, 0, if (val & 0x0F) == 0 {1} else {0}, BIT_IGNORE);
+        cpu.set_flags((val == 0) as u8, 0, if (val & 0x0F) == 0 {1} else {0}, BIT_IGNORE);
     }
 }
 
@@ -223,14 +224,17 @@ fn proc_dec(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
 }
 
 fn proc_add(cpu: &mut CPU, _bus: &mut Interconnect, ctx: &mut EmuContext) {
-    let mut value = cpu.registers.read(cpu.curr_inst.reg_1).wrapping_add(cpu.fetched_data);
+    let mut value:u16; 
 
     if cpu.curr_inst.reg_1.is_16bit() {
+        value = cpu.registers.read(cpu.curr_inst.reg_1).wrapping_add(cpu.fetched_data);
         ctx.incr_cycle();
+    } else {
+        value = (cpu.registers.read(cpu.curr_inst.reg_1) as u8).wrapping_add(cpu.fetched_data as u8) as u16;
     }
 
     if cpu.curr_inst.reg_1 == RegType::SP {
-        let e = cpu.fetched_data as i8;
+        let e = (cpu.fetched_data as u8).cast_signed();
         value = cpu.registers.read(cpu.curr_inst.reg_1).wrapping_add_signed(e as i16);
     }
 
@@ -240,7 +244,7 @@ fn proc_add(cpu: &mut CPU, _bus: &mut Interconnect, ctx: &mut EmuContext) {
 
     if cpu.curr_inst.reg_1.is_16bit() && cpu.curr_inst.reg_1 != RegType::SP {
         z = BIT_IGNORE;
-        h  = ((cpu.registers.read(cpu.curr_inst.reg_1) & 0xFFF) + (cpu.fetched_data & 0xFFF)) >= 0x10;
+        h  = ((cpu.registers.read(cpu.curr_inst.reg_1) & 0xFFF) + (cpu.fetched_data & 0xFFF)) > 0xFFF;
         (_, c) = cpu.registers.read(cpu.curr_inst.reg_1).overflowing_add(cpu.fetched_data)
     }
 
@@ -280,7 +284,7 @@ fn proc_sbc(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
     let (value, overflow1) = a.overflowing_sub(u);
     let (value, overflow2) = value.overflowing_sub(c);
 
-    let h = (u + c) & 0xF > (a & 0xF);
+    let h = ((u + c) & 0xF) > (a & 0xF);
 
     cpu.registers.a = value;
     cpu.set_flags((value == 0) as u8, 1, h as u8, (overflow1 || overflow2) as u8);
@@ -292,7 +296,7 @@ fn proc_and(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
 }
 
 fn proc_xor(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
-    cpu.registers.a ^= (cpu.fetched_data & 0xFF) as u8;
+    cpu.registers.a ^= cpu.fetched_data as u8;
     cpu.set_flags((cpu.registers.a == 0) as u8, 0, 0, 0);
 }
 
@@ -325,85 +329,85 @@ fn proc_cb(cpu: &mut CPU, bus: &mut Interconnect, ctx: &mut EmuContext) {
     }
 
     match bit_op {
-        1 => cpu.set_flags(!(reg_val & (1 << bit)) as u8, 0, 1, BIT_IGNORE),
-        2 => {
+        1 => { // BIT
+            cpu.set_flags(((reg_val & (1 << bit)) == 0) as u8, 0, 1, BIT_IGNORE)
+        }, 
+        2 => { // RES
             reg_val &= !(1 << bit);
-            cpu.registers.set_reg8(bus, register, reg_val);
+            cpu.registers.set_reg8(bus, register, reg_val)
         },
-        3 => {
+        3 => { // SET
             reg_val |= 1 << bit;
-            cpu.registers.set_reg8(bus, register, reg_val);
+            cpu.registers.set_reg8(bus, register, reg_val)
         },
-        _ => panic!("Invalid bit operator in CB")
-    }
+        0 => { // OTHER
+            let cflag = cpu.c_flag() as u8;
+            match bit {
+                0 => { // RLC
+                    let mut set_c = false;
+                    let mut value = (reg_val << 1) & 0xFF;
 
-    let cflag = cpu.c_flag() as u8;
+                    if reg_val & (1 << 7) != 0 {
+                        value |= 1;
+                        set_c = true
+                    }
+                    cpu.registers.set_reg8(bus, register, value);
+                    cpu.set_flags((value == 0) as u8, 0, 0, set_c as u8);
+                },
+                1 => { // RRC
+                    let old = reg_val;
+                    reg_val >>= 1;
+                    reg_val |= old << 7;
 
-    match bit {
-        0 => { // RLC
-            let mut set_c = false;
-            let mut value = (reg_val << 1) & 0xFF;
+                    cpu.registers.set_reg8(bus, register, reg_val);
+                    cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
+                }
+                2 => { // RL
+                    let old = reg_val;
+                    reg_val <<= 1;
+                    reg_val |= cflag;
 
-            if reg_val & (1 << 7) != 0 {
-                value |= 1;
-                set_c = true
+                    cpu.registers.set_reg8(bus, register, reg_val);
+                    cpu.set_flags((reg_val == 0) as u8, 0, 0, ((old & 0x80) != 0) as u8);
+                },
+                3 => { // RR
+                    let old = reg_val;
+                    reg_val >>= 1;
+                    reg_val |= cflag << 7;
+
+                    cpu.registers.set_reg8(bus, register, reg_val);
+                    cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
+                },
+                4 => { // SLA,
+                    let old = reg_val;
+                    reg_val <<= 1;
+
+                    cpu.registers.set_reg8(bus, register, reg_val);
+                    cpu.set_flags((reg_val == 0) as u8, 0, 0, ((old & 0x80) != 0) as u8);
+                }
+                5 => { // SRA,
+                    let u = (reg_val.cast_signed() >> 1) as u8;
+
+                    cpu.registers.set_reg8(bus, register, u);
+                    cpu.set_flags((u == 0) as u8, 0, 0, reg_val & 1);
+                } 
+                6 => { // SWAP
+                    reg_val = ((reg_val & 0xF0) >> 4) | ((reg_val & 0x0F) << 4);
+
+                    cpu.registers.set_reg8(bus, register, reg_val);
+                    cpu.set_flags((reg_val == 0) as u8, 0, 0, 0);
+                },
+                7 => { // SRL
+                    let old = reg_val;
+                    reg_val >>= 1;
+
+                    cpu.registers.set_reg8(bus, register, reg_val);
+                    cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
+                },
+                _ => panic!("Unknown CB-prefixed command {op}")
             }
-            cpu.registers.set_reg8(bus, register, value);
-            cpu.set_flags((value == 0) as u8, 0, 0, set_c as u8);
-        },
-        1 => { // RRC
-            let old = reg_val;
-            reg_val >>= 1;
-            reg_val |= old << 7;
-
-            cpu.registers.set_reg8(bus, register, reg_val);
-            cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
         }
-        2 => { // RL
-            let old = reg_val;
-            reg_val <<= 1;
-            reg_val |= cflag;
-
-            cpu.registers.set_reg8(bus, register, reg_val);
-            cpu.set_flags((reg_val == 0) as u8, 0, 0, (old & 0x80 != 0) as u8);
-        },
-        3 => { // RR
-            let old = reg_val;
-            reg_val >>= 1;
-            reg_val |= cflag << 7;
-
-            cpu.registers.set_reg8(bus, register, reg_val);
-            cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
-        },
-        4 => { // SLA,
-            let old = reg_val;
-            reg_val <<= 1;
-
-            cpu.registers.set_reg8(bus, register, reg_val);
-            cpu.set_flags((reg_val == 0) as u8, 0, 0, (old & 0x80 != 0) as u8);
-        }
-        5 => { // SRA,
-            let mut u = reg_val >> 1;
-
-            u |= (reg_val >> 7) << 7;
-
-            cpu.registers.set_reg8(bus, register, u);
-            cpu.set_flags((u == 0) as u8, 0, 0, reg_val & 1);
-        } 
-        6 => { // SWAP
-            reg_val = ((reg_val & 0xF0) >> 4) | ((reg_val & 0x0F) << 4);
-
-            cpu.registers.set_reg8(bus, register, reg_val);
-            cpu.set_flags((reg_val == 0) as u8, 0, 0, 0);
-        },
-        7 => { // SRL
-            let old = reg_val;
-            reg_val >>= 1;
-
-            cpu.registers.set_reg8(bus, register, reg_val);
-            cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
-        },
-        _ => panic!("Unknown CB-prefixed command {op}")
+        _ => panic!("Invalid bit operator in CB")
     }
 }
 
@@ -448,25 +452,33 @@ fn proc_stop(_cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
 }
 
 fn proc_daa(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {
-    let mut adjustment: u8 = 0;
+    let mut a = cpu.registers.a;
+    let mut adjust: u8 = 0;
+    let mut cflag: u8 = cpu.c_flag() as u8;
+
     let (n, h, c) = (cpu.n_flag(), cpu.h_flag(), cpu.c_flag());
-    let mut cflag: u8 = 0;
     
-    if h || (!n && cpu.registers.a & 0xF > 0x9) {
-        adjustment += 0x6;
-    }
-    if c || (!n && cpu.registers.a > 0x99) {
-        adjustment += 0x60;
-        cflag = 1;
-    }
-
-    if n {
-        cpu.registers.a = cpu.registers.a.wrapping_sub(adjustment);
+    if !n {
+        if h || (a & 0x0F) > 9 {
+            adjust |= 0x06;
+        }
+        if c || a > 0x99 {
+            adjust |= 0x60;
+            cflag = 1;
+        }
+        a = a.wrapping_add(adjust);
     } else {
-        cpu.registers.a = cpu.registers.a.wrapping_add(adjustment);
+        if h {
+            adjust |= 0x06;
+        }
+        if c {
+            adjust |= 0x60;
+        }
+        a = a.wrapping_sub(adjust);
     }
 
-    cpu.set_flags((cpu.registers.a == 0) as u8, BIT_IGNORE, 0, cflag);
+    cpu.registers.a = a;
+    cpu.set_flags((a == 0) as u8, BIT_IGNORE, 0, cflag);
 }
 
 fn proc_cpl(cpu: &mut CPU, _bus: &mut Interconnect, _ctx: &mut EmuContext) {

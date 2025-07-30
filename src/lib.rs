@@ -108,7 +108,7 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
     emulator.load_cart(&ctx.file_path)
         .expect(&format!("Failed to load the ROM file: {}", &ctx.file_path));
 
-    println!("Cart loaded...");
+    // println!("Cart loaded...");
 
     start_emulation(ctx);
 

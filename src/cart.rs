@@ -214,12 +214,12 @@ impl CartridgeHeader {
         if data[0x143] < 127 {
             // ASCII max
             title = String::from_utf8(data[0x134..0x144].to_vec()).unwrap();
-            println!("This is a DMG game")
+            // println!("This is a DMG game")
         } else {
             if data[0x143] == 0x80 {
-                println!("This game supports CGB enhancements")
+                // println!("This game supports CGB enhancements")
             } else if data[0x143] == 0xC0 {
-                println!("This is a CGB game")
+                // println!("This is a CGB game")
             }
             title = String::from_utf8(data[0x134..0x143].to_vec()).unwrap()
         }
@@ -281,25 +281,25 @@ impl Cartridge {
 
         let header = CartridgeHeader::from_bytes(&rom_data)?;
 
-        println!("Cartridge successfully loaded");
-        println!("\t Title    : {}", header.title);
-        println!(
-            "\t Type     : {0} ({1})",
-            header.cart_type,
-            header.get_cart_type()
-        );
-        println!("\t ROM Size : {} KiB", 32 << header.rom_size);
-        println!("\t RAM Size : {}", header.ram_size);
-        println!(
-            "\t LIC Code : {0} ({1})",
-            if header.lic_code != 0x33 {
-                header.lic_code.to_string()
-            } else {
-                str::from_utf8(&header.new_lic_code).unwrap().to_string()
-            },
-            header.get_lic_name()
-        );
-        println!("\t ROM Vers : {}", header.version);
+        // println!("Cartridge successfully loaded");
+        // println!("\t Title    : {}", header.title);
+        // println!(
+        //     "\t Type     : {0} ({1})",
+        //     header.cart_type,
+        //     header.get_cart_type()
+        // );
+        // println!("\t ROM Size : {} KiB", 32 << header.rom_size);
+        // println!("\t RAM Size : {}", header.ram_size);
+        // println!(
+        //     "\t LIC Code : {0} ({1})",
+        //     if header.lic_code != 0x33 {
+        //         header.lic_code.to_string()
+        //     } else {
+        //         str::from_utf8(&header.new_lic_code).unwrap().to_string()
+        //     },
+        //     header.get_lic_name()
+        // );
+        // println!("\t ROM Vers : {}", header.version);
 
         Ok(Cartridge {
             filename: path.to_string(),
@@ -316,7 +316,7 @@ impl Cartridge {
 
     pub fn write(&self, address: u16, value: u8) {
         //for now, ROM only...
-        println!("Writing to cart not implemented!")
+        eprintln!("Writing to cart not implemented!")
     }
 }
 

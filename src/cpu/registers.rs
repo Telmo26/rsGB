@@ -16,12 +16,23 @@ pub struct CpuRegisters {
 
 impl CpuRegisters {
     pub fn new() -> CpuRegisters {
-        CpuRegisters { a: 0x01, f: 0, b: 0, c: 0, d: 0, e: 0, h: 0, l: 0, pc: 0x100, sp: 0 }
+        CpuRegisters { 
+            a: 0x01, 
+            f: 0xB0, 
+            b: 0x00, 
+            c: 0x13, 
+            d: 0x00, 
+            e: 0xD8, 
+            h: 0x01, 
+            l: 0x4D, 
+            pc: 0x100, 
+            sp: 0xFFFE 
+        }
     }
 
     pub fn read(&self, register: RegType) -> u16 {
         match register {
-            RegType::NONE => 0,
+            RegType::NONE => panic!("Trying to read register None !"),
 
             RegType::A => self.a as u16,
             RegType::F => self.f as u16,
@@ -32,10 +43,10 @@ impl CpuRegisters {
             RegType::H => self.h as u16,
             RegType::L => self.l as u16,
 
-            RegType::AF => (self.a as u16) << 8 | self.f as u16,
-            RegType::BC => (self.b as u16) << 8 | self.c as u16,
-            RegType::DE => (self.d as u16) << 8 | self.e as u16,
-            RegType::HL => (self.h as u16) << 8 | self.l as u16,
+            RegType::AF => ((self.a as u16) << 8) | (self.f as u16),
+            RegType::BC => ((self.b as u16) << 8) | (self.c as u16),
+            RegType::DE => ((self.d as u16) << 8) | (self.e as u16),
+            RegType::HL => ((self.h as u16) << 8) | (self.l as u16),
 
             RegType::SP => self.sp as u16,
             RegType::PC => self.pc as u16,
@@ -44,7 +55,7 @@ impl CpuRegisters {
 
     pub fn set(&mut self, register: RegType, value: u16) {
         match register {
-            RegType::NONE => (),
+            RegType::NONE => panic!("Trying to write register None !"),
 
             RegType::A => self.a = value as u8,
             RegType::F => self.f = value as u8,
@@ -91,4 +102,25 @@ impl CpuRegisters {
             _ => panic!("INVALID REG8: {register:?}"),
         }
     }
+}
+
+#[test]
+fn test_register_hl_read_write() {
+    let mut regs = CpuRegisters {
+        a: 0, f: 0,
+        b: 0, c: 0,
+        d: 0, e: 0,
+        h: 0x12, l: 0x34,
+        sp: 0, pc: 0,
+    };
+
+    assert_eq!(regs.read(RegType::HL), 0x1234);
+
+    let incr = regs.read(RegType::HL).wrapping_add(1);
+    println!("{incr:X}");
+
+    regs.set(RegType::HL, regs.read(RegType::HL).wrapping_add(1));
+    assert_eq!(regs.h, 0x12);
+    assert_eq!(regs.l, 0x34 + 1);
+    assert_eq!(regs.read(RegType::HL), 0x1234 + 1);
 }

@@ -90,7 +90,7 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),
 
            // Char/Map Data
-            0x8000..0xA000 => println!("Write at address {address:X} not implemented!"),
+            0x8000..0xA000 => eprintln!("Write at address {address:X} not implemented!"),
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_mut().unwrap().write(address, value),
@@ -102,7 +102,7 @@ impl Interconnect {
             0xE000..0xFE00 => (),
 
             // OAM
-            0xFE00..0xFEA0 => println!("Write at address {address:X} not implemented!"),
+            0xFE00..0xFEA0 => eprintln!("Write at address {address:X} not implemented!"),
 
             // Reserved - Unusable
             0xFEA0..0xFF00 => (),

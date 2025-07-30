@@ -14,8 +14,9 @@ impl IO {
         match address {
             0xFF01 => self.serial[0],
             0xFF02 => self.serial[1],
+            0xFF44 => 0x90,
             _ => {
-                println!("Read at address {address:X} not implemented!");
+                eprintln!("Read at address {address:X} not implemented!");
                 0
             }
         }
@@ -25,7 +26,7 @@ impl IO {
         match address {
             0xFF01 => self.serial[0] = value,
             0xFF02 => self.serial[1] = value,
-            _ => println!("Write at address {address:X} not implemented!"),
+            _ => eprintln!("Write at address {address:X} not implemented!"),
         }
     }
 }

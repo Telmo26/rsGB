@@ -39,7 +39,7 @@ impl CPU {
         if (self.int_flags & interrupt_type.value()) != 0 && 
             (bus.get_ie_register() & interrupt_type.value()) != 0 {
             self.interrupt_handle(bus, address);
-            self.int_flags |= !interrupt_type.value();
+            self.int_flags &= !interrupt_type.value();
             self.halted = false;
             self.int_master_enabled = false;
             return true
