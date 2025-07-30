@@ -126,5 +126,9 @@ impl Interconnect {
     pub fn get_ie_register(&self) -> u8 {
         self.ie_register
     }
+
+    pub fn timer_tick(&mut self) {
+        self.io.timer.tick();
+    }
 }
 

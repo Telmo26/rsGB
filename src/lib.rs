@@ -2,11 +2,10 @@ mod cart;
 mod cpu;
 mod interconnect;
 mod ppu;
-mod timer;
 mod utils;
 mod dbg;
 
-use std::{sync::{Arc, Mutex, MutexGuard}, thread, time::Duration};
+use std::{cell::RefCell, rc::Rc, sync::{Arc, Mutex, MutexGuard}, thread, time::Duration};
 
 use crate::{
     cart::Cartridge, 
@@ -36,8 +35,6 @@ pub struct EmuContext {
     paused: bool,
     running: bool,
     ticks: u64,
-
-    debugger: Option<Debugger>
 }
 
 impl EmuContext {
@@ -49,13 +46,16 @@ impl EmuContext {
             paused: false,
             running: false,
             ticks: 0,
-
-            debugger: if debug { Some(Debugger::new()) } else { None },
         }
     }
 
-    fn incr_cycle(&mut self) {
-        self.ticks += 1;
+    fn incr_cycle(&mut self, bus: &mut Interconnect, cpu_cycles: u16) {
+        let n = cpu_cycles * 4;
+
+        for _ in 0..n {
+            self.ticks += 1;
+            bus.timer_tick();
+        }   
     }
 
     fn start(&mut self) {
@@ -75,18 +75,46 @@ impl EmuContext {
     }
 }
 
+struct Devices<'a> {
+    bus: Option<&'a mut Interconnect>,
+    cpu: Option<&'a mut CPU>,
+    ppu: Option<&'a mut PPU>,
+
+    debugger: &'a mut Option<Debugger>,
+    ticks: &'a mut u64,
+}
+
+impl<'a> Devices<'a> {
+    fn incr_cycle(&mut self, cpu_cycles: u16) {
+        let n = cpu_cycles * 4;
+
+        if let Some(bus) = self.bus.as_mut() {
+            for _ in 0..n {
+                *self.ticks += 1;
+                bus.timer_tick();
+            } 
+        }  
+    }
+}
+
 struct Emulator {
     bus: Interconnect,
     cpu: CPU,
     ppu: PPU,
+
+    debugger: Option<Debugger>,
+    ticks: u64,
 }
 
 impl Emulator {
-    fn new() -> Emulator {
+    fn new(debug: bool) -> Emulator {
         Emulator {
             bus: Interconnect::new(),
             cpu: CPU::new(),
             ppu: PPU::new(),
+
+            debugger: if debug { Some(Debugger::new()) } else { None },
+            ticks: 0,
         }
     }
 
@@ -96,15 +124,31 @@ impl Emulator {
         Ok(())
     }
 
-    fn step(&mut self, ctx: &mut MutexGuard<'_, EmuContext>) -> bool {
-        self.cpu.step(&mut self.bus, ctx)
+    fn step(&mut self) -> bool {
+        let (cpu, devices) = self.isolate_cpu();
+        
+        cpu.step(devices)
+    }
+
+    fn isolate_cpu<'a>(&'a mut self) -> (&'a mut CPU, Devices<'a>) {
+        unsafe {
+            let ptr = self as *mut Emulator;
+            let devices = Devices {
+                bus: Some(&mut (*ptr).bus),
+                cpu: None,
+                ppu: Some(&mut (*ptr).ppu),
+                debugger: &mut (*ptr).debugger,
+                ticks: &mut (*ptr).ticks
+            };
+            (&mut (*ptr).cpu, devices)
+        } 
     }
 }
 
 pub fn run(context: Arc<Mutex<EmuContext>>) {
-    let ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
-    let mut emulator = Emulator::new();
-
+    let mut ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
+    
+    let mut emulator = Emulator::new(ctx.debug);
     emulator.load_cart(&ctx.file_path)
         .expect(&format!("Failed to load the ROM file: {}", &ctx.file_path));
 
@@ -113,7 +157,7 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
     start_emulation(ctx);
 
     loop {
-        let mut ctx = context.lock().unwrap();
+        let ctx = context.lock().unwrap();
         if !ctx.is_running() {
             break
         }
@@ -123,7 +167,7 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
             continue;
         }
 
-        if !emulator.step(&mut ctx) {
+        if !emulator.step() {
             println!("CPU Stopped");
             break;
         }

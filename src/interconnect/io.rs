@@ -1,12 +1,38 @@
+mod timer;
+use timer::Timer;
+
+/*
+
+Start | End   | 1st app | Purpose
+---------------------------------------------------------------------------
+$FF00 | 	  |   DMG 	| Joypad input
+$FF01 | $FF02 |   DMG 	| Serial transfer
+$FF04 | $FF07 |   DMG 	| Timer and divider
+$FF0F | 	  |   DMG 	| Interrupts
+$FF10 | $FF26 |   DMG 	| Audio
+$FF30 | $FF3F |   DMG 	| Wave pattern
+$FF40 | $FF4B |   DMG 	| LCD Control, Status, Position, Scrolling, and Palettes
+$FF4F | 	  |   CGB 	| VRAM Bank Select
+$FF50 | 	  |   DMG 	| Boot ROM mapping control
+$FF51 | $FF55 |   CGB 	| VRAM DMA
+$FF68 | $FF6B |   CGB 	| BG / OBJ Palettes
+$FF70 | 	  |   CGB 	| WRAM Bank Select
+
+*/
+
 
 pub struct IO {
-    serial: [u8; 2]
+    serial: [u8; 2],
+    pub timer: Timer,
+    if_register: u8,
 }
 
 impl IO {
     pub fn new() -> IO {
         IO { 
             serial: [0; 2],
+            timer: Timer::new(),
+            if_register: 0,
         }
     }
 
@@ -14,6 +40,8 @@ impl IO {
         match address {
             0xFF01 => self.serial[0],
             0xFF02 => self.serial[1],
+            0xFF04..=0xFF07 => self.timer.read(address),
+            0xFF0F => self.if_register,
             0xFF44 => 0x90,
             _ => {
                 eprintln!("Read at address {address:X} not implemented!");
@@ -26,6 +54,8 @@ impl IO {
         match address {
             0xFF01 => self.serial[0] = value,
             0xFF02 => self.serial[1] = value,
+            0xFF04..=0xFF07 => self.timer.write(address, value),
+            0xFF0F => self.if_register = value,
             _ => eprintln!("Write at address {address:X} not implemented!"),
         }
     }

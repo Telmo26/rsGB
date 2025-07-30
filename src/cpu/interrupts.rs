@@ -1,3 +1,5 @@
+use crate::Devices;
+
 use super::{CPU, Interconnect};
 
 #[derive(Clone)]
@@ -16,30 +18,34 @@ impl InterruptType {
 }
 
 impl CPU {
-    fn interrupt_handle(&mut self, bus: &mut Interconnect, address: u16) {
+    fn interrupt_handle(&mut self, dev: &mut Devices, address: u16) {
+        let bus = dev.bus.as_mut().unwrap();
         self.push16(bus, self.registers.pc);
         self.registers.pc = address;
     }
 
-    pub fn handle_interrupts(&mut self, bus: &mut Interconnect) {
-        if self.interrupt_check(bus, 0x40, InterruptType::VBlank) {
+    pub fn handle_interrupts(&mut self, dev: &mut Devices) {
+        if self.interrupt_check(dev, 0x40, InterruptType::VBlank) {
 
-        } else if self.interrupt_check(bus, 0x48, InterruptType::LcdStat) {
+        } else if self.interrupt_check(dev, 0x48, InterruptType::LcdStat) {
 
-        } else if self.interrupt_check(bus, 0x50, InterruptType::Timer) {
+        } else if self.interrupt_check(dev, 0x50, InterruptType::Timer) {
 
-        } else if self.interrupt_check(bus, 0x58, InterruptType::Serial) {
+        } else if self.interrupt_check(dev, 0x58, InterruptType::Serial) {
 
-        } else if self.interrupt_check(bus, 0x60, InterruptType::Joypad) {
+        } else if self.interrupt_check(dev, 0x60, InterruptType::Joypad) {
             
         }
     }
 
-    fn interrupt_check(&mut self, bus: &mut Interconnect, address: u16, interrupt_type: InterruptType) -> bool {
-        if (self.int_flags & interrupt_type.value()) != 0 && 
-            (bus.get_ie_register() & interrupt_type.value()) != 0 {
-            self.interrupt_handle(bus, address);
-            self.int_flags &= !interrupt_type.value();
+    fn interrupt_check(&mut self, dev: &mut Devices, address: u16, interrupt_type: InterruptType) -> bool {
+        let if_register = self.get_int_flags(dev);
+        if (if_register & interrupt_type.value()) != 0 && 
+            (dev.bus.as_ref().unwrap().get_ie_register() & interrupt_type.value()) != 0 {
+            self.interrupt_handle(dev, address);
+
+            self.set_int_flags(dev, if_register &!interrupt_type.value());
+            
             self.halted = false;
             self.int_master_enabled = false;
             return true
