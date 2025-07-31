@@ -113,7 +113,7 @@ impl CPU {
             AddrMode::MR => {
                 self.mem_dest = self.registers.read(self.curr_inst.reg_1);
                 self.dest_is_mem = true;
-                self.fetched_data = dev.bus.as_mut().unwrap().read(self.registers.read(self.curr_inst.reg_1)) as u16;
+                self.fetched_data = dev.bus.as_ref().unwrap().read(self.mem_dest) as u16;
                 dev.incr_cycle(1);
             }
             AddrMode::R_A16 => {

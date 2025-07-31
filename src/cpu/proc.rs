@@ -188,7 +188,7 @@ fn proc_push(cpu: &mut CPU, dev: &mut Devices) {
 fn proc_inc(cpu: &mut CPU, dev: &mut Devices) {
     let mut val = cpu.fetched_data;
     
-    if cpu.curr_inst.reg_1.is_16bit() {
+    if cpu.curr_inst.reg_1.is_16bit() && !cpu.dest_is_mem {
         dev.incr_cycle(1);
         val = val.wrapping_add(1);
     } else {
@@ -201,7 +201,7 @@ fn proc_inc(cpu: &mut CPU, dev: &mut Devices) {
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
 
-    if !cpu.curr_inst.reg_1.is_16bit() {
+    if !cpu.curr_inst.reg_1.is_16bit() || cpu.dest_is_mem {
         cpu.set_flags((val == 0) as u8, 0, if (val & 0x0F) == 0 {1} else {0}, BIT_IGNORE);
     }
 }
