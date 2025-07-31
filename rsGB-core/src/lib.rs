@@ -6,7 +6,7 @@ mod utils;
 mod dbg;
 
 use std::{
-    sync::{Arc, Mutex, MutexGuard, mpsc}, 
+    sync::{mpsc::{self, Sender}, Arc, Mutex, MutexGuard}, 
     thread, 
     time::Duration
 };
@@ -15,7 +15,7 @@ use crate::{
     cart::Cartridge, 
     cpu::CPU, 
     ppu::PPU,
-    interconnect::{Interconnect, OAMEntry},
+    interconnect::Interconnect,
     dbg::Debugger,
 };
 
@@ -39,8 +39,8 @@ pub struct EmuContext {
     paused: bool,
     running: bool,
 
-    debug_tx: Option<mpsc::Sender<[OAMEntry; 40]>>, 
-    debug_rx: Option<mpsc::Receiver<[OAMEntry; 40]>>,
+    debug_tx: Option<mpsc::Sender<[u8; 0x1800]>>, 
+    debug_rx: Option<mpsc::Receiver<[u8; 0x1800]>>,
 }
 
 impl EmuContext {
@@ -84,7 +84,7 @@ impl EmuContext {
         self.paused
     }
 
-    pub fn get_debug_rx(&mut self) -> mpsc::Receiver<[OAMEntry; 40]> {
+    pub fn get_debug_rx(&mut self) -> mpsc::Receiver<[u8; 0x1800]> {
         let debug_rx = self.debug_rx.take();
         debug_rx.expect("Attempted to get the debug receiver while not in debug mode!")
     }
@@ -134,17 +134,19 @@ struct Emulator {
     ppu: PPU,
 
     debugger: Option<Debugger>,
+    debug_tx: Option<Sender<[u8; 0x1800]>>,
     ticks: u64,
 }
 
 impl Emulator {
-    fn new(debug: bool) -> Emulator {
+    fn new(debug: bool, debug_tx: Option<Sender<[u8; 0x1800]>>) -> Emulator {
         Emulator {
             bus: Interconnect::new(),
             cpu: CPU::new(),
             ppu: PPU::new(),
 
             debugger: if debug { Some(Debugger::new()) } else { None },
+            debug_tx,
             ticks: 0,
         }
     }
@@ -157,7 +159,7 @@ impl Emulator {
 
     fn step(&mut self) -> bool {
         let (cpu, devices) = self.isolate_cpu();
-        
+
         cpu.step(devices)
     }
 
@@ -174,12 +176,26 @@ impl Emulator {
             (&mut (*ptr).cpu, devices)
         } 
     }
+
+    fn check_debug(&mut self) {
+        match &self.debug_tx {
+            Some(tx) => {
+                let t: [u8; 0x1800] = self.bus.vram[0..0x1800].try_into().unwrap();
+                tx.send(t).unwrap();
+            },
+            None => ()
+        };
+    }
 }
 
 pub fn run(context: Arc<Mutex<EmuContext>>) {
-    let ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
+    let mut ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
     
-    let mut emulator = Emulator::new(ctx.debug);
+    let debug = ctx.debug;
+    let debug_tx = ctx.debug_tx.take();
+
+    let mut emulator = Emulator::new(debug, debug_tx);
+     
     emulator.load_cart(&ctx.file_path)
         .expect(&format!("Failed to load the ROM file: {}", &ctx.file_path));
 
@@ -202,6 +218,9 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
             println!("CPU Stopped");
             break;
         }
+        if emulator.ticks % 1_000 == 0 {
+            emulator.check_debug();
+        } 
     }
 }
 
