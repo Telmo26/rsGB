@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::{
     cart::Cartridge, cpu::AddrMode,
 };
@@ -30,6 +32,7 @@ pub struct Interconnect {
     ram: RAM,
     oam_ram: [OAMEntry; 40],
     io: IO,
+    ly: RefCell<u8>,
     ie_register: u8
 }
 
@@ -41,6 +44,7 @@ impl Interconnect {
             ram: RAM::new(),
             oam_ram: [OAMEntry::new(); 40],
             io: IO::new(),
+            ly: RefCell::new(0),
             ie_register: 0 
         }
     }
@@ -72,7 +76,7 @@ impl Interconnect {
                 if self.io.dma_transferring() {
                     0xFF
                 } else {
-                    let address = (address - 0xFE00) as usize;
+                    let address = ((address - 0xFE00)/4) as usize;
                     let byte = address % 4;
                     self.oam_ram[address].read(byte)
                 } 
@@ -82,7 +86,16 @@ impl Interconnect {
             0xFEA0..0xFF00 => 0,
 
             // I/O Registers
-            0xFF00..0xFF80 => self.io.read(address), // panic!("Read at address {address:X} not implemented!"),
+            0xFF00..0xFF80 => {
+                if address == 0xFF44 {
+                    let mut ly_ref = self.ly.borrow_mut();    // one mutable borrow
+                    let incremented = (*ly_ref).wrapping_add(1);  // read the *inner* u8
+                    *ly_ref = incremented;                         // write it back
+                    incremented 
+                } else {
+                    self.io.read(address)
+                }
+            }, // panic!("Read at address {address:X} not implemented!"),
 
             // HRAM (High RAM) / Zero Page
             0xFF80..0xFFFF => self.ram.hram_read(address),
@@ -121,7 +134,7 @@ impl Interconnect {
                 if self.io.dma_transferring() {
                     return
                 } else {
-                    let address = (address - 0xFE00) as usize;
+                    let address = ((address - 0xFE00)/4) as usize;
                     let byte = address % 4;
                     self.oam_ram[address].write(byte, value);
                 }

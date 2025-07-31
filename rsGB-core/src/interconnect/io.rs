@@ -28,6 +28,7 @@ pub struct IO {
     serial: [u8; 2],
     timer: Timer,
     if_register: u8,
+    ly: u8,
     dma: DMA,
 }
 
@@ -37,6 +38,7 @@ impl IO {
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
+            ly: 0,
             dma: DMA::new(),
         }
     }
@@ -47,6 +49,7 @@ impl IO {
             0xFF02 => self.serial[1],
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => self.if_register,
+            0xFF44 => self.ly,
             0xFF46 => 0x00, // DMA
             _ => {
                 eprintln!("Read at address {address:X} not implemented!");
