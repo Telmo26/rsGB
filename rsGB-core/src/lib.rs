@@ -95,6 +95,22 @@ impl<'a> Devices<'a> {
             } 
         }  
     }
+
+    fn bus_read(&self, address: u16) -> u8 {
+        if let Some(bus) = self.bus.as_ref() {
+            bus.read(address)
+        } else {
+            panic!("Trying to read through a device that has no bus")
+        }
+    }
+
+    fn bus_write(&mut self, address: u16, value: u8) {
+        if let Some(bus) = self.bus.as_mut() {
+            bus.write(address, value)
+        } else {
+            panic!("Trying to write through a device that has no bus")
+        }
+    }
 }
 
 struct Emulator {
