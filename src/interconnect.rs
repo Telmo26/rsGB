@@ -1,12 +1,14 @@
 use crate::{
-    cart::Cartridge,
+    cart::Cartridge, cpu::AddrMode,
 };
 
 mod ram;
 mod io;
+mod oam;
 
 use ram::*;
 use io::*;
+use oam::*;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
@@ -24,7 +26,9 @@ use io::*;
 
 pub struct Interconnect {
     cart: Option<Cartridge>,
+    vram: [u8; 0x2000],
     ram: RAM,
+    oam_ram: [OAMEntry; 40],
     io: IO,
     ie_register: u8
 }
@@ -33,7 +37,9 @@ impl Interconnect {
     pub fn new() -> Interconnect {
         Interconnect { 
             cart: None,
+            vram: [0; 0x2000],
             ram: RAM::new(),
+            oam_ram: [OAMEntry::new(); 40],
             io: IO::new(),
             ie_register: 0 
         }
@@ -50,7 +56,7 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_ref().unwrap().read(address),
 
             // Char/Map Data
-            0x8000..0xA000 => 0, // panic!("Read at address {address:X} not implemented!"),
+            0x8000..0xA000 => self.vram[(address - 0x8000) as usize],
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_ref().unwrap().read(address),
@@ -62,7 +68,11 @@ impl Interconnect {
             0xE000..0xFE00 => 0,
 
             // OAM
-            0xFE00..0xFEA0 => 0, // panic!("Read at address {address:X} not implemented!"),
+            0xFE00..0xFEA0 => {
+                let address = (address - 0xFE00) as usize;
+                let byte = address % 4;
+                self.oam_ram[address].read(byte)
+            }, // panic!("Read at address {address:X} not implemented!"),
 
             // Reserved - Unusable
             0xFEA0..0xFF00 => 0,
@@ -91,7 +101,7 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),
 
            // Char/Map Data
-            0x8000..0xA000 => eprintln!("Write at address {address:X} not implemented!"),
+            0x8000..0xA000 => self.vram[(address - 0x8000) as usize] = value,
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_mut().unwrap().write(address, value),
@@ -103,7 +113,11 @@ impl Interconnect {
             0xE000..0xFE00 => (),
 
             // OAM
-            0xFE00..0xFEA0 => eprintln!("Write at address {address:X} not implemented!"),
+            0xFE00..0xFEA0 => {
+                let address = (address - 0xFE00) as usize;
+                let byte = address % 4;
+                self.oam_ram[address].write(byte, value);
+            },
 
             // Reserved - Unusable
             0xFEA0..0xFF00 => (),

@@ -294,18 +294,6 @@ fn proc_sbc(cpu: &mut CPU, _dev: &mut Devices) {
     let result = a.wrapping_sub(val as u8);
     let z = result == 0;
 
-    // let sub = u.wrapping_add(c);
-    // let value = a.wrapping_sub(sub);
-
-    // let h = (a & 0xF) < (sub & 0xF); // borrow from bit 4
-    // let c = (a as u16) < (sub as u16); // borrow from bit 8
-
-    // let (value, overflow1) = a.overflowing_sub(u);
-    // let (value, overflow2) = value.overflowing_sub(c);
-
-    // let h = ((u.wrapping_add(c)) & 0xF) > (a & 0xF);
-    // let c = overflow1 || overflow2;
-
     cpu.registers.a = result;
     cpu.set_flags(z as u8, 1, h as u8, c as u8);
 }
