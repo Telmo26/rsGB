@@ -146,7 +146,7 @@ impl Emulator {
 }
 
 pub fn run(context: Arc<Mutex<EmuContext>>) {
-    let mut ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
+    let ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
     
     let mut emulator = Emulator::new(ctx.debug);
     emulator.load_cart(&ctx.file_path)

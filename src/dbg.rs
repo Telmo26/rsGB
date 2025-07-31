@@ -30,7 +30,7 @@ impl Debugger {
         }
     }
 
-    pub fn gameboy_doctor(&mut self, cpu: &mut CPU, dev: &Devices, previous_pc: u16) {
+    pub fn gameboy_doctor(&mut self, cpu: &mut CPU, bus: &mut &mut Interconnect, previous_pc: u16) {
         let hl  = if cpu.curr_inst.mode == AddrMode::HLI_R || cpu.curr_inst.mode == AddrMode::R_HLI { 
             cpu.registers.read(RegType::HL) - 1
         } else if cpu.curr_inst.mode == AddrMode::HLD_R || cpu.curr_inst.mode == AddrMode::R_HLD {
@@ -38,8 +38,6 @@ impl Debugger {
         } else {
             cpu.registers.read(RegType::HL)
         };
-
-        let bus = dev.bus.as_ref().unwrap();
 
         println!( // GB Doctor
             "A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}",

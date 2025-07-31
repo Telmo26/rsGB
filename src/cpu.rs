@@ -1,19 +1,16 @@
-use std::sync::MutexGuard;
-
 mod proc;
 mod instruction;
 mod registers;
 mod stack;
-mod interrupts;
+pub mod interrupts;
 mod debug;
 
 use crate::{
-    utils::{bit_set, BIT_IGNORE}, Devices, EmuContext, Interconnect
+    utils::{bit_set, BIT_IGNORE}, Devices, Interconnect
 };
 
 pub use instruction::*;
 use registers::*;
-use interrupts::*;
 
 pub struct CPU {
     pub registers: CpuRegisters,
@@ -47,7 +44,7 @@ impl CPU {
             halted: false,
             stepping: false,
 
-            int_master_enabled: true,
+            int_master_enabled: false,
             enabling_ime: false,
         }
     }
@@ -57,11 +54,12 @@ impl CPU {
             let previous_pc = self.registers.pc;
 
             self.fetch_instruction(&mut dev);
+            dev.incr_cycle(1);
             self.fetch_data(&mut dev);
 
             if let Some(debugger) = dev.debugger {
                 debugger.debug_info(self, dev.bus.as_mut().unwrap(), *dev.ticks, previous_pc);
-                // debugger.gameboy_doctor(self, &dev, previous_pc);
+                // debugger.gameboy_doctor(self, dev.bus.as_mut().unwrap(), previous_pc);
             }
 
             self.execute(&mut dev, self.curr_inst.in_type);
@@ -84,7 +82,6 @@ impl CPU {
     }
 
     fn fetch_instruction(&mut self, dev: &mut Devices) {
-        let bus = dev.bus.as_mut().unwrap();
         self.curr_opcode = dev.bus.as_mut().unwrap().read(self.registers.pc);
         self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
@@ -94,7 +91,6 @@ impl CPU {
     fn fetch_data(&mut self, dev: &mut Devices) {
         self.mem_dest = 0;
         self.dest_is_mem = false;
-        let bus = dev.bus.as_mut().unwrap();
 
         match self.curr_inst.mode {
             AddrMode::IMP => (),
@@ -158,14 +154,14 @@ impl CPU {
                 self.registers.set(RegType::HL, self.registers.read(RegType::HL).wrapping_add(1));
             }
             AddrMode::R_A8 => {
-                let address = dev.bus.as_mut().unwrap().read(self.registers.pc) as u16 | 0xFF00;
-                self.fetched_data = dev.bus.as_mut().unwrap().read(address) as u16;
+                let address = dev.bus.as_ref().unwrap().read(self.registers.pc) as u16 | 0xFF00;
+                self.fetched_data = dev.bus.as_ref().unwrap().read(address) as u16;
                 dev.incr_cycle(1);
                 self.registers.pc += 1;
             }
             AddrMode::A8_R => {
                 self.fetched_data = self.registers.read(self.curr_inst.reg_2);
-                self.mem_dest = dev.bus.as_mut().unwrap().read(self.registers.pc) as u16 | 0xFF00;
+                self.mem_dest = dev.bus.as_ref().unwrap().read(self.registers.pc) as u16 | 0xFF00;
                 self.dest_is_mem = true;
                 dev.incr_cycle(1);
                 self.registers.pc += 1;
@@ -207,16 +203,16 @@ impl CPU {
                 dev.incr_cycle(1);
             }
             AddrMode::R_A16 => {
-                let low: u8 = dev.bus.as_mut().unwrap().read(self.registers.pc);
+                let low: u8 = dev.bus.as_ref().unwrap().read(self.registers.pc);
                 dev.incr_cycle(1);
 
-                let high: u8 = dev.bus.as_mut().unwrap().read(self.registers.pc + 1);
+                let high: u8 = dev.bus.as_ref().unwrap().read(self.registers.pc + 1);
                 dev.incr_cycle(1);
 
                 let addr = (high as u16) << 8 | low as u16;
 
                 self.registers.pc += 2;
-                self.fetched_data = dev.bus.as_mut().unwrap().read(addr) as u16;
+                self.fetched_data = dev.bus.as_ref().unwrap().read(addr) as u16;
                 dev.incr_cycle(1);
             }
         }

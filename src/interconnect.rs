@@ -35,7 +35,8 @@ impl Interconnect {
             cart: None,
             ram: RAM::new(),
             io: IO::new(),
-            ie_register: 0 }
+            ie_register: 0 
+        }
     }
 
     pub fn set_cart(&mut self, cart: Cartridge) {
@@ -128,7 +129,7 @@ impl Interconnect {
     }
 
     pub fn timer_tick(&mut self) {
-        self.io.timer.tick();
+        self.io.tick_timer();
     }
 }
 

@@ -1,3 +1,5 @@
+use std::result;
+
 use super::{instruction::*, CPU};
 
 use crate::{utils::*, Devices, EmuContext, Interconnect};
@@ -81,6 +83,7 @@ fn proc_ld(cpu: &mut CPU, dev: &mut Devices) {
         } else {
             dev.bus.as_mut().unwrap().write(cpu.mem_dest, cpu.fetched_data as u8);
         }
+        dev.incr_cycle(1);
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, cpu.fetched_data);
     }
@@ -101,8 +104,7 @@ fn proc_ldh(cpu: &mut CPU, dev: &mut Devices) {
 fn goto_addr(cpu: &mut CPU, dev: &mut Devices, address: u16, push_pc: bool) {
     if cpu.check_cond() {
         if push_pc {
-            dev.incr_cycle(1);
-            dev.incr_cycle(1);
+            dev.incr_cycle(2);
             cpu.push16(dev.bus.as_mut().unwrap(), cpu.registers.pc);
         }
         cpu.registers.pc = address;
@@ -206,20 +208,21 @@ fn proc_inc(cpu: &mut CPU, dev: &mut Devices) {
 
 fn proc_dec(cpu: &mut CPU, dev: &mut Devices) {
     let mut val = cpu.fetched_data;
-    
+
     if cpu.curr_inst.reg_1.is_16bit() {
         dev.incr_cycle(1);
+        val = val.wrapping_sub(1);
+    } else {
+        val = (cpu.fetched_data as u8).wrapping_sub(1) as u16;
     }
 
     if cpu.dest_is_mem {
-        let val = (cpu.fetched_data as u8).wrapping_sub(1);
-        dev.bus.as_mut().unwrap().write(cpu.registers.read(cpu.curr_inst.reg_1), val);
+        dev.bus.as_mut().unwrap().write(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
     } else {
-        val = val.wrapping_sub(1);
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
 
-    if !cpu.curr_inst.reg_1.is_16bit() {
+    if !cpu.curr_inst.reg_1.is_16bit() || cpu.curr_inst.mode == AddrMode::MR {
         cpu.set_flags((val == 0) as u8, 1, ((val & 0x0F) == 0xF) as u8, BIT_IGNORE);
     }
 }
@@ -282,13 +285,29 @@ fn proc_sbc(cpu: &mut CPU, _dev: &mut Devices) {
     let u = cpu.fetched_data as u8;
     let c = cpu.c_flag() as u8;
 
-    let (value, overflow1) = a.overflowing_sub(u);
-    let (value, overflow2) = value.overflowing_sub(c);
+    let val = u as u16 + c as u16;
 
-    let h = ((u + c) & 0xF) > (a & 0xF);
+    let h = (a & 0xF) < (u & 0xF) + c;
 
-    cpu.registers.a = value;
-    cpu.set_flags((value == 0) as u8, 1, h as u8, (overflow1 || overflow2) as u8);
+    let c =  (a as u16) < val;
+
+    let result = a.wrapping_sub(val as u8);
+    let z = result == 0;
+
+    // let sub = u.wrapping_add(c);
+    // let value = a.wrapping_sub(sub);
+
+    // let h = (a & 0xF) < (sub & 0xF); // borrow from bit 4
+    // let c = (a as u16) < (sub as u16); // borrow from bit 8
+
+    // let (value, overflow1) = a.overflowing_sub(u);
+    // let (value, overflow2) = value.overflowing_sub(c);
+
+    // let h = ((u.wrapping_add(c)) & 0xF) > (a & 0xF);
+    // let c = overflow1 || overflow2;
+
+    cpu.registers.a = result;
+    cpu.set_flags(z as u8, 1, h as u8, c as u8);
 }
 
 fn proc_and(cpu: &mut CPU, _dev: &mut Devices) {
@@ -325,8 +344,7 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
     dev.incr_cycle(1);
 
     if register == RegType::HL {
-        dev.incr_cycle(1);
-        dev.incr_cycle(1);
+        dev.incr_cycle(2);
     }
 
     match bit_op {

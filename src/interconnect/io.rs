@@ -59,4 +59,11 @@ impl IO {
             _ => eprintln!("Write at address {address:X} not implemented!"),
         }
     }
+
+    pub fn tick_timer(&mut self) {
+        let interrupt = self.timer.tick();
+        if let Some(interrupt) = interrupt {
+            self.if_register |= interrupt.value();
+        }
+    }
 }

@@ -2,7 +2,7 @@ use crate::Devices;
 
 use super::{CPU, Interconnect};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum InterruptType {
     VBlank = 1,
     LcdStat = 2,
@@ -12,7 +12,7 @@ pub enum InterruptType {
 }
 
 impl InterruptType {
-    fn value(&self) -> u8 {
+    pub fn value(&self) -> u8 {
         self.clone() as u8
     }
 }
@@ -40,14 +40,19 @@ impl CPU {
 
     fn interrupt_check(&mut self, dev: &mut Devices, address: u16, interrupt_type: InterruptType) -> bool {
         let if_register = self.get_int_flags(dev);
-        if (if_register & interrupt_type.value()) != 0 && 
-            (dev.bus.as_ref().unwrap().get_ie_register() & interrupt_type.value()) != 0 {
+        let ie_register = dev.bus.as_ref().unwrap().get_ie_register();
+        let it = interrupt_type.value();
+
+        if (if_register & it) != 0 && 
+            (ie_register & it) != 0 {
+
             self.interrupt_handle(dev, address);
 
-            self.set_int_flags(dev, if_register &!interrupt_type.value());
+            self.set_int_flags(dev, if_register & !it);
             
             self.halted = false;
             self.int_master_enabled = false;
+            
             return true
         }
         false
