@@ -5,13 +5,17 @@ mod ppu;
 mod utils;
 mod dbg;
 
-use std::{cell::RefCell, rc::Rc, sync::{Arc, Mutex, MutexGuard}, thread, time::Duration};
+use std::{
+    sync::{Arc, Mutex, MutexGuard, mpsc}, 
+    thread, 
+    time::Duration
+};
 
 use crate::{
     cart::Cartridge, 
     cpu::CPU, 
     ppu::PPU,
-    interconnect::Interconnect,
+    interconnect::{Interconnect, OAMEntry},
     dbg::Debugger,
 };
 
@@ -34,28 +38,34 @@ pub struct EmuContext {
     debug: bool,
     paused: bool,
     running: bool,
-    ticks: u64,
+
+    debug_tx: Option<mpsc::Sender<[OAMEntry; 40]>>, 
+    debug_rx: Option<mpsc::Receiver<[OAMEntry; 40]>>,
 }
 
 impl EmuContext {
     pub fn new(path: &str, debug: bool) -> EmuContext {
+        let (debug_tx, debug_rx);
+        if debug {
+            let (tx, rx) = mpsc::channel();
+            debug_tx = Some(tx);
+            debug_rx = Some(rx);
+        } else {
+            debug_tx = None;
+            debug_rx = None;
+        }
+
+
         EmuContext {
             file_path: path.to_string(),
 
             debug,
             paused: false,
             running: false,
-            ticks: 0,
+
+            debug_tx,
+            debug_rx
         }
-    }
-
-    fn incr_cycle(&mut self, bus: &mut Interconnect, cpu_cycles: u16) {
-        let n = cpu_cycles * 4;
-
-        for _ in 0..n {
-            self.ticks += 1;
-            bus.timer_tick();
-        }   
     }
 
     fn start(&mut self) {
@@ -72,6 +82,11 @@ impl EmuContext {
 
     fn is_paused(&self) -> bool {
         self.paused
+    }
+
+    pub fn get_debug_rx(&mut self) -> mpsc::Receiver<[OAMEntry; 40]> {
+        let debug_rx = self.debug_rx.take();
+        debug_rx.expect("Attempted to get the debug receiver while not in debug mode!")
     }
 }
 

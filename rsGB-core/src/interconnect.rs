@@ -8,7 +8,7 @@ mod oam;
 
 use ram::*;
 use io::*;
-use oam::*;
+pub use oam::*;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
