@@ -8,7 +8,7 @@ mod oam;
 
 use ram::*;
 use io::*;
-pub use oam::*;
+use oam::*;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
@@ -69,10 +69,14 @@ impl Interconnect {
 
             // OAM
             0xFE00..0xFEA0 => {
-                let address = (address - 0xFE00) as usize;
-                let byte = address % 4;
-                self.oam_ram[address].read(byte)
-            }, // panic!("Read at address {address:X} not implemented!"),
+                if self.io.dma_transferring() {
+                    0xFF
+                } else {
+                    let address = (address - 0xFE00) as usize;
+                    let byte = address % 4;
+                    self.oam_ram[address].read(byte)
+                } 
+            },
 
             // Reserved - Unusable
             0xFEA0..0xFF00 => 0,
@@ -114,9 +118,13 @@ impl Interconnect {
 
             // OAM
             0xFE00..0xFEA0 => {
-                let address = (address - 0xFE00) as usize;
-                let byte = address % 4;
-                self.oam_ram[address].write(byte, value);
+                if self.io.dma_transferring() {
+                    return
+                } else {
+                    let address = (address - 0xFE00) as usize;
+                    let byte = address % 4;
+                    self.oam_ram[address].write(byte, value);
+                }
             },
 
             // Reserved - Unusable
@@ -142,8 +150,21 @@ impl Interconnect {
         self.ie_register
     }
 
-    pub fn timer_tick(&mut self) {
+    /// This function ticks all the devices that tick once
+    /// per clock cycle, like the DMA.
+    pub fn tick_t(&mut self) {
         self.io.tick_timer();
+    }
+
+
+    /// This function ticks all the devices that tick once
+    /// per machine cycle, like the DMA.
+    pub fn tick_m(&mut self) {
+        if let Some((byte, val)) = self.io.tick_dma() {
+            let value = self.read(val as u16 * 0x100 + byte as u16);
+            let address = 0xFE00 | (byte as u16);
+            self.write(address, value);
+        }
     }
 }
 

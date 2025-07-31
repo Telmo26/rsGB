@@ -101,12 +101,13 @@ struct Devices<'a> {
 
 impl<'a> Devices<'a> {
     fn incr_cycle(&mut self, cpu_cycles: u16) {
-        let n = cpu_cycles * 4;
-
         if let Some(bus) = self.bus.as_mut() {
-            for _ in 0..n {
-                *self.ticks += 1;
-                bus.timer_tick();
+            for _ in 0..cpu_cycles {
+                for _ in 0..4 {
+                    *self.ticks += 1;
+                    bus.tick_t();
+                }
+                bus.tick_m();
             } 
         }  
     }
@@ -170,6 +171,7 @@ impl Emulator {
                 bus: Some(&mut (*ptr).bus),
                 cpu: None,
                 ppu: Some(&mut (*ptr).ppu),
+
                 debugger: &mut (*ptr).debugger,
                 ticks: &mut (*ptr).ticks
             };

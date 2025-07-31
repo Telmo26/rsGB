@@ -1,5 +1,8 @@
 mod timer;
+mod dma;
+
 use timer::Timer;
+use dma::DMA;
 
 /*
 
@@ -23,8 +26,9 @@ $FF70 | 	  |   CGB 	| WRAM Bank Select
 
 pub struct IO {
     serial: [u8; 2],
-    pub timer: Timer,
+    timer: Timer,
     if_register: u8,
+    dma: DMA,
 }
 
 impl IO {
@@ -33,6 +37,7 @@ impl IO {
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
+            dma: DMA::new(),
         }
     }
 
@@ -42,7 +47,7 @@ impl IO {
             0xFF02 => self.serial[1],
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => self.if_register,
-            0xFF44 => 0x90,
+            0xFF46 => 0x00, // DMA
             _ => {
                 eprintln!("Read at address {address:X} not implemented!");
                 0
@@ -56,6 +61,7 @@ impl IO {
             0xFF02 => self.serial[1] = value,
             0xFF04..=0xFF07 => self.timer.write(address, value),
             0xFF0F => self.if_register = value,
+            0xFF46 => self.dma.start(value),
             _ => eprintln!("Write at address {address:X} not implemented!"),
         }
     }
@@ -65,5 +71,13 @@ impl IO {
         if let Some(interrupt) = interrupt {
             self.if_register |= interrupt.value();
         }
+    }
+
+    pub fn tick_dma(&mut self) -> Option<(u8, u8)> {
+        self.dma.tick()
+    }
+
+    pub fn dma_transferring(&self) -> bool {
+        self.dma.transferring()
     }
 }
