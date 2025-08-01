@@ -1,8 +1,6 @@
-use std::result;
-
 use super::{instruction::*, CPU};
 
-use crate::{utils::*, Devices, EmuContext, Interconnect};
+use crate::{utils::*, Devices};
 
 impl CPU {
     pub fn execute(&mut self, dev: &mut Devices, instruction: InType) { // -> impl FnMut(&mut CPU, &mut Interconnect, &mut EmuContext) {
@@ -60,7 +58,7 @@ fn decode_register(register: u8) -> Option<RegType>{
 
 /* These are the processing functions */
 
-fn proc_nop(_cpu: &mut CPU, dev: &mut Devices) {}
+fn proc_nop(_cpu: &mut CPU, _dev: &mut Devices) {}
 
 fn proc_ld(cpu: &mut CPU, dev: &mut Devices) {
     if cpu.curr_inst.mode == AddrMode::HL_SP {

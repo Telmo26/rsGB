@@ -1,4 +1,4 @@
-use crate::{cpu::interrupts::InterruptType, interconnect::{io::IO, Interconnect}};
+use crate::{cpu::interrupts::InterruptType};
 
 #[derive(Debug)]
 pub struct Timer {

@@ -1,8 +1,10 @@
 mod timer;
 mod dma;
+mod lcd;
 
 use timer::Timer;
 use dma::DMA;
+use lcd::LCD;
 
 /*
 
@@ -28,7 +30,7 @@ pub struct IO {
     serial: [u8; 2],
     timer: Timer,
     if_register: u8,
-    ly: u8,
+    lcd: LCD,
     dma: DMA,
 }
 
@@ -38,7 +40,7 @@ impl IO {
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
-            ly: 0,
+            lcd: LCD::new(),
             dma: DMA::new(),
         }
     }
@@ -49,8 +51,7 @@ impl IO {
             0xFF02 => self.serial[1],
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => self.if_register,
-            0xFF44 => self.ly,
-            0xFF46 => 0x00, // DMA
+            0xFF40..=0xFF4B => self.lcd.read(address),
             _ => {
                 eprintln!("Read at address {address:X} not implemented!");
                 0
@@ -64,7 +65,10 @@ impl IO {
             0xFF02 => self.serial[1] = value,
             0xFF04..=0xFF07 => self.timer.write(address, value),
             0xFF0F => self.if_register = value,
-            0xFF46 => self.dma.start(value),
+            0xFF40..0xFF4B => {
+                if address == 0xFF46 { self.dma.start(value) }
+                self.lcd.write(address, value);
+            }
             _ => eprintln!("Write at address {address:X} not implemented!"),
         }
     }

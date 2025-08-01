@@ -5,7 +5,6 @@ use minifb::{Scale, Window, WindowOptions};
 // Add a pixel between all tiles
 const DEBUG_WIDTH: usize = 16 * 8 + 16; 
 const DEBUG_HEIGHT: usize = 32 * 8 + 32;
-
 const SCALE: Scale = Scale::X4;
 
 const COLORS: [u32; 4] = [0x00FFFFFF, 0x00AAAAAA, 0x00555555, 0x00000000];
