@@ -44,8 +44,8 @@ fn main() {
     }
 
     // When the window is shut, we stop the emulation and dump the frames
-    stop_emulation(context);
     windows.iter_mut().for_each(|w| w.dump());
+    stop_emulation(context);
 
     emulator_handle.join().unwrap();
 }

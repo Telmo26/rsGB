@@ -159,8 +159,6 @@ struct Emulator {
 
 impl Emulator {
     fn new(frame_tx: FrameSender, debug: bool, debug_tx: Option<DebugSender>) -> Emulator {
-        let mut ticks = 0;
-
         let devices: Devices = Devices::new(debug);
 
         Emulator {
@@ -190,9 +188,11 @@ impl Emulator {
     }
 
     fn check_debug(&mut self) {
-        if let Some(tx) = &self.debug_tx {
-            let t: [u8; 0x1800] = self.devices.bus.vram[0..0x1800].try_into().unwrap();
-            tx.send(t).unwrap();
+        if self.devices.bus.vram_update {
+            if let Some(tx) = &self.debug_tx {
+                let _ = tx.try_send(self.devices.bus.vram[0..0x1800].try_into().unwrap());
+                self.devices.bus.vram_update = false;
+            }
         }
     }
 }
@@ -229,9 +229,7 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
             println!("CPU Stopped");
             break;
         }
-        if emulator.devices.ticks % 1_000 == 0 {
-            emulator.check_debug();
-        }
+        emulator.check_debug();
     }
 }
 

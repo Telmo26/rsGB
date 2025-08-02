@@ -6,8 +6,6 @@ use timer::Timer;
 use dma::DMA;
 use lcd::LCD;
 
-use crate::cpu::interrupts;
-
 use super::InterruptType;
 
 /*

@@ -36,7 +36,10 @@ pub struct Interconnect {
     ram: RAM,
     oam_ram: [OAMEntry; 40],
     io: IO,
-    ie_register: u8
+    ie_register: u8,
+
+    // Debug info
+    pub(crate) vram_update: bool,
 }
 
 impl Interconnect {
@@ -47,7 +50,9 @@ impl Interconnect {
             ram: RAM::new(),
             oam_ram: [OAMEntry::new(); 40],
             io: IO::new(),
-            ie_register: 0 
+            ie_register: 0,
+
+            vram_update: false,
         }
     }
 
@@ -111,7 +116,10 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),
 
            // Char/Map Data
-            0x8000..0xA000 => self.vram[(address - 0x8000) as usize] = value,
+            0x8000..0xA000 => {
+                self.vram[(address - 0x8000) as usize] = value;
+                self.vram_update = true;
+            },
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_mut().unwrap().write(address, value),
