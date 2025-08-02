@@ -2,8 +2,6 @@ use crate::{interconnect::Interconnect, Devices};
 
 mod state_machine;
 
-use state_machine::*;
-
 const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;
 const YRES: usize = 144;
@@ -27,6 +25,9 @@ impl PPU {
     }
 
     pub fn tick(&mut self, bus: &mut Interconnect) {
+        self.line_ticks += 1;
+        self.new_frame = false;
+
         let lcd_status = bus.read(0xFF41);
         let mode = lcd_status & 0b11;
         

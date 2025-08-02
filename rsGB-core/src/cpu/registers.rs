@@ -87,7 +87,7 @@ impl CpuRegisters {
         }
     }
 
-    pub fn read_reg8(&self, bus: &mut Interconnect, register: RegType) -> u8 {
+    pub fn read_reg8(&self, bus: &Interconnect, register: RegType) -> u8 {
         match register {
             x if x < RegType::AF => self.read(register) as u8,
             RegType::HL => bus.read(self.read(register)),

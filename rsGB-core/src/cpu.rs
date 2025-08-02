@@ -50,20 +50,20 @@ impl CPU {
         }
     }
 
-    pub fn step(&mut self, mut dev: Devices) -> bool {
+    pub fn step(&mut self, dev: &mut Devices) -> bool {
         if !self.halted {
             let previous_pc = self.registers.pc;
 
-            self.fetch_instruction(&mut dev);
+            self.fetch_instruction(dev);
             dev.incr_cycle(1);
-            self.fetch_data(&mut dev);
+            self.fetch_data(dev);
 
-            if let Some(debugger) = dev.debugger {
-                debugger.debug_info(self, dev.bus.as_mut().unwrap(), *dev.ticks, previous_pc);
+            if let Some(debugger) = &mut dev.debugger {
+                debugger.debug_info(self, &mut dev.bus, dev.ticks, previous_pc);
                 // debugger.gameboy_doctor(self, dev.bus.as_mut().unwrap(), previous_pc);
             }
 
-            self.execute(&mut dev, self.curr_inst.in_type);
+            self.execute(dev, self.curr_inst.in_type);
         } else {
             dev.incr_cycle(1);
             if self.get_int_flags(&dev) != 0 {
@@ -72,7 +72,7 @@ impl CPU {
         }
 
         if self.int_master_enabled {
-            self.handle_interrupts(&mut dev);
+            self.handle_interrupts(dev);
             self.enabling_ime = false;
         }
 
@@ -83,7 +83,7 @@ impl CPU {
     }
 
     fn fetch_instruction(&mut self, dev: &mut Devices) {
-        self.curr_opcode = dev.bus.as_mut().unwrap().read(self.registers.pc);
+        self.curr_opcode = dev.bus.read(self.registers.pc);
         self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
         self.registers.pc += 1;
@@ -137,10 +137,10 @@ impl CPU {
     }
 
     fn get_int_flags(&self, dev: &Devices) -> u8 {
-        dev.bus.as_ref().unwrap().read(0xFF0F)
+        dev.bus.read(0xFF0F)
     }
 
     fn set_int_flags(&mut self, dev: &mut Devices, value: u8) {
-        dev.bus.as_mut().unwrap().write(0xFF0F, value);
+        dev.bus.write(0xFF0F, value);
     }
 }

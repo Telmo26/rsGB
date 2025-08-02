@@ -32,11 +32,6 @@ impl DMA {
         self.byte = self.byte.wrapping_add(1);
         self.active = self.byte < 0xA0;
 
-        if !self.active {
-            println!("DMA Done!");
-            thread::sleep(Duration::from_secs(2));
-        }
-
         Some((prev_byte, self.value))
     }
 

@@ -52,4 +52,8 @@ impl MainWindow {
     pub fn is_key_down(&self, key: Key) -> bool {
         self.window.is_key_down(key)
     }
+
+    pub fn dump(&mut self) {
+        let _ = self.frame_rx.recv_timeout(Duration::from_micros(16600));
+    }
 }

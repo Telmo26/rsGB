@@ -39,12 +39,9 @@ impl PPU {
                 self.current_frame += 1;
                 self.new_frame = true;
             } else {
-                self.new_frame = false;
                 status_mode_set(bus, LCDMode::OAM);
             }
             self.line_ticks = 0;
-        } else {
-            self.new_frame = false;
         }
     }
 

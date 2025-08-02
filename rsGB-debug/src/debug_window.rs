@@ -1,4 +1,4 @@
-use std::sync::mpsc::Receiver;
+use std::{sync::mpsc::Receiver, time::Duration};
 
 use minifb::{Scale, Window, WindowOptions};
 
@@ -26,29 +26,37 @@ impl DebugWindow {
                             ..WindowOptions::default()
                         }).unwrap();
         window.set_target_fps(60);
+        let buffer = [0x00000000; DEBUG_WIDTH * DEBUG_HEIGHT];
+
+        window.update_with_buffer(&buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
         
         DebugWindow { 
             window,
-            buffer: [0x00000000; DEBUG_WIDTH * DEBUG_HEIGHT],
+            buffer,
             debug_rx
         }
     }
 
     pub fn update(&mut self) {
-        let vram = self.debug_rx.recv()
-            .expect("Error while receiving tiles");
+        let recv_result = self.debug_rx.recv_timeout(Duration::from_micros(16600));
+        if let Ok(vram) = recv_result {
+            let tiles: &[[u8; 16]; 384] = 
+                unsafe { &*(vram.as_ptr() as *const [[u8; 16]; 384]) };
 
-        let tiles: &[[u8; 16]; 384] = 
-            unsafe { &*(vram.as_ptr() as *const [[u8; 16]; 384]) };
-
-        for y in 0..24 {
-            for x in 0..16 {
-                let tile = &tiles[x + y * 16];
-                display_tile(&mut self.buffer, x * 9, y * 9, tile);
+            for y in 0..24 {
+                for x in 0..16 {
+                    let tile = &tiles[x + y * 16];
+                    display_tile(&mut self.buffer, x * 9, y * 9, tile);
+                }
             }
+
+            self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
         }
 
-        self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
+    }
+
+    pub fn dump(&mut self) {
+        let _ = self.debug_rx.recv_timeout(Duration::from_micros(16600));
     }
 }
 

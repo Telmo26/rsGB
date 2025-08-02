@@ -32,10 +32,10 @@ use crate::{
 
 */
 
-type FrameSender = mpsc::SyncSender<[u32; 144 * 160]>;
-type FrameReceiver = mpsc::Receiver<[u32; 144 * 160]>;
+type FrameSender = mpsc::SyncSender<[u32; 0x5A00]>;
+type FrameReceiver = mpsc::Receiver<[u32; 0x5A00]>;
 
-type DebugSender = mpsc::Sender<[u8; 0x1800]>;
+type DebugSender = mpsc::SyncSender<[u8; 0x1800]>;
 type DebugReceiver = mpsc::Receiver<[u8; 0x1800]>;
 
 pub struct EmuContext {
@@ -56,7 +56,7 @@ impl EmuContext {
     pub fn new(path: &str, debug: bool) -> EmuContext {
         let (debug_tx, debug_rx);
         if debug {
-            let (tx, rx) = mpsc::channel();
+            let (tx, rx) = mpsc::sync_channel(1);
             debug_tx = Some(tx);
             debug_rx = Some(rx);
         } else {
@@ -109,112 +109,91 @@ impl EmuContext {
     }
 }
 
-struct Devices<'a> {
-    bus: Option<&'a mut Interconnect>,
-    cpu: Option<&'a mut CPU>,
-    ppu: Option<&'a mut PPU>,
+struct Devices {
+    bus: Interconnect,
+    ppu: PPU,
 
-    debugger: &'a mut Option<Debugger>,
-    ticks: &'a mut u64,
+    debugger: Option<Debugger>,
+    ticks: u64,
 }
 
-impl<'a> Devices<'a> {
+impl Devices {
+    fn new(debug: bool) -> Devices {
+        Devices {
+            bus: Interconnect::new(),
+            ppu: PPU::new(),
+
+            debugger: if debug { Some(Debugger::new()) } else { None },
+            ticks: 0,
+        }
+    }
     fn incr_cycle(&mut self, cpu_cycles: u16) {
-        if let Some(bus) = self.bus.as_mut() {
-            for _ in 0..cpu_cycles {
-                for _ in 0..4 {
-                    *self.ticks += 1;
-                    bus.tick_t();
-                }
-                bus.tick_m();
-            } 
-        }  
+        for _ in 0..cpu_cycles {
+            for _ in 0..4 {
+                self.ticks += 1;
+                self.bus.tick_t();
+                self.ppu.tick(&mut self.bus);
+            }
+            self.bus.tick_m();
+        } 
     }
 
     fn bus_read(&self, address: u16) -> u8 {
-        if let Some(bus) = self.bus.as_ref() {
-            bus.read(address)
-        } else {
-            panic!("Trying to read through a device that has no bus")
-        }
+        self.bus.read(address)
     }
 
     fn bus_write(&mut self, address: u16, value: u8) {
-        if let Some(bus) = self.bus.as_mut() {
-            bus.write(address, value)
-        } else {
-            panic!("Trying to write through a device that has no bus")
-        }
+        self.bus.write(address, value);
     }
 }
 
 struct Emulator {
-    bus: Interconnect,
     cpu: CPU,
-    ppu: PPU,
+
+    devices: Devices,
 
     frame_tx: FrameSender,
 
-    debugger: Option<Debugger>,
-    debug_tx: Option<Sender<[u8; 0x1800]>>,
-    ticks: u64,
+    debug_tx: Option<DebugSender>,
 }
 
 impl Emulator {
-    fn new(frame_tx: FrameSender, debug: bool, debug_tx: Option<Sender<[u8; 0x1800]>>) -> Emulator {
+    fn new(frame_tx: FrameSender, debug: bool, debug_tx: Option<DebugSender>) -> Emulator {
+        let mut ticks = 0;
+
+        let devices: Devices = Devices::new(debug);
+
         Emulator {
-            bus: Interconnect::new(),
             cpu: CPU::new(),
-            ppu: PPU::new(),
+            devices,
 
             frame_tx,
 
-            debugger: if debug { Some(Debugger::new()) } else { None },
             debug_tx,
-            ticks: 0,
         }
     }
 
     fn load_cart(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let cartridge = Cartridge::load(path)?;
-        self.bus.set_cart(cartridge);
+        self.devices.bus.set_cart(cartridge);
         Ok(())
     }
 
     fn step(&mut self) -> bool {
-        let (cpu, devices) = self.isolate_cpu();
+        let res = self.cpu.step(&mut self.devices);
 
-        let res = cpu.step(devices);
-
-        if let Some(frame) = self.ppu.get_frame() {
+        if let Some(frame) = self.devices.ppu.get_frame() {
+            println!("Sending the frame");
             self.frame_tx.send(frame).unwrap();
         }
         res
     }
 
-    fn isolate_cpu<'a>(&'a mut self) -> (&'a mut CPU, Devices<'a>) {
-        unsafe {
-            let ptr = self as *mut Emulator;
-            let devices = Devices {
-                bus: Some(&mut (*ptr).bus),
-                cpu: None,
-                ppu: Some(&mut (*ptr).ppu),
-
-                debugger: &mut (*ptr).debugger,
-                ticks: &mut (*ptr).ticks
-            };
-            (&mut (*ptr).cpu, devices)
-        } 
-    }
-
     fn check_debug(&mut self) {
-        match &self.debug_tx {
-            Some(tx) => {
-                let t: [u8; 0x1800] = self.bus.vram[0..0x1800].try_into().unwrap();
-                tx.send(t).unwrap();
-            },
-            None => ()
-        };
+        if let Some(tx) = &self.debug_tx {
+            let t: [u8; 0x1800] = self.devices.bus.vram[0..0x1800].try_into().unwrap();
+            tx.send(t).unwrap();
+        }
     }
 }
 
@@ -250,9 +229,9 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
             println!("CPU Stopped");
             break;
         }
-        if emulator.ticks % 1_000 == 0 {
+        if emulator.devices.ticks % 1_000 == 0 {
             emulator.check_debug();
-        } 
+        }
     }
 }
 

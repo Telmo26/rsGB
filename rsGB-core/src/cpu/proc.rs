@@ -77,9 +77,9 @@ fn proc_ld(cpu: &mut CPU, dev: &mut Devices) {
     } else if cpu.dest_is_mem {
         if cpu.curr_inst.reg_2.is_16bit() {
             dev.incr_cycle(1);
-            dev.bus.as_mut().unwrap().write16(cpu.mem_dest, cpu.fetched_data);
+            dev.bus.write16(cpu.mem_dest, cpu.fetched_data);
         } else {
-            dev.bus.as_mut().unwrap().write(cpu.mem_dest, cpu.fetched_data as u8);
+            dev.bus.write(cpu.mem_dest, cpu.fetched_data as u8);
         }
         dev.incr_cycle(1);
     } else {
@@ -93,7 +93,7 @@ fn proc_ldh(cpu: &mut CPU, dev: &mut Devices) {
         cpu.registers.set(RegType::A, cpu.fetched_data);
     } else {
         // Loading A into a memory region
-        dev.bus.as_mut().unwrap().write(cpu.mem_dest, cpu.fetched_data as u8)
+        dev.bus.write(cpu.mem_dest, cpu.fetched_data as u8)
     }
 
     dev.incr_cycle(1);
@@ -103,7 +103,7 @@ fn goto_addr(cpu: &mut CPU, dev: &mut Devices, address: u16, push_pc: bool) {
     if cpu.check_cond() {
         if push_pc {
             dev.incr_cycle(2);
-            cpu.push16(dev.bus.as_mut().unwrap(), cpu.registers.pc);
+            cpu.push16(&mut dev.bus, cpu.registers.pc);
         }
         cpu.registers.pc = address;
         dev.incr_cycle(1);
@@ -134,10 +134,10 @@ fn proc_ret(cpu: &mut CPU, dev: &mut Devices) {
     }
 
     if cpu.check_cond() {
-        let low: u16 = cpu.pop(dev.bus.as_mut().unwrap()) as u16;
+        let low: u16 = cpu.pop(&mut dev.bus) as u16;
         dev.incr_cycle(1);
 
-        let high: u16 = cpu.pop(dev.bus.as_mut().unwrap()) as u16;
+        let high: u16 = cpu.pop(&mut dev.bus) as u16;
         dev.incr_cycle(1);
 
         cpu.registers.pc = (high << 8) | low;
@@ -156,10 +156,10 @@ fn proc_di(cpu: &mut CPU, _dev: &mut Devices) {
 }
 
 fn proc_pop(cpu: &mut CPU, dev: &mut Devices) {
-    let low = cpu.pop(dev.bus.as_mut().unwrap()) as u16;
+    let low = cpu.pop(&mut dev.bus) as u16;
     dev.incr_cycle(1);
 
-    let high = cpu.pop(dev.bus.as_mut().unwrap()) as u16;
+    let high = cpu.pop(&mut dev.bus) as u16;
     dev.incr_cycle(1);
 
     let data = (high << 8) | low;
@@ -174,11 +174,11 @@ fn proc_pop(cpu: &mut CPU, dev: &mut Devices) {
 fn proc_push(cpu: &mut CPU, dev: &mut Devices) {
     let high = (cpu.registers.read(cpu.curr_inst.reg_1) >> 8) as u8;
     dev.incr_cycle(1);
-    cpu.push(dev.bus.as_mut().unwrap(), high);
+    cpu.push(&mut dev.bus, high);
 
     let low = cpu.registers.read(cpu.curr_inst.reg_1) as u8;
     dev.incr_cycle(1);
-    cpu.push(dev.bus.as_mut().unwrap(), low);
+    cpu.push(&mut dev.bus, low);
 
     dev.incr_cycle(1);
 }
@@ -194,7 +194,7 @@ fn proc_inc(cpu: &mut CPU, dev: &mut Devices) {
     }
 
     if cpu.dest_is_mem {
-        dev.bus.as_mut().unwrap().write(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
+        dev.bus.write(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
@@ -215,7 +215,7 @@ fn proc_dec(cpu: &mut CPU, dev: &mut Devices) {
     }
 
     if cpu.dest_is_mem {
-        dev.bus.as_mut().unwrap().write(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
+        dev.bus.write(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
@@ -325,7 +325,7 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
     let bit = (op >> 3) & 0b111;
     let bit_op = (op >> 6) & 0b11;
 
-    let mut reg_val = cpu.registers.read_reg8(dev.bus.as_mut().unwrap(), register);
+    let mut reg_val = cpu.registers.read_reg8(&dev.bus, register);
 
     dev.incr_cycle(1);
 
@@ -339,11 +339,11 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
         }, 
         2 => { // RES
             reg_val &= !(1 << bit);
-            cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, reg_val)
+            cpu.registers.set_reg8(&mut dev.bus, register, reg_val)
         },
         3 => { // SET
             reg_val |= 1 << bit;
-            cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, reg_val)
+            cpu.registers.set_reg8(&mut dev.bus, register, reg_val)
         },
         0 => { // OTHER
             let cflag = cpu.c_flag() as u8;
@@ -356,7 +356,7 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
                         value |= 1;
                         set_c = true
                     }
-                    cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, value);
+                    cpu.registers.set_reg8(&mut dev.bus, register, value);
                     cpu.set_flags((value == 0) as u8, 0, 0, set_c as u8);
                 },
                 1 => { // RRC
@@ -364,7 +364,7 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
                     reg_val >>= 1;
                     reg_val |= old << 7;
 
-                    cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, reg_val);
+                    cpu.registers.set_reg8(&mut dev.bus, register, reg_val);
                     cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
                 }
                 2 => { // RL
@@ -372,7 +372,7 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
                     reg_val <<= 1;
                     reg_val |= cflag;
 
-                    cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, reg_val);
+                    cpu.registers.set_reg8(&mut dev.bus, register, reg_val);
                     cpu.set_flags((reg_val == 0) as u8, 0, 0, ((old & 0x80) != 0) as u8);
                 },
                 3 => { // RR
@@ -380,33 +380,33 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
                     reg_val >>= 1;
                     reg_val |= cflag << 7;
 
-                    cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, reg_val);
+                    cpu.registers.set_reg8(&mut dev.bus, register, reg_val);
                     cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
                 },
                 4 => { // SLA,
                     let old = reg_val;
                     reg_val <<= 1;
 
-                    cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, reg_val);
+                    cpu.registers.set_reg8(&mut dev.bus, register, reg_val);
                     cpu.set_flags((reg_val == 0) as u8, 0, 0, ((old & 0x80) != 0) as u8);
                 }
                 5 => { // SRA,
                     let u = (reg_val.cast_signed() >> 1) as u8;
 
-                    cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, u);
+                    cpu.registers.set_reg8(&mut dev.bus, register, u);
                     cpu.set_flags((u == 0) as u8, 0, 0, reg_val & 1);
                 } 
                 6 => { // SWAP
                     reg_val = ((reg_val & 0xF0) >> 4) | ((reg_val & 0x0F) << 4);
 
-                    cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, reg_val);
+                    cpu.registers.set_reg8(&mut dev.bus, register, reg_val);
                     cpu.set_flags((reg_val == 0) as u8, 0, 0, 0);
                 },
                 7 => { // SRL
                     let old = reg_val;
                     reg_val >>= 1;
 
-                    cpu.registers.set_reg8(dev.bus.as_mut().unwrap(), register, reg_val);
+                    cpu.registers.set_reg8(&mut dev.bus, register, reg_val);
                     cpu.set_flags((reg_val == 0) as u8, 0, 0, old & 1);
                 },
                 _ => panic!("Unknown CB-prefixed command {op}")
