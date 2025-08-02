@@ -6,6 +6,10 @@ use timer::Timer;
 use dma::DMA;
 use lcd::LCD;
 
+use crate::cpu::interrupts;
+
+use super::InterruptType;
+
 /*
 
 Start | End   | 1st app | Purpose
@@ -78,6 +82,10 @@ impl IO {
         if let Some(interrupt) = interrupt {
             self.if_register |= interrupt.value();
         }
+    }
+
+    pub fn request_interrupt(&mut self, interrupt: InterruptType) {
+        self.if_register |= interrupt as u8;
     }
 
     pub fn tick_dma(&mut self) -> Option<(u8, u8)> {

@@ -4,6 +4,10 @@ use crate::{
     cart::Cartridge, cpu::AddrMode,
 };
 
+pub use crate::{
+    cpu::interrupts::InterruptType
+};
+
 mod ram;
 mod io;
 mod oam;
@@ -150,6 +154,10 @@ impl Interconnect {
 
     pub fn get_ie_register(&self) -> u8 {
         self.ie_register
+    }
+
+    pub fn request_interrupt(&mut self, interrupt: InterruptType) {
+        self.io.request_interrupt(interrupt);
     }
 
     /// This function ticks all the devices that tick once

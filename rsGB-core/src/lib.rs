@@ -32,6 +32,12 @@ use crate::{
 
 */
 
+type FrameSender = mpsc::SyncSender<[u32; 144 * 160]>;
+type FrameReceiver = mpsc::Receiver<[u32; 144 * 160]>;
+
+type DebugSender = mpsc::Sender<[u8; 0x1800]>;
+type DebugReceiver = mpsc::Receiver<[u8; 0x1800]>;
+
 pub struct EmuContext {
     file_path: String,
 
@@ -39,8 +45,11 @@ pub struct EmuContext {
     paused: bool,
     running: bool,
 
-    debug_tx: Option<mpsc::Sender<[u8; 0x1800]>>, 
-    debug_rx: Option<mpsc::Receiver<[u8; 0x1800]>>,
+    frame_tx: Option<FrameSender>,
+    frame_rx: Option<FrameReceiver>,
+
+    debug_tx: Option<DebugSender>, 
+    debug_rx: Option<DebugReceiver>,
 }
 
 impl EmuContext {
@@ -55,6 +64,8 @@ impl EmuContext {
             debug_rx = None;
         }
 
+        let (frame_tx, frame_rx) = mpsc::sync_channel(1);
+
 
         EmuContext {
             file_path: path.to_string(),
@@ -62,6 +73,9 @@ impl EmuContext {
             debug,
             paused: false,
             running: false,
+
+            frame_tx: Some(frame_tx),
+            frame_rx: Some(frame_rx),
 
             debug_tx,
             debug_rx
@@ -84,9 +98,14 @@ impl EmuContext {
         self.paused
     }
 
-    pub fn get_debug_rx(&mut self) -> mpsc::Receiver<[u8; 0x1800]> {
+    pub fn get_debug_rx(&mut self) -> DebugReceiver {
         let debug_rx = self.debug_rx.take();
         debug_rx.expect("Attempted to get the debug receiver while not in debug mode!")
+    }
+
+    pub fn get_frame_rx(&mut self) -> FrameReceiver {
+        self.frame_rx.take()
+            .expect("Tried to get the frame receiver twice")
     }
 }
 
@@ -134,17 +153,21 @@ struct Emulator {
     cpu: CPU,
     ppu: PPU,
 
+    frame_tx: FrameSender,
+
     debugger: Option<Debugger>,
     debug_tx: Option<Sender<[u8; 0x1800]>>,
     ticks: u64,
 }
 
 impl Emulator {
-    fn new(debug: bool, debug_tx: Option<Sender<[u8; 0x1800]>>) -> Emulator {
+    fn new(frame_tx: FrameSender, debug: bool, debug_tx: Option<Sender<[u8; 0x1800]>>) -> Emulator {
         Emulator {
             bus: Interconnect::new(),
             cpu: CPU::new(),
             ppu: PPU::new(),
+
+            frame_tx,
 
             debugger: if debug { Some(Debugger::new()) } else { None },
             debug_tx,
@@ -161,7 +184,12 @@ impl Emulator {
     fn step(&mut self) -> bool {
         let (cpu, devices) = self.isolate_cpu();
 
-        cpu.step(devices)
+        let res = cpu.step(devices);
+
+        if let Some(frame) = self.ppu.get_frame() {
+            self.frame_tx.send(frame).unwrap();
+        }
+        res
     }
 
     fn isolate_cpu<'a>(&'a mut self) -> (&'a mut CPU, Devices<'a>) {
@@ -196,7 +224,9 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
     let debug = ctx.debug;
     let debug_tx = ctx.debug_tx.take();
 
-    let mut emulator = Emulator::new(debug, debug_tx);
+    let frame_tx = ctx.frame_tx.take().unwrap();
+
+    let mut emulator = Emulator::new(frame_tx, debug, debug_tx);
      
     emulator.load_cart(&ctx.file_path)
         .expect(&format!("Failed to load the ROM file: {}", &ctx.file_path));
