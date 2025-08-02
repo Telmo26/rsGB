@@ -137,23 +137,13 @@ impl Devices {
             self.bus.tick_m();
         } 
     }
-
-    fn bus_read(&self, address: u16) -> u8 {
-        self.bus.read(address)
-    }
-
-    fn bus_write(&mut self, address: u16, value: u8) {
-        self.bus.write(address, value);
-    }
 }
 
 struct Emulator {
     cpu: CPU,
-
     devices: Devices,
 
     frame_tx: FrameSender,
-
     debug_tx: Option<DebugSender>,
 }
 
@@ -166,7 +156,6 @@ impl Emulator {
             devices,
 
             frame_tx,
-
             debug_tx,
         }
     }

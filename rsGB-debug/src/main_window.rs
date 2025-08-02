@@ -10,7 +10,6 @@ type FrameReceiver = std::sync::mpsc::Receiver<[u32; WIDTH * HEIGHT]>;
 
 pub struct MainWindow {
     window: Window,
-    buffer: [u32; WIDTH* HEIGHT],
     frame_rx: FrameReceiver,
 }
 
@@ -26,13 +25,9 @@ impl MainWindow {
             }
         ).unwrap();
         window.set_target_fps(60);
-        
-        let buffer = [0x00000000; WIDTH* HEIGHT];
-        window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
 
         MainWindow { 
             window, 
-            buffer,
             frame_rx,
         }
     }
@@ -42,11 +37,10 @@ impl MainWindow {
     }
 
     pub fn update(&mut self) {
-        match self.frame_rx.recv_timeout(Duration::from_micros(16600)) {
-            Ok(b) => self.buffer = b,
-            Err(_) => (),
+        let recv_result = self.frame_rx.recv_timeout(Duration::from_micros(16600));
+        if let Ok(buffer) = recv_result {
+            self.window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
         };
-        self.window.update_with_buffer(&self.buffer, WIDTH, HEIGHT).unwrap();
     }
 
     pub fn is_key_down(&self, key: Key) -> bool {

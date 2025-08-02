@@ -40,20 +40,20 @@ impl PPU {
         }
     }
 
-    pub fn oam_read(&self, dev: &mut Devices, address: u16) -> u8 {
-        dev.bus_read(address)
+    pub fn oam_read(&self, dev: &Devices, address: u16) -> u8 {
+        dev.bus.read(address)
     }
 
     pub fn oam_write(&self, dev: &mut Devices, address: u16, value: u8) {
-        dev.bus_write(address, value);
+        dev.bus.write(address, value);
     }
 
-    pub fn vram_read(&self, dev: &mut Devices, address: u16) -> u8 {
-        dev.bus_read(address)
+    pub fn vram_read(&self, dev: &Devices, address: u16) -> u8 {
+        dev.bus.read(address)
     }
 
     pub fn vram_write(&self, dev: &mut Devices, address: u16, value: u8) {
-        dev.bus_write(address, value);
+        dev.bus.write(address, value);
     }
 
     pub fn get_frame(&self) -> Option<[u32; XRES * YRES]> {
