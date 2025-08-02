@@ -32,7 +32,8 @@ fn main() {
     // Creation of the windows
     let mut windows = Vec::new();
 
-    let main_window = MainWindow::new();
+    let frame_rx = context.lock().unwrap().get_frame_rx();
+    let main_window = MainWindow::new(frame_rx);
     windows.push(CustomWindow::MainWindow(main_window));    
 
     if CORE_DEBUG {
