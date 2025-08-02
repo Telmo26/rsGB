@@ -3,8 +3,8 @@ use std::{sync::mpsc::Receiver, time::Duration};
 use minifb::{Scale, Window, WindowOptions};
 
 // Add a pixel between all tiles
-const DEBUG_WIDTH: usize = 16 * 8 + 16; 
-const DEBUG_HEIGHT: usize = 32 * 8 + 32;
+const DEBUG_WIDTH: usize = 16 * 8 + 16 + 1; 
+const DEBUG_HEIGHT: usize = 24 * 8 + 24 + 1;
 const SCALE: Scale = Scale::X4;
 
 const COLORS: [u32; 4] = [0x00FFFFFF, 0x00AAAAAA, 0x00555555, 0x00000000];
@@ -46,7 +46,7 @@ impl DebugWindow {
             for y in 0..24 {
                 for x in 0..16 {
                     let tile = &tiles[x + y * 16];
-                    display_tile(&mut self.buffer, x * 9, y * 9, tile);
+                    display_tile(&mut self.buffer, x * 9 + 1, y * 9 + 1, tile);
                 }
             }
 
