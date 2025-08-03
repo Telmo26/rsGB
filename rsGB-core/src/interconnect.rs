@@ -184,5 +184,9 @@ impl Interconnect {
             self.write(address, value);
         }
     }
+
+    pub fn lcd_bg_colors(&self) -> &[u32; 4] {
+        return &self.io.lcd.bg_colors
+    }
 }
 

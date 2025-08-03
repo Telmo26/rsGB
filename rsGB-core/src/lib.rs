@@ -170,7 +170,6 @@ impl Emulator {
         let res = self.cpu.step(&mut self.devices);
 
         if let Some(frame) = self.devices.ppu.get_frame() {
-            println!("Sending the frame");
             self.frame_tx.send(frame).unwrap();
         }
         res

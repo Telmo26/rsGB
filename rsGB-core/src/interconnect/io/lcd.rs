@@ -17,7 +17,7 @@ pub struct LCD {
     win_y: u8,
     win_x: u8,
 
-    // Other data
+    pub(crate) // Other data
     bg_colors: [u32; 4],
     sp1_colors: [u32; 4],
     sp2_colors: [u32; 4],

@@ -1,15 +1,13 @@
-use std::{env, ops::Deref, sync::{mpsc::Receiver, Arc, Mutex, MutexGuard}, thread};
+use std::{env, sync::{Arc, Mutex, MutexGuard}, thread};
 
 use rs_gb_core::{run, EmuContext};
 
-use minifb::{Key, Window, WindowOptions, Scale};
+use minifb::Key;
 
 mod main_window;
 mod debug_window;
 use main_window::MainWindow;
 use debug_window::DebugWindow;
-
-const COLORS: [u32; 4] = [0x00FFFFFF, 0x00AAAAAA, 0x00555555, 0x00000000];
 
 const CORE_DEBUG: bool = true;
 
@@ -42,7 +40,7 @@ fn main() {
             (*w).update();
         }
     }
-
+    
     // When the window is shut, we stop the emulation and dump the frames
     windows.iter_mut().for_each(|w| w.dump());
     stop_emulation(context);

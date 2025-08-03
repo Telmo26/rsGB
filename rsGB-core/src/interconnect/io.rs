@@ -32,7 +32,7 @@ pub struct IO {
     serial: [u8; 2],
     timer: Timer,
     if_register: u8,
-    lcd: LCD,
+    pub(crate) lcd: LCD,
     dma: DMA,
 }
 

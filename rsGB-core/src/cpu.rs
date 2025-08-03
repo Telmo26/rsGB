@@ -3,7 +3,6 @@ mod instruction;
 mod registers;
 mod stack;
 pub mod interrupts;
-mod debug;
 mod fetch_data;
 
 use crate::{
