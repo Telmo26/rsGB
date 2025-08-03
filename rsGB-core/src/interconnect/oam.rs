@@ -1,9 +1,9 @@
 #[derive(Debug, Clone, Copy)]
 pub struct OAMEntry {
-    y: u8,
-    x: u8,
-    tile: u8,
-    flags: u8,
+    pub y: u8,
+    pub x: u8,
+    pub(crate) tile: u8,
+    pub(crate) flags: u8,
 }
 
 /*
@@ -21,7 +21,7 @@ impl OAMEntry {
         OAMEntry { y: 0, x: 0, tile: 0, flags: 0 }
     }
 
-    pub fn write(&mut self, byte: usize, value: u8) {
+    pub fn write(&mut self, byte: u8, value: u8) {
         match byte {
             0 => self.y = value,
             1 => self.x = value,
@@ -31,7 +31,7 @@ impl OAMEntry {
         }
     }
 
-    pub fn read(&self, byte: usize) -> u8 {
+    pub fn read(&self, byte: u8) -> u8 {
         match byte {
             0 => self.y,
             1 => self.x,
@@ -39,6 +39,30 @@ impl OAMEntry {
             3 => self.flags,
             _ => panic!() // This can never happen
         }
+    }
+
+    pub fn bg_over_obj(&self) -> bool {
+        self.flags & (1 << 7) != 0
+    }
+
+    pub fn y_flip(&self) -> bool {
+        self.flags & (1 << 6) != 0
+    }
+
+    pub fn x_flip(&self) -> bool {
+        self.flags & (1 << 5) != 0
+    }
+
+    pub fn palette_nb(&self) -> bool {
+        self.flags & (1 << 4) != 0
+    }
+
+    pub fn _vram_bank(&self) -> bool {
+        self.flags & (1 << 3) != 0
+    }
+
+    pub fn _cgb_palette_nb(&self) -> u8 {
+        self.flags & 0b111
     }
 }
 

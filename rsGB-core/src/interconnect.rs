@@ -14,7 +14,7 @@ mod oam;
 
 use ram::*;
 use io::*;
-use oam::*;
+pub use oam::OAMEntry;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
@@ -83,9 +83,9 @@ impl Interconnect {
                 if self.io.dma_transferring() {
                     0xFF
                 } else {
-                    let address = ((address - 0xFE00)/4) as usize;
-                    let byte = address % 4;
-                    self.oam_ram[address].read(byte)
+                    let sprite_index = ((address - 0xFE00)/4) as usize;
+                    let byte = (address % 4) as u8;
+                    self.oam_ram[sprite_index].read(byte)
                 } 
             },
 
@@ -135,9 +135,9 @@ impl Interconnect {
                 if self.io.dma_transferring() {
                     return
                 } else {
-                    let address = ((address - 0xFE00)/4) as usize;
-                    let byte = address % 4;
-                    self.oam_ram[address].write(byte, value);
+                    let sprite_index = ((address - 0xFE00)/4) as usize;
+                    let byte = (address % 4) as u8;
+                    self.oam_ram[sprite_index].write(byte, value);
                 }
             },
 
@@ -179,14 +179,32 @@ impl Interconnect {
     /// per machine cycle, like the DMA.
     pub fn tick_m(&mut self) {
         if let Some((byte, val)) = self.io.tick_dma() {
-            let value = self.read(val as u16 * 0x100 + byte as u16);
+            let source_addr = val as u16 * 0x100 + byte as u16;
+            let value = self.read(source_addr);
             let address = 0xFE00 | (byte as u16);
-            self.write(address, value);
+
+            let sprite_index = byte as usize / 4;
+            let byte_offset = byte as u8 % 4;
+            self.oam_ram[sprite_index].write(byte_offset, value);
         }
     }
 
     pub fn lcd_bg_colors(&self) -> &[u32; 4] {
-        return &self.io.lcd.bg_colors
+        &self.io.lcd.bg_colors
+    }
+
+    pub fn lcd_sp1_colors(&self) -> &[u32; 4] {
+        &self.io.lcd.sp1_colors
+    }
+
+    pub fn lcd_sp2_colors(&self) -> &[u32; 4] {
+        &self.io.lcd.sp2_colors
+    }
+
+    pub fn oam_sprite(&self, index: u8) -> OAMEntry {
+        assert!(index < 40);
+
+        self.oam_ram[index as usize]
     }
 }
 

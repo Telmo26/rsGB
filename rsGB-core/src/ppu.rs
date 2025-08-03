@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{Devices, interconnect::Interconnect};
+use crate::{interconnect::{Interconnect, OAMEntry}, Devices};
 
 mod state_machine;
 mod pixel_fifo;
@@ -15,7 +15,12 @@ const XRES: usize = 160;
 const PIXELS: usize = 0x5A00;
 
 pub struct PPU {
+    line_sprites: Vec<OAMEntry>,
+
+    fetched_entries: Vec<OAMEntry>, // Capacity : 3
+
     pixel_fifo: PixelFifo,
+    
     current_frame: u32,
     line_ticks: u32,
     video_buffer: [u32; PIXELS],
@@ -25,7 +30,12 @@ pub struct PPU {
 impl PPU {
     pub fn new() -> PPU {
         PPU {
+            line_sprites: Vec::with_capacity(10),
+
+            fetched_entries: Vec::with_capacity(3),
+
             pixel_fifo: PixelFifo::new(),
+
             current_frame: 0,
             line_ticks: 0,
             video_buffer: [0; PIXELS],

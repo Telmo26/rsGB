@@ -19,8 +19,8 @@ pub struct LCD {
 
     pub(crate) // Other data
     bg_colors: [u32; 4],
-    sp1_colors: [u32; 4],
-    sp2_colors: [u32; 4],
+    pub(crate) sp1_colors: [u32; 4],
+    pub(crate) sp2_colors: [u32; 4],
 }
 
 impl LCD {

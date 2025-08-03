@@ -1,5 +1,5 @@
 use crate::{
-    interconnect::{Interconnect, InterruptType}, 
+    interconnect::{Interconnect, InterruptType}, ppu::utils::{lcd_read_ly, lcdc_obj_height}, 
 };
 
 use super::{
@@ -14,6 +14,26 @@ const START_TIMER: f64 = 0.0;
 const FRAME_COUNT: f64 = 0.0;
 
 impl PPU {
+    fn load_line_sprites(&mut self, bus: &mut Interconnect) {
+        let cur_y = lcd_read_ly(bus);
+        let sprite_height = lcdc_obj_height(bus);
+
+        for i in 0..40 {
+            let e = bus.oam_sprite(i);
+
+            if e.x == 0 { continue } // X = 0 means invisible
+
+            if self.line_sprites.len() > 9 { 
+                break 
+            }
+
+            if e.y <= cur_y + 16 && e.y + sprite_height > cur_y + 16 {
+                // This sprite is on the current line
+                self.line_sprites.push(e);
+            }
+        }
+        self.line_sprites.sort_by_key(|e| e.x);
+    }   
     pub fn hblank(&mut self, bus: &mut Interconnect) {
         if self.line_ticks >= TICKS_PER_LINE {
             let mut ly = bus.read(0xFF44);
@@ -60,13 +80,20 @@ impl PPU {
             self.pixel_fifo.pushed_x = 0;
             self.pixel_fifo.fifo_x = 0;
         }
+
+        if self.line_ticks == 1 {
+            // Read OAM on the first tick only
+            self.line_sprites.clear();
+
+            self.load_line_sprites(bus);
+        }
     }
 
     pub fn xfer(&mut self, bus: &mut Interconnect) {
-        self.pixel_fifo.process(bus, &mut self.video_buffer, self.line_ticks);
+        self.pipeline_process(bus);
         
         if self.pixel_fifo.pushed_x >= XRES as u8 {
-            self.pixel_fifo.reset();
+            self.pipeline_reset();
 
             change_lcd_mode(bus, LCDMode::HBlank);
 
