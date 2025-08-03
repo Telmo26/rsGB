@@ -9,10 +9,10 @@ mod debug_window;
 use main_window::MainWindow;
 use debug_window::DebugWindow;
 
-const CORE_DEBUG: bool = true;
+const CORE_DEBUG: bool = false;
 
 fn main() {
-    // PArsing of the arguments
+    // Parsing of the arguments
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         println!("Usage: rsgb <rom_file>");
@@ -35,14 +35,18 @@ fn main() {
     );
     
     // Updating the windows
-    while windows[0].is_open() && !windows[0].is_key_down(Key::Escape) {
-        for w in &mut windows {
-            (*w).update();
-        }
+    while windows.iter().any(|w| w.is_main() && w.is_open()) {
+        windows.retain_mut(|window|
+            if window.is_open() {
+                window.update();
+                true
+            } else {
+                false
+            }
+        );
     }
     
     // When the window is shut, we stop the emulation and dump the frames
-    windows.iter_mut().for_each(|w| w.dump());
     stop_emulation(context);
 
     emulator_handle.join().unwrap();
@@ -72,10 +76,16 @@ enum CustomWindow {
 
 impl CustomWindow {
     fn is_open(&self) -> bool {
-        if let CustomWindow::MainWindow(w) = self {
-            w.is_open()
-        } else {
-            false
+        match self {
+            CustomWindow::MainWindow(w) => w.is_open(),
+            CustomWindow::DebugWindow(w) => w.is_open(),
+        }
+    }
+
+    fn is_main(&self) -> bool {
+        match self {
+            CustomWindow::MainWindow(_) => true,
+            _ => false
         }
     }
 

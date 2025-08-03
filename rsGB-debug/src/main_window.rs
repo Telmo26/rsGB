@@ -38,9 +38,12 @@ impl MainWindow {
 
     pub fn update(&mut self) {
         let recv_result = self.frame_rx.recv_timeout(Duration::from_micros(16600));
+
         if let Ok(buffer) = recv_result {
             self.window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
-        };
+        } else {
+            self.window.update();
+        }
     }
 
     pub fn is_key_down(&self, key: Key) -> bool {

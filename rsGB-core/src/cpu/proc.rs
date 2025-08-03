@@ -453,7 +453,7 @@ fn proc_rra(cpu: &mut CPU, _dev: &mut Devices) {
 }
 
 fn proc_stop(_cpu: &mut CPU, _dev: &mut Devices) {
-    panic!("STOP instruction received!")
+    println!("STOP instruction received!")
 }
 
 fn proc_daa(cpu: &mut CPU, _dev: &mut Devices) {

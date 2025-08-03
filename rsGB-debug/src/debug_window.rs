@@ -51,8 +51,14 @@ impl DebugWindow {
             }
 
             self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
+        } else {
+            self.window.update();
         }
 
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.window.is_open()
     }
 
     pub fn dump(&mut self) {
