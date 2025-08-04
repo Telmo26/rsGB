@@ -67,7 +67,7 @@ impl IO {
             0xFF02 => self.serial[1] = value,
             0xFF04..=0xFF07 => self.timer.write(address, value),
             0xFF0F => self.if_register = value,
-            0xFF40..0xFF4B => {
+            0xFF40..=0xFF4B => {
                 if address == 0xFF46 { self.dma.start(value) }
                 self.lcd.write(address, value);
             }
@@ -78,7 +78,7 @@ impl IO {
     pub fn tick_timer(&mut self) {
         let interrupt = self.timer.tick();
         if let Some(interrupt) = interrupt {
-            self.if_register |= interrupt.value();
+            self.if_register |= interrupt as u8;
         }
     }
 

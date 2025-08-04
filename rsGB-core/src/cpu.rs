@@ -50,6 +50,11 @@ impl CPU {
     }
 
     pub fn step(&mut self, dev: &mut Devices) -> bool {
+        if self.int_master_enabled {
+            self.handle_interrupts(dev);
+            self.enabling_ime = false;
+        }
+
         if !self.halted {
             let previous_pc = self.registers.pc;
 
@@ -59,7 +64,7 @@ impl CPU {
 
             if let Some(debugger) = &mut dev.debugger {
                 debugger.debug_info(self, &mut dev.bus, dev.ticks, previous_pc);
-                // debugger.gameboy_doctor(self, dev.bus.as_mut().unwrap(), previous_pc);
+                // debugger.gameboy_doctor(self, &mut dev.bus, previous_pc);
             }
 
             self.execute(dev, self.curr_inst.in_type);
@@ -68,11 +73,6 @@ impl CPU {
             if self.get_int_flags(&dev) != 0 {
                 self.halted = false;
             }
-        }
-
-        if self.int_master_enabled {
-            self.handle_interrupts(dev);
-            self.enabling_ime = false;
         }
 
         if self.enabling_ime {

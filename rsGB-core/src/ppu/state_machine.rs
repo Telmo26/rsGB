@@ -1,17 +1,12 @@
 use crate::{
-    interconnect::{Interconnect, InterruptType}, ppu::utils::{lcd_read_ly, lcdc_obj_height}, 
+    interconnect::{Interconnect, InterruptType}, ppu::utils::{lcd_read_ly, lcd_read_win_y, lcd_write_ly, lcdc_obj_height}, 
 };
 
 use super::{
     LINES_PER_FRAME, PPU, TICKS_PER_LINE, XRES, YRES,
-    pixel_fifo::FetchState,
+    pipeline::FetchState,
     utils::{LCDMode, StatusSrc, status_stat_int, status_lyc_set, change_lcd_mode, status_mode_set}
 };
-
-const TARGET_FRAME_TIME: f64 = 1000.0 / 60.0;
-const PREV_FRAME_TIME: f64 = 0.0;
-const START_TIMER: f64 = 0.0;
-const FRAME_COUNT: f64 = 0.0;
 
 impl PPU {
     fn load_line_sprites(&mut self, bus: &mut Interconnect) {
@@ -36,8 +31,7 @@ impl PPU {
     }   
     pub fn hblank(&mut self, bus: &mut Interconnect) {
         if self.line_ticks >= TICKS_PER_LINE {
-            let mut ly = bus.read(0xFF44);
-            increment_ly(bus, &mut ly);
+            let ly = self.increment_ly(bus);
 
             if ly >= YRES as u8 {
                 change_lcd_mode(bus, LCDMode::VBlank);
@@ -58,12 +52,12 @@ impl PPU {
 
     pub fn vblank(&mut self, bus: &mut Interconnect) {
         if self.line_ticks >= TICKS_PER_LINE {
-            let mut ly = bus.read(0xFF44);
-            increment_ly(bus, &mut ly);
+            let ly = self.increment_ly(bus);
 
             if ly >= LINES_PER_FRAME {
                 change_lcd_mode(bus, LCDMode::OAM);
                 bus.write(0xFF44, 0);
+                self.window_line = 0;
             }
 
             self.line_ticks = 0;
@@ -102,19 +96,25 @@ impl PPU {
             }
         }
     }
-}
 
-fn increment_ly(bus: &mut Interconnect, ly: &mut u8) {
-    *ly = ly.wrapping_add(1);
-    bus.write(0xFF44, *ly);
-
-    if *ly == bus.read(0xFF45) { // If LY == LYC
-        status_lyc_set(bus, 1);
-
-        if status_stat_int(bus, StatusSrc::LYC) {
-            bus.request_interrupt(crate::interconnect::InterruptType::LcdStat);
+    fn increment_ly(&mut self, bus: &mut Interconnect) -> u8 {
+        let mut ly = lcd_read_ly(bus);
+        if self.window_visible(bus) && 
+            ly >= lcd_read_win_y(bus) && ly < (lcd_read_win_y(bus) + YRES as u8) {
+            self.window_line += 1;
         }
-    } else {
-        status_lyc_set(bus, 0);
+        ly = ly.wrapping_add(1);
+        lcd_write_ly(bus, ly);
+
+        if ly == bus.read(0xFF45) { // If LY == LYC
+            status_lyc_set(bus, 1);
+
+            if status_stat_int(bus, StatusSrc::LYC) {
+                bus.request_interrupt(crate::interconnect::InterruptType::LcdStat);
+            }
+        } else {
+            status_lyc_set(bus, 0);
+        }
+        ly
     }
 }

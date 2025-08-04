@@ -15,7 +15,7 @@ impl CPU {
 
     pub fn pop(&mut self, bus: &mut Interconnect) -> u8 {
         let val = bus.read(self.registers.sp);
-        self.registers.sp += 1;
+        self.registers.sp = self.registers.sp.wrapping_add(1);
         val
     }
 

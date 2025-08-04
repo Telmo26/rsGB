@@ -1,12 +1,12 @@
 use std::collections::VecDeque;
 
-use crate::{interconnect::{Interconnect, OAMEntry}, Devices};
+use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}, Devices};
 
 mod state_machine;
-mod pixel_fifo;
+mod pipeline;
 mod utils;
 
-use pixel_fifo::PixelFifo;
+use pipeline::PixelFifo;
 
 const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;
@@ -15,9 +15,11 @@ const XRES: usize = 160;
 const PIXELS: usize = 0x5A00;
 
 pub struct PPU {
-    line_sprites: Vec<OAMEntry>,
+    line_sprites: Vec<OAMEntry>, // Capacity: 10
 
-    fetched_entries: Vec<OAMEntry>, // Capacity : 3
+    fetched_entries: Vec<OAMEntry>, // Capacity: 3
+
+    window_line: u8,
 
     pixel_fifo: PixelFifo,
     
@@ -34,6 +36,8 @@ impl PPU {
 
             fetched_entries: Vec::with_capacity(3),
 
+            window_line: 0,
+
             pixel_fifo: PixelFifo::new(),
 
             current_frame: 0,
@@ -47,32 +51,14 @@ impl PPU {
         self.line_ticks += 1;
         self.new_frame = false;
 
-        let lcd_status = bus.read(0xFF41);
-        let mode = lcd_status & 0b11;
+        let lcd_mode = status_mode(bus);
 
-        match mode {
-            0 => self.hblank(bus),
-            1 => self.vblank(bus),
-            2 => self.oam(bus),
-            3 => self.xfer(bus),
-            _ => panic!(),
+        match lcd_mode {
+            LCDMode::HBlank => self.hblank(bus),
+            LCDMode::VBlank => self.vblank(bus),
+            LCDMode::OAM => self.oam(bus),
+            LCDMode::XFer => self.xfer(bus),
         }
-    }
-
-    pub fn oam_read(&self, dev: &Devices, address: u16) -> u8 {
-        dev.bus.read(address)
-    }
-
-    pub fn oam_write(&self, dev: &mut Devices, address: u16, value: u8) {
-        dev.bus.write(address, value);
-    }
-
-    pub fn vram_read(&self, dev: &Devices, address: u16) -> u8 {
-        dev.bus.read(address)
-    }
-
-    pub fn vram_write(&self, dev: &mut Devices, address: u16, value: u8) {
-        dev.bus.write(address, value);
     }
 
     pub fn get_frame(&self) -> Option<[u32; XRES * YRES]> {

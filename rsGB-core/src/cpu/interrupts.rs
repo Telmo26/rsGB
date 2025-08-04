@@ -11,12 +11,6 @@ pub enum InterruptType {
     Joypad = 16,
 }
 
-impl InterruptType {
-    pub fn value(&self) -> u8 {
-        self.clone() as u8
-    }
-}
-
 impl CPU {
     fn interrupt_handle(&mut self, dev: &mut Devices, address: u16) {
         self.push16(&mut dev.bus, self.registers.pc);
@@ -40,7 +34,7 @@ impl CPU {
     fn interrupt_check(&mut self, dev: &mut Devices, address: u16, interrupt_type: InterruptType) -> bool {
         let if_register = self.get_int_flags(dev);
         let ie_register = dev.bus.get_ie_register();
-        let it = interrupt_type.value();
+        let it = interrupt_type as u8;
 
         if (if_register & it) != 0 && 
             (ie_register & it) != 0 {

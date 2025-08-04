@@ -116,8 +116,6 @@ fn test_register_hl_read_write() {
 
     assert_eq!(regs.read(RegType::HL), 0x1234);
 
-    let incr = regs.read(RegType::HL).wrapping_add(1);
-
     regs.set(RegType::HL, regs.read(RegType::HL).wrapping_add(1));
     assert_eq!(regs.h, 0x12);
     assert_eq!(regs.l, 0x34 + 1);

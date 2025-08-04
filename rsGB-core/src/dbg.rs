@@ -30,7 +30,7 @@ impl Debugger {
         }
     }
 
-    pub fn gameboy_doctor(&mut self, cpu: &mut CPU, bus: &mut &mut Interconnect, previous_pc: u16) {
+    pub fn gameboy_doctor(&mut self, cpu: &mut CPU, bus: &mut Interconnect, previous_pc: u16) {
         let hl  = if cpu.curr_inst.mode == AddrMode::HLI_R || cpu.curr_inst.mode == AddrMode::R_HLI { 
             cpu.registers.read(RegType::HL) - 1
         } else if cpu.curr_inst.mode == AddrMode::HLD_R || cpu.curr_inst.mode == AddrMode::R_HLD {

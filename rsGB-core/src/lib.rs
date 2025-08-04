@@ -127,6 +127,7 @@ impl Devices {
             ticks: 0,
         }
     }
+    
     fn incr_cycle(&mut self, cpu_cycles: u16) {
         for _ in 0..cpu_cycles {
             for _ in 0..4 {

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{interconnect::{Interconnect, OAMEntry}, ppu::{utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_scroll_y, lcdc_bg_map_area, lcdc_bgw_data_area, lcdc_bgw_enable, lcdc_obj_enable, lcdc_obj_height}, PIXELS, PPU, XRES}};
+use crate::{interconnect::{Interconnect}, ppu::{utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_scroll_y, lcd_read_win_x, lcd_read_win_y, lcdc_bg_map_area, lcdc_bgw_data_area, lcdc_bgw_enable, lcdc_obj_enable, lcdc_obj_height, lcdc_win_enable, lcdc_win_map_area}, PPU, XRES, YRES}};
 
 pub enum FetchState {
     Tile,
@@ -79,7 +79,7 @@ impl PPU {
             }
 
             if lcdc_obj_enable(bus) {
-                color = self.pipeline_fetch_sprite_pixels(bus, bit, color, high << 1 | low)
+                color = self.pipeline_fetch_sprite_pixels(bus, color, high << 1 | low)
             }
 
             if x >= 0 {
@@ -90,26 +90,25 @@ impl PPU {
         true
     }
 
-    fn pipeline_fetch_sprite_pixels(&self, bus: &mut Interconnect, mut bit: u8, mut color: u32, bg_color: u8) -> u32 {        
+    fn pipeline_fetch_sprite_pixels(&self, bus: &mut Interconnect, mut color: u32, bg_color: u8) -> u32 {        
         for i in 0..self.fetched_entries.len() {
             let sprite = self.fetched_entries[i];
-            let sp_x = sprite.x.wrapping_sub(8)
-                                               .wrapping_add(lcd_read_scroll_x(bus) % 8);
-            if sp_x + 8 < self.pixel_fifo.fifo_x {
+            let sp_x = (sprite.x as i16) - 8 + ((lcd_read_scroll_x(bus) % 8) as i16);
+            if (sp_x + 8) < self.pixel_fifo.fifo_x as i16 {
                 // Past pixel point
                 continue;
             }
 
-            let (offset, negative) = self.pixel_fifo.fifo_x.overflowing_sub(sp_x);
+            let offset = (self.pixel_fifo.fifo_x as i16) - sp_x;
 
-            if negative || offset > 7 {
+            if offset < 0 || offset > 7 {
                 // Out of bounds
                 continue;
             }
 
-            bit = 7 - offset;
+            let mut bit = 7 - (offset as u8);
             if sprite.x_flip() {
-                bit = offset
+                bit = offset as u8;
             }
 
             let low = (self.pixel_fifo.fetch_entry_data[i * 2] & (1 << bit) != 0) as u8;
@@ -171,6 +170,38 @@ impl PPU {
         }
     }
 
+    fn pipeline_load_window_tile(&mut self, bus: &mut Interconnect) {
+        if !self.window_visible(bus) {
+            return;
+        }
+        let window_visible = self.window_visible(bus);
+        let window_y = lcd_read_win_y(bus);
+        let window_x = lcd_read_win_x(bus);
+        let ly = lcd_read_ly(bus);
+        
+        // println!("Window check: visible={}, WX={}, WY={}, LY={}, fetch_x={}, window_line={}", 
+        //      window_visible, window_x, window_y, ly, self.pixel_fifo.fetch_x, self.window_line);
+
+        if self.pixel_fifo.fetch_x + 7 >= window_x &&
+            self.pixel_fifo.fetch_x + 7 < window_x + XRES as u8 + 14 {
+
+            // println!("  → X condition met");
+
+            if ly >= window_y && ly < window_y + YRES as u8 {
+                // println!("  → Y condition met, loading window tile");
+                let w_tile_y = (self.window_line / 8) as u16;
+
+                let map_area = lcdc_win_map_area(bus);
+
+                let address = map_area +
+                    ((self.pixel_fifo.fetch_x as u16 + 7 - window_x as u16) / 8) +
+                    w_tile_y.wrapping_mul(32) ;
+
+                self.pixel_fifo.bgw_fetch_data[0] = bus.read(address);
+            }
+        }
+    }
+
     fn pipeline_fetch(&mut self, bus: &mut Interconnect) {
         match self.pixel_fifo.current_state {
             FetchState::Tile => {
@@ -178,9 +209,12 @@ impl PPU {
 
                 if lcdc_bgw_enable(bus) {
                     let bg_map_area = lcdc_bg_map_area(bus);
-                    self.pixel_fifo.bgw_fetch_data[0] = bus.read( bg_map_area + 
-                        (self.pixel_fifo.map_x/8) as u16 + ((self.pixel_fifo.map_y / 8) as u16) * 32);
+                    let address = bg_map_area + (self.pixel_fifo.map_x/8) as u16 + ((self.pixel_fifo.map_y / 8) as u16) * 32;
+
+                    self.pixel_fifo.bgw_fetch_data[0] = bus.read(address);
                     
+                    // self.pipeline_load_window_tile(bus);
+
                     if lcdc_bgw_data_area(bus) == 0x8800 {
                         self.pixel_fifo.bgw_fetch_data[0] = self.pixel_fifo.bgw_fetch_data[0].wrapping_add(128);
                     }
@@ -250,5 +284,11 @@ impl PPU {
 
     pub fn pipeline_reset(&mut self) {
         self.pixel_fifo.reset();
+    }
+
+    pub fn window_visible(&self, bus: &mut Interconnect) -> bool {
+        lcdc_win_enable(bus) && 
+            lcd_read_win_x(bus) < XRES as u8 + 7 &&
+            lcd_read_win_y(bus) < YRES as u8
     }
 }

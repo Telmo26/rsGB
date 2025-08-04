@@ -22,6 +22,10 @@ pub fn lcd_read_scroll_x(bus: &mut Interconnect) -> u8 { bus.read(0xFF43) }
 
 pub fn lcd_read_scroll_y(bus: &mut Interconnect) -> u8 { bus.read(0xFF42) }
 
+pub fn lcd_read_win_y(bus: &mut Interconnect) -> u8 { bus.read(0xFF4B) }
+
+pub fn lcd_read_win_x(bus: &mut Interconnect) -> u8 { bus.read(0xFF4A) }
+
 pub fn change_lcd_mode(bus: &mut Interconnect, mode: LCDMode) {
     let mut status = bus.read(0xFF41);
     status &= !0b11;
@@ -59,11 +63,11 @@ pub fn lcdc_bgw_data_area(bus: &mut Interconnect) -> u16 {
 
 pub fn lcdc_win_enable(bus: &mut Interconnect) -> bool { (bus.read(0xFF40) & (1 << 5)) != 0 }
 
-fn lcdc_win_map_area(bus: &mut Interconnect) -> u16 {
+pub fn lcdc_win_map_area(bus: &mut Interconnect) -> u16 {
     if bus.read(0xFF40) & (1 << 6) != 0 {
-        0x9800
-    } else {
         0x9C00
+    } else {
+        0x9800
     }
 }
 
