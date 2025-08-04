@@ -56,8 +56,8 @@ impl LCD {
             0xFF47 => self.bg_palette,
             0xFF48 => self.obj_palette[0],
             0xFF49 => self.obj_palette[1],
-            0xFF4A => self.win_x,
-            0xFF4B => self.win_y,
+            0xFF4A => self.win_y,
+            0xFF4B => self.win_x,
             _ => panic!(),
         }
     }
@@ -74,8 +74,8 @@ impl LCD {
             0xFF47 => self.bg_palette = value,
             0xFF48 => self.obj_palette[0] = value,
             0xFF49 => self.obj_palette[1] = value,
-            0xFF4A => self.win_x = value,
-            0xFF4B => self.win_y = value,
+            0xFF4A => self.win_y = value,
+            0xFF4B => self.win_x = value,
             _ => panic!(),
         }
 

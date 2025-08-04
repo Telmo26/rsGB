@@ -182,12 +182,12 @@ impl PPU {
         // println!("Window check: visible={}, WX={}, WY={}, LY={}, fetch_x={}, window_line={}", 
         //      window_visible, window_x, window_y, ly, self.pixel_fifo.fetch_x, self.window_line);
 
-        if self.pixel_fifo.fetch_x + 7 >= window_x &&
-            self.pixel_fifo.fetch_x + 7 < window_x + XRES as u8 + 14 {
+        if self.pixel_fifo.fetch_x.wrapping_add(7) >= window_x &&
+            self.pixel_fifo.fetch_x.wrapping_add(7) < window_x.wrapping_add(YRES as u8).wrapping_add(14) {
 
             // println!("  → X condition met");
 
-            if ly >= window_y && ly < window_y + YRES as u8 {
+            if ly >= window_y && ly < window_y + XRES as u8 {
                 // println!("  → Y condition met, loading window tile");
                 let w_tile_y = (self.window_line / 8) as u16;
 
@@ -213,7 +213,7 @@ impl PPU {
 
                     self.pixel_fifo.bgw_fetch_data[0] = bus.read(address);
                     
-                    // self.pipeline_load_window_tile(bus);
+                    self.pipeline_load_window_tile(bus);
 
                     if lcdc_bgw_data_area(bus) == 0x8800 {
                         self.pixel_fifo.bgw_fetch_data[0] = self.pixel_fifo.bgw_fetch_data[0].wrapping_add(128);

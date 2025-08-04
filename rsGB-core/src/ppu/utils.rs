@@ -22,9 +22,9 @@ pub fn lcd_read_scroll_x(bus: &mut Interconnect) -> u8 { bus.read(0xFF43) }
 
 pub fn lcd_read_scroll_y(bus: &mut Interconnect) -> u8 { bus.read(0xFF42) }
 
-pub fn lcd_read_win_y(bus: &mut Interconnect) -> u8 { bus.read(0xFF4B) }
+pub fn lcd_read_win_y(bus: &mut Interconnect) -> u8 { bus.read(0xFF4A) }
 
-pub fn lcd_read_win_x(bus: &mut Interconnect) -> u8 { bus.read(0xFF4A) }
+pub fn lcd_read_win_x(bus: &mut Interconnect) -> u8 { bus.read(0xFF4B) }
 
 pub fn change_lcd_mode(bus: &mut Interconnect, mode: LCDMode) {
     let mut status = bus.read(0xFF41);
