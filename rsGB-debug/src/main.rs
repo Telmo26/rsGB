@@ -1,6 +1,6 @@
 use std::{env, sync::{Arc, Mutex, MutexGuard}, thread};
 
-use rs_gb_core::{run, EmuContext};
+use rs_gb_core::{init, run, EmuContext, MainCommunicator, DebugCommunicator};
 
 use minifb::Key;
 
@@ -20,13 +20,22 @@ fn main() {
     }
 
     // Creation of the emulator context
-    let context = Arc::new(Mutex::new(EmuContext::new(&args[1], CORE_DEBUG)));
+    // let context = Arc::new(Mutex::new(EmuContext::new(&args[1], CORE_DEBUG)));
+    let (context, main_communicator, debug_communicator) = init(CORE_DEBUG);
+
+    // Loading the file into the context
+    context.lock().unwrap().load_file(&args[1]);
 
     // Creation of the windows
     let mut windows = Vec::new();
 
-    let context_lock = context.lock().unwrap();
-    generate_windows(&mut windows, context_lock);
+    let main_window = MainWindow::new(main_communicator);
+    windows.push(CustomWindow::MainWindow(main_window));    
+
+    if CORE_DEBUG {
+        let debug_window = DebugWindow::new(debug_communicator.unwrap());
+        windows.push(CustomWindow::DebugWindow(debug_window));
+    }
 
     // Launching the emulator
     let context1 = Arc::clone(&context);
@@ -55,18 +64,6 @@ fn main() {
 fn stop_emulation(context: Arc<Mutex<EmuContext>>) {
     let mut ctx = context.lock().unwrap();
     ctx.stop();
-}
-
-fn generate_windows(windows: &mut Vec<CustomWindow>, mut context_lock: MutexGuard<'_, EmuContext>) {
-    let frame_rx = context_lock.get_frame_rx();
-    let main_window = MainWindow::new(frame_rx);
-    windows.push(CustomWindow::MainWindow(main_window));    
-
-    if CORE_DEBUG {
-        let debug_rx= context_lock.get_debug_rx();
-        let debug_window = DebugWindow::new(debug_rx);
-        windows.push(CustomWindow::DebugWindow(debug_window));
-    }
 }
 
 enum CustomWindow {

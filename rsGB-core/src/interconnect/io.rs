@@ -1,10 +1,12 @@
 mod timer;
 mod dma;
 mod lcd;
+mod gamepad;
 
 use timer::Timer;
 use dma::DMA;
 use lcd::LCD;
+use gamepad::Gamepad;
 
 use super::InterruptType;
 
@@ -29,6 +31,7 @@ $FF70 | 	  |   CGB 	| WRAM Bank Select
 
 
 pub struct IO {
+    gamepad: Gamepad,
     serial: [u8; 2],
     timer: Timer,
     if_register: u8,
@@ -39,6 +42,7 @@ pub struct IO {
 impl IO {
     pub fn new() -> IO {
         IO { 
+            gamepad: Gamepad::new(),
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
@@ -49,6 +53,7 @@ impl IO {
 
     pub fn read(&self, address: u16) -> u8 {
         match address {
+            0xFF00 => self.gamepad.get_output(),
             0xFF01 => self.serial[0],
             0xFF02 => self.serial[1],
             0xFF04..=0xFF07 => self.timer.read(address),
@@ -63,6 +68,7 @@ impl IO {
 
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
+            0xFF00 => self.gamepad.set_sel(value),
             0xFF01 => self.serial[0] = value,
             0xFF02 => self.serial[1] = value,
             0xFF04..=0xFF07 => self.timer.write(address, value),

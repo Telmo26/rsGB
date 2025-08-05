@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use minifb::{Key, Scale, Window, WindowOptions};
+use rs_gb_core::MainCommunicator;
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -10,11 +11,11 @@ type FrameReceiver = std::sync::mpsc::Receiver<[u32; WIDTH * HEIGHT]>;
 
 pub struct MainWindow {
     window: Window,
-    frame_rx: FrameReceiver,
+    comm: MainCommunicator,
 }
 
 impl MainWindow {
-    pub fn new(frame_rx: FrameReceiver) -> MainWindow {
+    pub fn new(comm: MainCommunicator) -> MainWindow {
         let mut window = Window::new(
             "rsGB - A GameBoy Emulator in Rust",
             WIDTH, 
@@ -28,7 +29,7 @@ impl MainWindow {
 
         MainWindow { 
             window, 
-            frame_rx,
+            comm,
         }
     }
 
@@ -37,9 +38,9 @@ impl MainWindow {
     }
 
     pub fn update(&mut self) {
-        let recv_result = self.frame_rx.recv_timeout(Duration::from_micros(16600));
+        let recv_result = self.comm.frame_recv(Duration::from_micros(16600));
 
-        if let Ok(buffer) = recv_result {
+        if let Some(buffer) = recv_result {
             self.window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
         } else {
             self.window.update();
@@ -51,6 +52,6 @@ impl MainWindow {
     }
 
     pub fn dump(&mut self) {
-        let _ = self.frame_rx.recv_timeout(Duration::from_micros(16600));
+        let _ = self.comm.frame_recv(Duration::from_micros(16600));
     }
 }

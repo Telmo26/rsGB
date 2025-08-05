@@ -1,6 +1,7 @@
 use std::{sync::mpsc::Receiver, time::Duration};
 
 use minifb::{Scale, Window, WindowOptions};
+use rs_gb_core::DebugCommunicator;
 
 // Add a pixel between all tiles
 const DEBUG_WIDTH: usize = 16 * 8 + 16 + 1; 
@@ -12,11 +13,11 @@ const COLORS: [u32; 4] = [0x00FFFFFF, 0x00AAAAAA, 0x00555555, 0x00000000];
 pub struct DebugWindow {
     window: Window,
     buffer: [u32; DEBUG_WIDTH * DEBUG_HEIGHT],
-    debug_rx: Receiver<[u8; 0x1800]>,
+    comm: DebugCommunicator,
 }
 
 impl DebugWindow {
-    pub fn new(debug_rx: Receiver<[u8; 0x1800]>) -> DebugWindow {
+    pub fn new(comm: DebugCommunicator) -> DebugWindow {
         let mut window = Window::new(
                         "Debug Window",
                         DEBUG_WIDTH, 
@@ -33,13 +34,13 @@ impl DebugWindow {
         DebugWindow { 
             window,
             buffer,
-            debug_rx
+            comm
         }
     }
 
     pub fn update(&mut self) {
-        let recv_result = self.debug_rx.recv_timeout(Duration::from_micros(16600));
-        if let Ok(vram) = recv_result {
+        let recv_result = self.comm.vram_recv(Duration::from_micros(16600));
+        if let Some(vram) = recv_result {
             let tiles: &[[u8; 16]; 384] = 
                 unsafe { &*(vram.as_ptr() as *const [[u8; 16]; 384]) };
 
@@ -62,7 +63,7 @@ impl DebugWindow {
     }
 
     pub fn dump(&mut self) {
-        let _ = self.debug_rx.recv_timeout(Duration::from_micros(16600));
+        let _ = self.comm.vram_recv(Duration::from_micros(16600));
     }
 }
 

@@ -5,6 +5,8 @@ mod ppu;
 mod utils;
 mod dbg;
 
+mod communicators;
+
 use std::{
     sync::{mpsc::{self, Sender}, Arc, Mutex, MutexGuard}, 
     thread, 
@@ -19,6 +21,8 @@ use crate::{
     dbg::Debugger,
 };
 
+pub use communicators::*;
+
 // use minifb;
 
 /*
@@ -31,83 +35,6 @@ use crate::{
     |Timer|
 
 */
-
-type FrameSender = mpsc::SyncSender<[u32; 0x5A00]>;
-type FrameReceiver = mpsc::Receiver<[u32; 0x5A00]>;
-
-type DebugSender = mpsc::SyncSender<[u8; 0x1800]>;
-type DebugReceiver = mpsc::Receiver<[u8; 0x1800]>;
-
-pub struct EmuContext {
-    file_path: String,
-
-    debug: bool,
-    paused: bool,
-    running: bool,
-
-    frame_tx: Option<FrameSender>,
-    frame_rx: Option<FrameReceiver>,
-
-    debug_tx: Option<DebugSender>, 
-    debug_rx: Option<DebugReceiver>,
-}
-
-impl EmuContext {
-    pub fn new(path: &str, debug: bool) -> EmuContext {
-        let (debug_tx, debug_rx);
-        if debug {
-            let (tx, rx) = mpsc::sync_channel(1);
-            debug_tx = Some(tx);
-            debug_rx = Some(rx);
-        } else {
-            debug_tx = None;
-            debug_rx = None;
-        }
-
-        let (frame_tx, frame_rx) = mpsc::sync_channel(1);
-
-
-        EmuContext {
-            file_path: path.to_string(),
-
-            debug,
-            paused: false,
-            running: false,
-
-            frame_tx: Some(frame_tx),
-            frame_rx: Some(frame_rx),
-
-            debug_tx,
-            debug_rx
-        }
-    }
-
-    fn start(&mut self) {
-        self.running = true;
-    }
-
-    pub fn stop(&mut self) {
-        self.running = false;
-    }
-
-    fn is_running(&self) -> bool {
-        self.running
-    }
-
-    fn is_paused(&self) -> bool {
-        self.paused
-    }
-
-    pub fn get_debug_rx(&mut self) -> DebugReceiver {
-        let debug_rx = self.debug_rx.take();
-        debug_rx.expect("Attempted to get the debug receiver while not in debug mode!")
-    }
-
-    pub fn get_frame_rx(&mut self) -> FrameReceiver {
-        self.frame_rx.take()
-            .expect("Tried to get the frame receiver twice")
-    }
-}
 
 struct Devices {
     bus: Interconnect,
@@ -149,8 +76,8 @@ struct Emulator {
 }
 
 impl Emulator {
-    fn new(frame_tx: FrameSender, debug: bool, debug_tx: Option<DebugSender>) -> Emulator {
-        let devices: Devices = Devices::new(debug);
+    fn new(frame_tx: FrameSender, debug_tx: Option<DebugSender>) -> Emulator {
+        let devices: Devices = Devices::new(debug_tx.is_some());
 
         Emulator {
             cpu: CPU::new(),
@@ -189,12 +116,11 @@ impl Emulator {
 pub fn run(context: Arc<Mutex<EmuContext>>) {
     let mut ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
     
-    let debug = ctx.debug;
     let debug_tx = ctx.debug_tx.take();
 
     let frame_tx = ctx.frame_tx.take().unwrap();
 
-    let mut emulator = Emulator::new(frame_tx, debug, debug_tx);
+    let mut emulator = Emulator::new(frame_tx, debug_tx);
      
     emulator.load_cart(&ctx.file_path)
         .expect(&format!("Failed to load the ROM file: {}", &ctx.file_path));
