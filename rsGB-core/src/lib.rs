@@ -45,9 +45,9 @@ struct Devices {
 }
 
 impl Devices {
-    fn new(debug: bool) -> Devices {
+    fn new(gamepad_state: Arc<Mutex<GamepadState>>, debug: bool) -> Devices {
         Devices {
-            bus: Interconnect::new(),
+            bus: Interconnect::new(gamepad_state),
             ppu: PPU::new(),
 
             debugger: if debug { Some(Debugger::new()) } else { None },
@@ -76,8 +76,8 @@ struct Emulator {
 }
 
 impl Emulator {
-    fn new(frame_tx: FrameSender, debug_tx: Option<DebugSender>) -> Emulator {
-        let devices: Devices = Devices::new(debug_tx.is_some());
+    fn new(frame_tx: FrameSender, debug_tx: Option<DebugSender>, gamepad_state: Arc<Mutex<GamepadState>>) -> Emulator {
+        let devices: Devices = Devices::new(gamepad_state, debug_tx.is_some());
 
         Emulator {
             cpu: CPU::new(),
@@ -116,11 +116,11 @@ impl Emulator {
 pub fn run(context: Arc<Mutex<EmuContext>>) {
     let mut ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
     
+    let gamepad_state = ctx.gamepad_state.take().unwrap();
     let debug_tx = ctx.debug_tx.take();
-
     let frame_tx = ctx.frame_tx.take().unwrap();
 
-    let mut emulator = Emulator::new(frame_tx, debug_tx);
+    let mut emulator = Emulator::new(frame_tx, debug_tx, gamepad_state);
      
     emulator.load_cart(&ctx.file_path)
         .expect(&format!("Failed to load the ROM file: {}", &ctx.file_path));

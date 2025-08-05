@@ -3,10 +3,14 @@ mod dma;
 mod lcd;
 mod gamepad;
 
+use std::sync::{Arc, Mutex};
+
 use timer::Timer;
 use dma::DMA;
 use lcd::LCD;
 use gamepad::Gamepad;
+
+use crate::GamepadState;
 
 use super::InterruptType;
 
@@ -40,9 +44,9 @@ pub struct IO {
 }
 
 impl IO {
-    pub fn new() -> IO {
+    pub fn new(gamepad_state: Arc<Mutex<GamepadState>>) -> IO {
         IO { 
-            gamepad: Gamepad::new(),
+            gamepad: Gamepad::new(gamepad_state),
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,

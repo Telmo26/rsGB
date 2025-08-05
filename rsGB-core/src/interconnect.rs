@@ -1,7 +1,7 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, sync::{Arc, Mutex}};
 
 use crate::{
-    cart::Cartridge, cpu::AddrMode,
+    cart::Cartridge, cpu::AddrMode, GamepadState,
 };
 
 pub use crate::{
@@ -43,13 +43,13 @@ pub struct Interconnect {
 }
 
 impl Interconnect {
-    pub fn new() -> Interconnect {
+    pub fn new(gamepad_state: Arc<Mutex<GamepadState>>) -> Interconnect {
         Interconnect { 
             cart: None,
             vram: [0; 0x2000],
             ram: RAM::new(),
             oam_ram: [OAMEntry::new(); 40],
-            io: IO::new(),
+            io: IO::new(gamepad_state),
             ie_register: 0,
 
             vram_update: false,

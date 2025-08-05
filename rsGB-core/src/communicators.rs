@@ -25,6 +25,21 @@ impl MainCommunicator {
             }
         }
     }
+
+    pub fn update_button(&mut self, button: Button, value: bool) {
+        let mut gamepad_lock = self.gamepad_state.lock().unwrap();
+        match button {
+            Button::A => gamepad_lock.a = value,
+            Button::B => gamepad_lock.b = value,
+            Button::START => gamepad_lock.start = value,
+            Button::SELECT => gamepad_lock.select = value,
+            Button::UP => gamepad_lock.up = value,
+            Button::DOWN => gamepad_lock.down = value,
+            Button::LEFT => gamepad_lock.left = value,
+            Button::RIGHT => gamepad_lock.right = value
+        }
+
+    }
 }
 
 pub struct DebugCommunicator {
@@ -52,7 +67,7 @@ pub struct EmuContext {
 
     pub(crate) frame_tx: Option<FrameSender>,
     pub(crate) debug_tx: Option<DebugSender>,
-    gamepad_state: Arc<Mutex<GamepadState>>
+    pub(crate) gamepad_state: Option<Arc<Mutex<GamepadState>>>
 }
 
 impl EmuContext {
@@ -77,15 +92,26 @@ impl EmuContext {
     }
 }
 
+pub enum Button {
+    A,
+    B,
+    START,
+    SELECT,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT
+}
+
 pub struct GamepadState {
-    start: bool,
-    select: bool,
-    a: bool,
-    b: bool,
-    up: bool,
-    down: bool,
-    left: bool,
-    right: bool,
+    pub start: bool,
+    pub select: bool,
+    pub a: bool,
+    pub b: bool,
+    pub up: bool,
+    pub down: bool,
+    pub left: bool,
+    pub right: bool,
 }
 
 impl GamepadState {
@@ -131,7 +157,7 @@ pub fn init(debug: bool) -> (Arc<Mutex<EmuContext>>, MainCommunicator, Option<De
         frame_tx: Some(frame_tx),
         debug_tx,
 
-        gamepad_state
+        gamepad_state: Some(gamepad_state)
     };
 
     let mut debug_communicator = None;
