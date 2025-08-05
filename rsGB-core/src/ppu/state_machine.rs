@@ -100,8 +100,8 @@ impl PPU {
     fn increment_ly(&mut self, bus: &mut Interconnect) -> u8 {
         let mut ly = lcd_read_ly(bus);
         if self.window_visible(bus) && 
-            ly >= lcd_read_win_y(bus) && ly < (lcd_read_win_y(bus) + YRES as u8) {
-            self.window_line += 1;
+            ly >= lcd_read_win_y(bus) && ly < lcd_read_win_y(bus).wrapping_add(YRES as u8) {
+            self.window_line = self.window_line.wrapping_add(1);
         }
         ly = ly.wrapping_add(1);
         lcd_write_ly(bus, ly);

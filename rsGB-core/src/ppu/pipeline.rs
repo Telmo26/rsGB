@@ -136,10 +136,10 @@ impl PPU {
 
     fn pipeline_load_sprite_tile(&mut self, bus: &mut Interconnect) {
         for sprite_entry in &self.line_sprites {
-            let sp_x = sprite_entry.x - 8 + lcd_read_scroll_x(bus) % 8;
+            let sp_x = sprite_entry.x.wrapping_sub(8).wrapping_add(lcd_read_scroll_x(bus) % 8);
 
             if (sp_x >= self.pixel_fifo.fetch_x && sp_x < self.pixel_fifo.fetch_x + 8) ||
-                (sp_x + 8 >= self.pixel_fifo.fetch_x && sp_x + 8 < self.pixel_fifo.fetch_x + 8) {
+                (sp_x.wrapping_add(8) >= self.pixel_fifo.fetch_x && sp_x.wrapping_add(8) < self.pixel_fifo.fetch_x + 8) {
                 self.fetched_entries.push(*sprite_entry);
             }
 
@@ -187,7 +187,7 @@ impl PPU {
 
             // println!("  → X condition met");
 
-            if ly >= window_y && ly < window_y + XRES as u8 {
+            if ly >= window_y && ly < window_y.wrapping_add(XRES as u8) {
                 // println!("  → Y condition met, loading window tile");
                 let w_tile_y = (self.window_line / 8) as u16;
 

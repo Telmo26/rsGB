@@ -1,6 +1,6 @@
-use std::{error::Error, fmt, fs};
+use std::{error::Error, fmt, fs::{self, File}, io::{Read, Write}};
 
-use crate::NO_IMPL;
+const RAM_BANK_SIZE: usize = 0x2000;
 
 const ROM_TYPES: [&str; 0x23] = [
     "ROM ONLY",
@@ -272,6 +272,23 @@ pub struct Cartridge {
     rom_size: u32,
     rom_data: Vec<u8>,
     header: CartridgeHeader,
+
+    // MBC1-related data
+    ram_enabled: bool,
+    ram_banking: bool,
+
+    active_rom_bank: usize, // Offset of the ROM bank
+    banking_mode: u8,
+
+    rom_bank_value: u8,
+    ram_bank_value: u8,
+
+    active_ram_bank: usize, // Currently selected RAM bank
+    ram_banks: [Option<Box<[u8; RAM_BANK_SIZE]>>; 16], // All RAM banks
+
+    // for battery
+    battery: bool,
+    need_save: bool,
 }
 
 impl Cartridge {
@@ -301,22 +318,165 @@ impl Cartridge {
         // );
         // println!("\t ROM Vers : {}", header.version);
 
+        let battery = header.cart_type == 3;
+        let need_save = false;
+
+        // RAM Banks initialization
+        let mut ram_banks: [Option<Box<[u8; 8192]>>; 16] = [const { None }; 16];
+        for i in 0..16 {
+            ram_banks[i] = match header.ram_size {
+                2 if i == 0 => Some(Box::new([0; 0x2000])),
+                3 if i < 4 => Some(Box::new([0; 0x2000])),
+                4 if i < 16 => Some(Box::new([0; 0x2000])),
+                5 if i < 8 => Some(Box::new([0; 0x2000])),
+                _ => None,
+            }
+        }
+
+        let active_ram_bank = 0;
+        let active_rom_bank = 1; // ROM bank 1
+        
+        if battery {
+
+        }
+
         Ok(Cartridge {
             filename: path.to_string(),
             rom_size,
             rom_data,
             header,
+
+            ram_enabled: true,
+            ram_banking: true,
+
+            active_rom_bank, 
+            banking_mode: 1,
+
+            rom_bank_value: 0,
+            ram_bank_value: 0,
+
+            active_ram_bank, 
+            ram_banks, 
+
+            battery,
+            need_save,
         })
     }
 
     pub fn read(&self, address: u16) -> u8 {
-        // for now ROM Only type supported
-        self.rom_data[address as usize]
+        match address {
+        0x0000..=0x3FFF => self.rom_data[address as usize],
+
+        0x4000..=0x7FFF => {
+            let offset = self.active_rom_bank * 0x4000;
+            self.rom_data[offset + (address as usize - 0x4000)]
+        }
+
+        0xA000..=0xBFFF if self.is_mbc1() => {
+            if !self.ram_enabled {
+                return 0xFF;
+            }
+
+            self.ram_banks[self.active_ram_bank]
+                .as_ref()
+                .unwrap()[address as usize - 0xA000]
+        }
+        _ => 0xFF,
+    }
     }
 
-    pub fn write(&self, address: u16, value: u8) {
-        //for now, ROM only...
-        eprintln!("Writing to cart not implemented!")
+    pub fn write(&mut self, address: u16, value: u8) {
+        if !self.is_mbc1() {
+            return
+        }
+
+        match address {
+            ..0x2000 => self.ram_enabled = (value & 0xF) == 0xA,
+            0x2000..0x4000 => self.active_rom_bank = (value as usize & 0x1F).max(1),
+            0x4000..0x6000 => self.active_ram_bank = value as usize & 0b11,
+            0x6000..0x8000 => self.banking_mode = value & 1,
+            0xA000..0xC000 if self.is_mbc1() && self.ram_enabled => {
+                self.ram_banks[self.active_ram_bank]
+                    .as_mut()                                
+                    .unwrap()[address as usize - 0xA000] = value;
+                if self.battery {
+                    self.need_save = true;
+                }
+            }
+            _ => (),
+        }
+    }
+
+    pub fn need_save(&self) -> bool {
+        self.need_save
+    }
+
+    pub fn is_mbc1(&self) -> bool {
+        self.header.cart_type >= 1 && self.header.cart_type <= 3
+    }
+
+    pub fn has_battery(&self) -> bool {
+        self.header.cart_type == 3
+    }
+
+    pub fn save(&self, save_path: &str) {
+        // Determine how many banks should be saved
+        let bank_count = match self.header.ram_size {
+            0 => 0,
+            2 => 1,
+            3 => 4,
+            4 => 16,
+            5 => 8,
+            _ => 0,
+        };
+
+        let mut buffer = Vec::with_capacity(bank_count * 0x2000);
+
+        for i in 0..bank_count {
+            if let Some(bank) = &self.ram_banks[i] {
+                buffer.extend_from_slice(&**bank);
+            } else {
+                // If a bank is missing, pad with zeros
+                buffer.extend_from_slice(&[0u8; 0x2000]);
+            }
+        }
+
+        let mut file = File::create(save_path).expect("Failed to create save file");
+        file.write_all(&buffer).expect("Failed to write save file");
+    }
+
+    pub fn load_save(&mut self, save_path: &str) {
+        // If the save file doesn't exist 
+        // it will be created on next frame anyway
+        if let Ok(mut file) = File::open(save_path) {
+            let mut buffer = Vec::new();
+            file.read_to_end(&mut buffer).unwrap();
+            
+            let bank_count = match self.header.ram_size {
+                0 => 0,
+                2 => 1,
+                3 => 4,
+                4 => 16,
+                5 => 8,
+                _ => 0,
+            };
+            let expected_len = bank_count * 0x2000;
+
+            if buffer.len() == expected_len {
+                for i in 0..bank_count {
+                    let start = i * 0x2000;
+                    let end = start + 0x2000;
+                    let slice = &buffer[start..end];
+
+                    // Copy the slice into a boxed array
+                    let mut arr = [0u8; 0x2000];
+                    arr.copy_from_slice(slice);
+                    self.ram_banks[i] = Some(Box::new(arr));
+                }
+            } else {
+                panic!("Failed to load the save data: incorrect size")
+            }
+        }
     }
 }
 

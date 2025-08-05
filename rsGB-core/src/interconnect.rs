@@ -206,5 +206,17 @@ impl Interconnect {
 
         self.oam_ram[index as usize]
     }
+
+    pub fn need_save(&self) -> bool {
+        self.cart.as_ref().unwrap().need_save()
+    }
+
+    pub fn save(&self, save_path: &str) {
+        self.cart.as_ref().unwrap().save(save_path);
+    }
+
+    pub fn load(&mut self, save_path: &str) {
+        self.cart.as_mut().unwrap().load_save(save_path);
+    }
 }
 

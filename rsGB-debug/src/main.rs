@@ -9,7 +9,7 @@ mod debug_window;
 use main_window::MainWindow;
 use debug_window::DebugWindow;
 
-const CORE_DEBUG: bool = true;
+const CORE_DEBUG: bool = false;
 
 fn main() {
     // Parsing of the arguments

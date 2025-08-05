@@ -71,17 +71,21 @@ struct Emulator {
     cpu: CPU,
     devices: Devices,
 
+    save_path: String,
+
     frame_tx: FrameSender,
     debug_tx: Option<DebugSender>,
 }
 
 impl Emulator {
-    fn new(frame_tx: FrameSender, debug_tx: Option<DebugSender>, gamepad_state: Arc<Mutex<GamepadState>>) -> Emulator {
+    fn new(file_path: String, frame_tx: FrameSender, debug_tx: Option<DebugSender>, gamepad_state: Arc<Mutex<GamepadState>>) -> Emulator {
         let devices: Devices = Devices::new(gamepad_state, debug_tx.is_some());
 
         Emulator {
             cpu: CPU::new(),
             devices,
+
+            save_path: file_path.replace(".gb", ".sav"),
 
             frame_tx,
             debug_tx,
@@ -91,6 +95,7 @@ impl Emulator {
     fn load_cart(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let cartridge = Cartridge::load(path)?;
         self.devices.bus.set_cart(cartridge);
+        self.devices.bus.load(&self.save_path);
         Ok(())
     }
 
@@ -98,9 +103,21 @@ impl Emulator {
         let res = self.cpu.step(&mut self.devices);
 
         if let Some(frame) = self.devices.ppu.get_frame() {
-            self.frame_tx.send(frame).unwrap();
+            // This is piloted by the UI polling rate
+            self.frame_tx.send(frame).unwrap(); 
+            if self.need_save() {
+                self.save()
+            }
         }
         res
+    }
+
+    fn need_save(&self) -> bool {
+        self.devices.bus.need_save()
+    }
+
+    fn save(&mut self) {
+        self.devices.bus.save(&self.save_path);
     }
 
     fn check_debug(&mut self) {
@@ -120,7 +137,7 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
     let debug_tx = ctx.debug_tx.take();
     let frame_tx = ctx.frame_tx.take().unwrap();
 
-    let mut emulator = Emulator::new(frame_tx, debug_tx, gamepad_state);
+    let mut emulator = Emulator::new(ctx.file_path.clone(), frame_tx, debug_tx, gamepad_state);
      
     emulator.load_cart(&ctx.file_path)
         .expect(&format!("Failed to load the ROM file: {}", &ctx.file_path));
