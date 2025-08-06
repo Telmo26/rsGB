@@ -64,7 +64,7 @@ impl IO {
             0xFF0F => self.if_register,
             0xFF40..=0xFF4B => self.lcd.read(address),
             _ => {
-                eprintln!("Read at address {address:X} not implemented!");
+                // eprintln!("Read at address {address:X} not implemented!");
                 0
             }
         }
@@ -81,7 +81,7 @@ impl IO {
                 if address == 0xFF46 { self.dma.start(value) }
                 self.lcd.write(address, value);
             }
-            _ => eprintln!("Write at address {address:X} not implemented!"),
+            _ => (), // eprintln!("Write at address {address:X} not implemented!"),
         }
     }
 

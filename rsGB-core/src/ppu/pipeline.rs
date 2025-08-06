@@ -261,7 +261,9 @@ impl PPU {
 
             if self.pixel_fifo.line_x >= (lcd_read_scroll_x(bus) % 8) {
                 let x = self.pixel_fifo.pushed_x as usize + lcd_read_ly(bus) as usize * XRES;
-                self.video_buffer[x] = pixel_data;
+                
+                let mut video_buffer = self.framebuffer.lock().unwrap();
+                video_buffer[x] = pixel_data;
 
                 self.pixel_fifo.pushed_x += 1;
             }

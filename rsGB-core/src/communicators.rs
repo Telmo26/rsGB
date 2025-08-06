@@ -1,29 +1,32 @@
-use std::{sync::{mpsc::{self, RecvError}, Arc, Mutex}, time::Duration};
+use std::{sync::{mpsc::{self, RecvError}, Arc, Condvar, Mutex, MutexGuard}, time::Duration};
+
+use crate::{dbg::Debugger, interconnect::Interconnect, ppu::PPU, Devices};
 
 pub type Frame = [u32; 0x5A00];
-pub type DebugData = [u8; 0x1800];
+pub type VRAM = [u8; 0x2000];
  
-pub type FrameSender = mpsc::SyncSender<Frame>;
-pub type FrameReceiver = mpsc::Receiver<Frame>;
- 
-pub type DebugSender = mpsc::SyncSender<DebugData>;
-pub type DebugReceiver = mpsc::Receiver<DebugData>;
-
 pub struct MainCommunicator {
-    frame_rx: FrameReceiver,
+    framebuffer: Arc<Mutex<Frame>>,
+    frame_sent: Arc<(Mutex<bool>, Condvar)>,
     gamepad_state: Arc<Mutex<GamepadState>>
 }
 
 impl MainCommunicator {
-    pub fn frame_recv(&self, timeout: Duration) -> Option<Frame> {
-        if timeout == Duration::ZERO {
-            Some(self.frame_rx.recv().unwrap())
-        } else {
-            match self.frame_rx.recv_timeout(timeout) {
-                Ok(frame) => Some(frame),
-                Err(_) => None,
-            }
+    pub fn frame_recv(&self) -> MutexGuard<'_, Frame> {
+        let (lock, cvar) = &*self.frame_sent;
+        
+        let mut frame_ready = lock.lock().unwrap();
+
+        while !*frame_ready {
+            frame_ready = cvar.wait(frame_ready).unwrap();
         }
+
+        let frame_lock = self.framebuffer.lock().unwrap();
+
+        *frame_ready = false;
+        cvar.notify_one();
+
+        frame_lock
     }
 
     pub fn update_button(&mut self, button: Button, value: bool) {
@@ -43,19 +46,13 @@ impl MainCommunicator {
 }
 
 pub struct DebugCommunicator {
-    debug_rx: DebugReceiver,
+    vram: Arc<Mutex<VRAM>>,
 }
 
 impl DebugCommunicator {
-    pub fn vram_recv(&self, timeout: Duration) -> Option<DebugData> {
-        if timeout == Duration::ZERO {
-            Some(self.debug_rx.recv().unwrap())
-        } else {
-            match self.debug_rx.recv_timeout(timeout) {
-                Ok(debug_data) => Some(debug_data),
-                Err(_) => None,
-            }
-        }
+    pub fn vram_recv(&self) -> MutexGuard<'_, VRAM> {
+        let lock = self.vram.lock().unwrap();
+        lock
     }
 }
 
@@ -65,9 +62,7 @@ pub struct EmuContext {
     paused: bool,
     running: bool,
 
-    pub(crate) frame_tx: Option<FrameSender>,
-    pub(crate) debug_tx: Option<DebugSender>,
-    pub(crate) gamepad_state: Option<Arc<Mutex<GamepadState>>>
+    pub(crate) emulator_devices: Option<Devices>,
 }
 
 impl EmuContext {
@@ -130,23 +125,34 @@ impl GamepadState {
 }
 
 pub fn init(debug: bool) -> (Arc<Mutex<EmuContext>>, MainCommunicator, Option<DebugCommunicator>) {
-    let (frame_tx, frame_rx) = mpsc::sync_channel(1);
+    let framebuffer = Arc::new(Mutex::new([0; 0x5A00]));
+    let frame_sent = Arc::new((Mutex::new(false), Condvar::new()));
+    
+    let vram = Arc::new(Mutex::new([0; 0x2000]));
     let gamepad_state = Arc::new(Mutex::new(GamepadState::new()));
 
-    let (debug_tx, debug_rx);
+    let main_communicator = MainCommunicator {
+        framebuffer: framebuffer.clone(),
+        frame_sent: frame_sent.clone(),
+        gamepad_state: gamepad_state.clone(),
+    };
+
+    let mut debug_communicator = None;
     if debug {
-        let (tx, rx) = mpsc::sync_channel(1);
-        debug_tx = Some(tx);
-        debug_rx = Some(rx);
-    } else {
-        debug_tx = None;
-        debug_rx = None;
+        debug_communicator = Some(DebugCommunicator {
+            vram: vram.clone(),
+        })
     }
 
-    let gamepad_state1 = Arc::clone(&gamepad_state);
-    let main_communicator = MainCommunicator {
-        frame_rx,
-        gamepad_state: gamepad_state1
+    let bus = Interconnect::new(vram, gamepad_state);
+    let ppu = PPU::new(framebuffer, frame_sent);
+
+    let devices = Devices {
+        bus,
+        ppu,
+        debugger: if debug { Some(Debugger::new()) } else { None },
+
+        ticks: 0,
     };
 
     let emu_context = EmuContext {
@@ -154,16 +160,8 @@ pub fn init(debug: bool) -> (Arc<Mutex<EmuContext>>, MainCommunicator, Option<De
 
         paused: false,
         running: false,
-        frame_tx: Some(frame_tx),
-        debug_tx,
-
-        gamepad_state: Some(gamepad_state)
+        emulator_devices: Some(devices),
     };
-
-    let mut debug_communicator = None;
-    if debug {
-        debug_communicator = Some(DebugCommunicator { debug_rx: debug_rx.unwrap() })
-    }
 
     (Arc::new(Mutex::new(emu_context)), main_communicator, debug_communicator)
 }

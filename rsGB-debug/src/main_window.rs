@@ -52,19 +52,11 @@ impl MainWindow {
 
         self.comm.update_button(Button::SELECT, self.window.is_key_down(Key::M));
 
-        let recv_result = self.comm.frame_recv(Duration::from_micros(16600));
-        if let Some(buffer) = recv_result {
-            self.window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
-        } else {
-            self.window.update();
-        }
+        let new_frame = *self.comm.frame_recv();
+        self.window.update_with_buffer(&new_frame, WIDTH, HEIGHT).unwrap();
     }
 
     pub fn is_key_down(&self, key: Key) -> bool {
         self.window.is_key_down(key)
-    }
-
-    pub fn dump(&mut self) {
-        let _ = self.comm.frame_recv(Duration::from_micros(16600));
     }
 }

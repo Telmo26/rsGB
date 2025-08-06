@@ -39,31 +39,21 @@ impl DebugWindow {
     }
 
     pub fn update(&mut self) {
-        let recv_result = self.comm.vram_recv(Duration::from_micros(16600));
-        if let Some(vram) = recv_result {
-            let tiles: &[[u8; 16]; 384] = 
-                unsafe { &*(vram.as_ptr() as *const [[u8; 16]; 384]) };
+        let vram = &*self.comm.vram_recv();
+        self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
+        let tiles: &[[u8; 16]; 384] = 
+            unsafe { &*(vram.as_ptr() as *const [[u8; 16]; 384]) };
 
-            for y in 0..24 {
-                for x in 0..16 {
-                    let tile = &tiles[x + y * 16];
-                    display_tile(&mut self.buffer, x * 9 + 1, y * 9 + 1, tile);
-                }
+        for y in 0..24 {
+            for x in 0..16 {
+                let tile = &tiles[x + y * 16];
+                display_tile(&mut self.buffer, x * 9 + 1, y * 9 + 1, tile);
             }
-
-            self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
-        } else {
-            self.window.update();
         }
-
     }
 
     pub fn is_open(&self) -> bool {
         self.window.is_open()
-    }
-
-    pub fn dump(&mut self) {
-        let _ = self.comm.vram_recv(Duration::from_micros(16600));
     }
 }
 

@@ -100,11 +100,4 @@ impl CustomWindow {
             CustomWindow::DebugWindow(dbg_w) => dbg_w.update()
         }
     }
-
-    fn dump(&mut self) {
-        match self {
-            CustomWindow::MainWindow(w) => w.dump(),
-            CustomWindow::DebugWindow(dbg_w) => dbg_w.dump()
-        }
-    }
 }
