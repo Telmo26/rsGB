@@ -1,4 +1,5 @@
-use std::{sync::{mpsc::{self, RecvError}, Arc, Condvar, Mutex, MutexGuard}, time::Duration};
+use core::time;
+use std::{sync::{mpsc::{self, RecvError}, Arc, Condvar, Mutex, MutexGuard}, time::{Duration, Instant}};
 
 use crate::{dbg::Debugger, interconnect::Interconnect, ppu::PPU, Devices};
 
@@ -8,17 +9,26 @@ pub type VRAM = [u8; 0x2000];
 pub struct MainCommunicator {
     framebuffer: Arc<Mutex<Frame>>,
     frame_sent: Arc<(Mutex<bool>, Condvar)>,
-    gamepad_state: Arc<Mutex<GamepadState>>
+    gamepad_state: Arc<Mutex<GamepadState>>,
 }
 
 impl MainCommunicator {
-    pub fn frame_recv(&self) -> MutexGuard<'_, Frame> {
+    pub fn frame_recv(&self, timeout: Duration) -> Option<MutexGuard<'_, Frame>> {
         let (lock, cvar) = &*self.frame_sent;
         
         let mut frame_ready = lock.lock().unwrap();
 
         while !*frame_ready {
-            frame_ready = cvar.wait(frame_ready).unwrap();
+            match cvar.wait_timeout(frame_ready, timeout) {
+                Ok((value, timed_out)) => {
+                    if !timed_out.timed_out() {
+                        frame_ready = value;
+                    } else {
+                        return None
+                    }
+                },
+                Err(_) => return None
+            }
         }
 
         let frame_lock = self.framebuffer.lock().unwrap();
@@ -26,7 +36,7 @@ impl MainCommunicator {
         *frame_ready = false;
         cvar.notify_one();
 
-        frame_lock
+        Some(frame_lock)
     }
 
     pub fn update_button(&mut self, button: Button, value: bool) {

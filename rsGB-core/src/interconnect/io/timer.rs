@@ -34,7 +34,7 @@ impl Timer {
         }
 
         if timer_update && ((self.tac & (1 << 2)) != 0) {
-            self.tima += 1;
+            self.tima = self.tima.wrapping_add(1);
 
             if self.tima == 0xFF {
                 self.tima = self.tma;

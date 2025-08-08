@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use minifb::{Key, Scale, Window, WindowOptions};
 use rs_gb_core::{MainCommunicator, Button};
@@ -10,6 +10,8 @@ const SCALE: Scale = Scale::X4;
 pub struct MainWindow {
     window: Window,
     comm: MainCommunicator,
+    previous_frame_time: Instant,
+    frame_count: u8,
 }
 
 impl MainWindow {
@@ -23,11 +25,13 @@ impl MainWindow {
                 ..WindowOptions::default()
             }
         ).unwrap();
-        window.set_target_fps(60);
+        window.set_target_fps(60 + 1);
 
         MainWindow { 
             window, 
             comm,
+            previous_frame_time: Instant::now(),
+            frame_count: 0,
         }
     }
 
@@ -52,8 +56,21 @@ impl MainWindow {
 
         self.comm.update_button(Button::SELECT, self.window.is_key_down(Key::M));
 
-        let new_frame = *self.comm.frame_recv();
-        self.window.update_with_buffer(&new_frame, WIDTH, HEIGHT).unwrap();
+        if let Some(new_frame) = self.comm.frame_recv(Duration::from_micros(16600)).as_deref() {
+            self.window.update_with_buffer(new_frame, WIDTH, HEIGHT).unwrap();
+        } else {
+            self.window.update();
+        }
+
+        // FPS tracking
+        self.frame_count += 1;
+        let elapsed = self.previous_frame_time.elapsed();
+        if elapsed >= Duration::from_secs(1) {
+            let fps = self.frame_count as f64 / elapsed.as_secs_f64();
+            println!("{:.2} FPS", fps);
+            self.frame_count = 0;
+            self.previous_frame_time = Instant::now();
+        }
     }
 
     pub fn is_key_down(&self, key: Key) -> bool {
