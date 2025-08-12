@@ -2,6 +2,7 @@ mod timer;
 mod dma;
 mod lcd;
 mod gamepad;
+mod apu;
 
 use std::sync::{Arc, Mutex};
 
@@ -9,6 +10,7 @@ use timer::Timer;
 use dma::DMA;
 use lcd::LCD;
 use gamepad::Gamepad;
+use apu::APU;
 
 use crate::GamepadState;
 
@@ -39,8 +41,13 @@ pub struct IO {
     serial: [u8; 2],
     timer: Timer,
     if_register: u8,
+    apu: APU,
     pub(crate) lcd: LCD,
     dma: DMA,
+
+    // Previous DIV value
+    prev_div: u16,
+    falling_edge: bool,
 }
 
 impl IO {
@@ -50,8 +57,12 @@ impl IO {
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
+            apu: APU::new(),
             lcd: LCD::new(),
             dma: DMA::new(),
+
+            prev_div: 0,
+            falling_edge: false,
         }
     }
 
@@ -87,8 +98,21 @@ impl IO {
 
     pub fn tick_timer(&mut self) {
         let interrupt = self.timer.tick();
+        
+        let div = self.timer.div;
+        if div & (1 << 4) == 1 && self.prev_div & (1 << 4) == 0 {
+            self.falling_edge = true;
+        }
+        self.prev_div = div;
+
         if let Some(interrupt) = interrupt {
             self.if_register |= interrupt as u8;
+        }
+    }
+
+    pub fn tick_apu(&mut self) {
+        if self.falling_edge {
+            self.apu.tick()
         }
     }
 

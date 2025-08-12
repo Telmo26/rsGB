@@ -170,6 +170,7 @@ impl Interconnect {
     /// per clock cycle, like the DMA.
     pub fn tick_t(&mut self) {
         self.io.tick_timer();
+        self.io.tick_apu();
     }
 
 

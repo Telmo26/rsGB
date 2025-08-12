@@ -2,7 +2,7 @@ use crate::{cpu::interrupts::InterruptType};
 
 #[derive(Debug)]
 pub struct Timer {
-    div: u16,
+    pub(crate) div: u16,
     tima: u8,
     tma: u8,
     tac: u8,
