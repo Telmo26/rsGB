@@ -6,13 +6,6 @@ use pulse_channel::PulseChannel;
 mod timer;
 use timer::Timer;
 
-const WAVEFORMS: [[bool; 8]; 4] = [
-    [false, false, false, false, false, false, false, true],
-    [true, false, false, false, false, false, false, true],
-    [true, false, false, false, false, true, true, true],
-    [false, true, true, true, true, true, true, false]
-];
-
 type Channel = (u8, u8, u8, u8, u8);
 
 pub struct APU {
@@ -28,10 +21,7 @@ pub struct APU {
     ch1_timer: Timer,
     ch1_waveform_pointer: u8,
 
-    // CH2 Variables
     ch2: PulseChannel,
-    ch2_timer: Timer,
-    ch2_waveform_pointer: u8,
 
     // CH3 Variables
     _ch3: Channel,
@@ -52,14 +42,12 @@ impl APU {
             sampling_timer: Timer::new(87),
 
             div_apu: 0,
-
+            
             ch1: PulseChannel::default(),
             ch1_timer: Timer::default(),
             ch1_waveform_pointer: 0,
 
             ch2: PulseChannel::default(),
-            ch2_timer: Timer::default(),
-            ch2_waveform_pointer: 0,
 
             _ch3: (0, 0, 0, 0, 0),
 
@@ -76,20 +64,16 @@ impl APU {
             self.div_apu = self.div_apu.wrapping_add(1);
         }
 
-        if self.ch2_timer.tick() {
-            self.ch2_waveform_pointer = (self.ch2_waveform_pointer + 1) % 8;
-        }
-
-        let duty = self.ch2.wave_duty() as usize;
-        let pattern = WAVEFORMS[duty];
-
-        let output = if pattern[self.ch2_waveform_pointer as usize] {
-            self.ch2.initial_volume() as f32
-        } else {
-            0.0
-        };
+        self.ch2.tick();
 
         if self.sampling_timer.tick() {
+            let ch1_output = 0.0;
+            let ch2_output = self.ch2.output();
+            let ch3_output = 0.0;
+            let ch4_output = 0.0;
+
+            let output = ch1_output + ch2_output + ch3_output + ch4_output;
+
             let _ = self.sender.try_push(output);
         }
     }
@@ -102,18 +86,7 @@ impl APU {
             0xFF13 => self.ch1.period_low = value,
             0xFF14 => self.ch1.period_high_ctrl = value,
 
-            0xFF16 => self.ch2.length_timer_duty_cycle = value,
-            0xFF17 => self.ch2.volume_envelope = value,
-            0xFF18 => self.ch2.period_low = value,
-
-            0xFF19 =>  {
-                self.ch2.period_high_ctrl = value;
-                if self.ch2.trigger() {
-                    self.ch2_timer.set_period((2048 - self.ch2.period()) * 4);
-                    self.ch2_timer.reset();
-                    self.ch2_waveform_pointer = 0;
-                }
-            },
+            0xFF15..0xFF1A => self.ch2.write(address - 0xFF15, value),
 
             0xFF24 => self.master_vol = value,
             0xFF25 => self.sound_panning = value,
@@ -131,10 +104,7 @@ impl APU {
             0xFF13 => self.ch1.period_low,
             0xFF14 => self.ch1.period_high_ctrl,
 
-            0xFF16 => self.ch2.length_timer_duty_cycle,
-            0xFF17 => self.ch2.volume_envelope,
-            0xFF18 => self.ch2.period_low,
-            0xFF19 => self.ch2.period_high_ctrl,
+            0xFF15..0xFF1A => self.ch2.read(address - 0xFF15),
 
             0xFF24 => self.master_vol,
             0xFF25 => self.sound_panning,
