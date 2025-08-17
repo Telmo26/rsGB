@@ -1,6 +1,7 @@
-use std::{env, sync::{Arc, Mutex, MutexGuard}, thread};
+use std::{env, sync::{Arc, Mutex}, thread};
 
-use rs_gb_core::{init, run, EmuContext, MainCommunicator, DebugCommunicator};
+use ringbuf::traits::Consumer;
+use rs_gb_core::{init, run, EmuContext};
 
 use minifb::Key;
 
@@ -21,10 +22,13 @@ fn main() {
 
     // Creation of the emulator context
     // let context = Arc::new(Mutex::new(EmuContext::new(&args[1], CORE_DEBUG)));
-    let (context, main_communicator, debug_communicator) = init(CORE_DEBUG);
+    let (context, mut main_communicator, debug_communicator) = init(CORE_DEBUG);
 
     // Loading the file into the context
     context.lock().unwrap().load_file(&args[1]);
+
+    // Getting the audio receiver
+    let mut audio_receiver = main_communicator.get_audio_receiver();
 
     // Creation of the windows
     let mut windows = Vec::new();
@@ -53,6 +57,10 @@ fn main() {
                 false
             }
         );
+
+        if let Some(audio) = audio_receiver.try_pop() {
+            println!("Audio received: {audio}");
+        }
     }
     
     // When the window is shut, we stop the emulation and dump the frames

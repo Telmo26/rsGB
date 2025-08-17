@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ringbuf = "0.4.8"
 minifb = '0.28.0'
 rs_gb_core = { path = "../rsGB-core" }

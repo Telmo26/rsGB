@@ -1,7 +1,7 @@
-use std::{cell::RefCell, sync::{Arc, Mutex}};
+use std::sync::{Arc, Mutex};
 
 use crate::{
-    cart::Cartridge, cpu::AddrMode, GamepadState,
+    cart::Cartridge, GamepadState,
 };
 
 pub use crate::{
@@ -15,6 +15,7 @@ mod oam;
 use ram::*;
 use io::*;
 pub use oam::OAMEntry;
+use ringbuf::HeapProd;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
@@ -40,13 +41,13 @@ pub struct Interconnect {
 }
 
 impl Interconnect {
-    pub fn new(vram: Arc<Mutex<[u8; 0x2000]>>,gamepad_state: Arc<Mutex<GamepadState>>) -> Interconnect {
+    pub fn new(vram: Arc<Mutex<[u8; 0x2000]>>, gamepad_state: Arc<Mutex<GamepadState>>, audio_sender: HeapProd<i16>) -> Interconnect {
         Interconnect { 
             cart: None,
             vram,
             ram: RAM::new(),
             oam_ram: [OAMEntry::new(); 40],
-            io: IO::new(gamepad_state),
+            io: IO::new(gamepad_state, audio_sender),
             ie_register: 0,
         }
     }
@@ -99,13 +100,6 @@ impl Interconnect {
             // CPU Enable Register
             0xFFFF => self.ie_register,
         }
-    }
-
-    pub fn read16(&self, address: u16) -> u16 {
-        let low: u16 = self.read(address) as u16;
-        let high: u16 = self.read(address + 1) as u16;
-
-        high << 8 | low
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
@@ -180,7 +174,6 @@ impl Interconnect {
         if let Some((byte, val)) = self.io.tick_dma() {
             let source_addr = val as u16 * 0x100 + byte as u16;
             let value = self.read(source_addr);
-            let address = 0xFE00 | (byte as u16);
 
             let sprite_index = byte as usize / 4;
             let byte_offset = byte as u8 % 4;

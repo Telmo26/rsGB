@@ -5,6 +5,7 @@ mod gamepad;
 mod apu;
 
 use std::sync::{Arc, Mutex};
+use ringbuf::HeapProd;
 
 use timer::Timer;
 use dma::DMA;
@@ -51,13 +52,13 @@ pub struct IO {
 }
 
 impl IO {
-    pub fn new(gamepad_state: Arc<Mutex<GamepadState>>) -> IO {
+    pub fn new(gamepad_state: Arc<Mutex<GamepadState>>, audio_sender: HeapProd<i16>) -> IO {
         IO { 
             gamepad: Gamepad::new(gamepad_state),
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
-            apu: APU::new(),
+            apu: APU::new(audio_sender),
             lcd: LCD::new(),
             dma: DMA::new(),
 
@@ -73,6 +74,7 @@ impl IO {
             0xFF02 => self.serial[1],
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => self.if_register,
+            0xFF10..0xFF40 => self.apu.read(address),
             0xFF40..=0xFF4B => self.lcd.read(address),
             _ => {
                 // eprintln!("Read at address {address:X} not implemented!");
@@ -88,6 +90,7 @@ impl IO {
             0xFF02 => self.serial[1] = value,
             0xFF04..=0xFF07 => self.timer.write(address, value),
             0xFF0F => self.if_register = value,
+            0xFF10..0xFF40 => self.apu.write(address, value),
             0xFF40..=0xFF4B => {
                 if address == 0xFF46 { self.dma.start(value) }
                 self.lcd.write(address, value);
@@ -102,6 +105,8 @@ impl IO {
         let div = self.timer.div;
         if div & (1 << 4) == 1 && self.prev_div & (1 << 4) == 0 {
             self.falling_edge = true;
+        } else {
+            self.falling_edge = false;
         }
         self.prev_div = div;
 
@@ -111,9 +116,7 @@ impl IO {
     }
 
     pub fn tick_apu(&mut self) {
-        if self.falling_edge {
-            self.apu.tick()
-        }
+        self.apu.tick(self.falling_edge)
     }
 
     pub fn request_interrupt(&mut self, interrupt: InterruptType) {

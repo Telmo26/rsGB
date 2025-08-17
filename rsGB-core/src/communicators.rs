@@ -1,6 +1,8 @@
 use core::time;
 use std::{sync::{mpsc::{self, RecvError}, Arc, Condvar, Mutex, MutexGuard}, time::{Duration, Instant}};
 
+use ringbuf::{traits::Split, HeapCons};
+
 use crate::{dbg::Debugger, interconnect::Interconnect, ppu::PPU, Devices};
 
 pub type Frame = [u32; 0x5A00];
@@ -10,6 +12,7 @@ pub struct MainCommunicator {
     framebuffer: Arc<Mutex<Frame>>,
     frame_sent: Arc<(Mutex<bool>, Condvar)>,
     gamepad_state: Arc<Mutex<GamepadState>>,
+    audio_receiver: Option<HeapCons<i16>>,
 }
 
 impl MainCommunicator {
@@ -51,7 +54,10 @@ impl MainCommunicator {
             Button::LEFT => gamepad_lock.left = value,
             Button::RIGHT => gamepad_lock.right = value
         }
+    }
 
+    pub fn get_audio_receiver(&mut self) -> HeapCons<i16> {
+        self.audio_receiver.take().unwrap()
     }
 }
 
@@ -141,10 +147,14 @@ pub fn init(debug: bool) -> (Arc<Mutex<EmuContext>>, MainCommunicator, Option<De
     let vram = Arc::new(Mutex::new([0; 0x2000]));
     let gamepad_state = Arc::new(Mutex::new(GamepadState::new()));
 
+    let rb = ringbuf::HeapRb::<i16>::new(8192);
+    let (prod, cons) = rb.split();
+
     let main_communicator = MainCommunicator {
         framebuffer: framebuffer.clone(),
         frame_sent: frame_sent.clone(),
         gamepad_state: gamepad_state.clone(),
+        audio_receiver: Some(cons),
     };
 
     let mut debug_communicator = None;
@@ -154,7 +164,7 @@ pub fn init(debug: bool) -> (Arc<Mutex<EmuContext>>, MainCommunicator, Option<De
         })
     }
 
-    let bus = Interconnect::new(vram, gamepad_state);
+    let bus = Interconnect::new(vram, gamepad_state, prod);
     let ppu = PPU::new(framebuffer, frame_sent);
 
     let devices = Devices {
