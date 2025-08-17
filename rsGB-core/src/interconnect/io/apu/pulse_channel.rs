@@ -17,8 +17,20 @@ pub struct PulseChannel {
     pub period_high_ctrl: u8,
 
     // Internal values
-    enabled: bool,
+    pub enabled: bool,
+
+    sweep_enabled: bool,
+    sweep_timer: u8,
+    shadow_register: u16,
+
+    volume: u8,
+    enveloppe_pace: u8,
+    enveloppe_timer: u8,
+    enveloppe_direction: bool,
+
+    length_timer: u8,
     timer: Timer,
+
     waveform_pointer: u8,
 }
 
@@ -44,9 +56,37 @@ impl PulseChannel {
                 self.period_high_ctrl = value;
                 if self.trigger() {
                     self.enabled = true;
+
+                    if self.length_timer == 0 {
+                        self.length_timer = 64 - self.initial_length_timer();
+                    }
+
                     self.timer.set_period((2048 - self.period()) * 4);
                     self.timer.reset();
+
+                    self.enveloppe_direction = self.enveloppe_direction();
+                    self.enveloppe_timer = self.enveloppe_pace();
+                    self.enveloppe_pace = self.enveloppe_pace();
+
+                    self.volume = self.initial_volume();
                     self.waveform_pointer = 0;
+
+                    self.shadow_register = self.period();
+                    self.sweep_timer = self.pace();
+                    self.sweep_enabled = self.pace() != 0 || self.step() != 0;
+
+                    if self.step() != 0 {
+                        let change = if self.direction() { (self.shadow_register >> self.step()) as i16}
+                            else { - ((self.shadow_register >> self.step()) as i16) };
+                        let freq = self.shadow_register.wrapping_add_signed(change);
+                        if freq > 0x7FF {
+                            self.enabled = false;
+                        } else {
+                            self.shadow_register = freq;
+                            self.period_low = freq as u8;
+                            self.period_high_ctrl = (self.period_high_ctrl & 0xF8) | ((freq >> 8) as u8 & 0x7);
+                        }
+                    }
                 }
             }
             _ => unreachable!()
@@ -60,13 +100,75 @@ impl PulseChannel {
     }
 
     pub fn output(&self) -> f32 {
-        let duty = self.wave_duty() as usize;
-        let pattern = WAVEFORMS[duty];
+        if self.enabled {
+            let duty = self.wave_duty() as usize;
+            let pattern = WAVEFORMS[duty];
 
-        if pattern[self.waveform_pointer as usize] {
-            self.initial_volume() as f32
+            let sample = self.volume as f32 / 15.0;
+            let bipolar = 2.0 * sample - 1.0; 
+
+            if pattern[self.waveform_pointer as usize] {
+                bipolar
+            } else {
+                -bipolar
+            }
         } else {
             0.0
+        }  
+    }
+
+    pub fn length_tick(&mut self) {
+        if self.enabled && self.length_enable() {
+            self.length_timer -= 1;
+            if self.length_timer == 0 {
+                self.enabled = false;
+            }
+        }
+    }
+
+    pub fn enveloppe_tick(&mut self) {
+        if self.enveloppe_timer == 0 {
+            if self.enveloppe_pace != 0 {
+                if self.enveloppe_direction {
+                    if self.volume < 15 {
+                        self.volume += 1;
+                    }
+                } else {
+                    self.volume = self.volume.saturating_sub(1);
+                }
+                self.enveloppe_timer = self.enveloppe_pace;
+            }
+        } else {
+            self.enveloppe_timer -= 1;
+        }
+    }
+
+    pub fn sweep_tick(&mut self) {
+        if !self.sweep_enabled || self.step() == 0 || self.pace() == 0 {
+            return;
+        }
+
+        if self.sweep_timer == 0 {
+            let change = if self.direction() { (self.shadow_register >> self.step()) as i16}
+                                else { - ((self.shadow_register >> self.step()) as i16) };
+            let freq = self.shadow_register.wrapping_add_signed(change);
+            if freq > 0x7FF {
+                self.enabled = false;
+            } else if self.step() != 0 {
+                self.shadow_register = freq;
+                self.period_low = freq as u8;
+                self.period_high_ctrl = (self.period_high_ctrl & 0xF8) | ((freq >> 8) as u8 & 0x7);
+
+                let change = if self.direction() { (self.shadow_register >> self.step()) as i16}
+                else { - ((self.shadow_register >> self.step()) as i16) };
+                let freq = self.shadow_register.wrapping_add_signed(change);
+                if freq > 0x7FF {
+                    self.enabled = false;
+                }
+            }
+            self.sweep_timer = self.pace();
+        } else {
+            self.sweep_timer -= 1;
         }
     }
 
@@ -102,7 +204,7 @@ impl PulseChannel {
         self.volume_envelope & 0b1000 != 0
     }
 
-    fn sweep_pace(&self) -> u8 {
+    fn enveloppe_pace(&self) -> u8 {
         self.volume_envelope & 0b111
     }
 

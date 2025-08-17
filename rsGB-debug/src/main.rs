@@ -34,6 +34,8 @@ fn main() {
     let device = host.default_output_device().expect("No output device detected");
     let config = device.default_output_config().unwrap();
 
+    println!("{config:?}");
+
     let stream = device.build_output_stream(
         &config.config(), 
         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {

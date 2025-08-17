@@ -18,8 +18,6 @@ pub struct APU {
 
     // CH1 Variables
     ch1: PulseChannel,
-    ch1_timer: Timer,
-    ch1_waveform_pointer: u8,
 
     ch2: PulseChannel,
 
@@ -39,13 +37,11 @@ impl APU {
     pub fn new(sender: HeapProd<f32>) -> APU {
         APU {
             sender,
-            sampling_timer: Timer::new(87),
+            sampling_timer: Timer::new(95),
 
             div_apu: 0,
             
             ch1: PulseChannel::default(),
-            ch1_timer: Timer::default(),
-            ch1_waveform_pointer: 0,
 
             ch2: PulseChannel::default(),
 
@@ -62,29 +58,70 @@ impl APU {
     pub fn tick(&mut self, div_falling_edge: bool) {
         if div_falling_edge {
             self.div_apu = self.div_apu.wrapping_add(1);
+            if self.div_apu % 2 == 0 { // Length counter step
+                self.ch1.length_tick();
+                self.ch2.length_tick();
+            }
+            
+            if self.div_apu % 4 == 0 { // Sweep step
+                self.ch1.sweep_tick();
+            }
+            
+            if self.div_apu % 8 == 0 { // Envelope step  
+                self.ch1.enveloppe_tick();
+                self.ch2.enveloppe_tick();
+            }
         }
 
+        self.ch1.tick();
         self.ch2.tick();
 
-        if self.sampling_timer.tick() {
-            let ch1_output = 0.0;
+        if self.sampling_timer.tick() && self.audio_enabled() {
+            let ch1_output = self.ch1.output();
             let ch2_output = self.ch2.output();
             let ch3_output = 0.0;
             let ch4_output = 0.0;
 
-            let output = ch1_output + ch2_output + ch3_output + ch4_output;
+            let left_vol = (self.master_vol >> 4) & 0x07;
+            let right_vol = self.master_vol & 0x07;
 
-            let _ = self.sender.try_push(output);
+            let pan = self.sound_panning;
+
+            let mut left = 0.0;
+            let mut right = 0.0;
+
+            // CH1
+            if pan & 0b0001 != 0 { right += ch1_output; }
+            if pan & 0b0001_0000 != 0 { left += ch1_output; }
+
+            // CH2
+            if pan & 0b0010 != 0 { right += ch2_output; }
+            if pan & 0b0010_0000 != 0 { left += ch2_output; }
+
+            // CH3
+            if pan & 0b0100 != 0 { right += ch3_output; }
+            if pan & 0b0100_0000 != 0 { left += ch3_output; }
+
+            // CH4
+            if pan & 0b1000 != 0 { right += ch4_output; }
+            if pan & 0b1000_0000 != 0 { left += ch4_output; }
+
+            // Apply master volume scaling
+            left *= left_vol as f32 / 7.0;
+            right *= right_vol as f32 / 7.0;
+
+            // Normalize a little to prevent clipping
+            left = left.clamp(-1.0, 1.0);
+            right = right.clamp(-1.0, 1.0);
+
+            let _ = self.sender.try_push(left);
+            let _ = self.sender.try_push(right);
         }
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
-            0xFF10 => self.ch1.sweep = value,
-            0xFF11 => self.ch1.length_timer_duty_cycle = value,
-            0xFF12 => self.ch1.volume_envelope = value,
-            0xFF13 => self.ch1.period_low = value,
-            0xFF14 => self.ch1.period_high_ctrl = value,
+            0xFF10..0xFF15 => self.ch1.write(address - 0xFF10, value),
 
             0xFF15..0xFF1A => self.ch2.write(address - 0xFF15, value),
 
@@ -98,11 +135,7 @@ impl APU {
 
     pub fn read(&self, address: u16) -> u8 {
         match address {
-            0xFF10 => self.ch1.sweep,
-            0xFF11 => self.ch1.length_timer_duty_cycle,
-            0xFF12 => self.ch1.volume_envelope,
-            0xFF13 => self.ch1.period_low,
-            0xFF14 => self.ch1.period_high_ctrl,
+            0xFF10..0xFF15 => self.ch1.read(address - 0xFF10),
 
             0xFF15..0xFF1A => self.ch2.read(address - 0xFF15),
 
@@ -112,5 +145,9 @@ impl APU {
 
             _ => unreachable!()
         }
+    }
+
+    fn audio_enabled(&self) -> bool {
+        self.audio_master_ctrl & 0b10000000 != 0
     }
 }
