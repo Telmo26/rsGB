@@ -12,7 +12,7 @@ pub struct MainCommunicator {
     framebuffer: Arc<Mutex<Frame>>,
     frame_sent: Arc<(Mutex<bool>, Condvar)>,
     gamepad_state: Arc<Mutex<GamepadState>>,
-    audio_receiver: Option<HeapCons<i16>>,
+    audio_receiver: Option<HeapCons<f32>>,
 }
 
 impl MainCommunicator {
@@ -56,7 +56,7 @@ impl MainCommunicator {
         }
     }
 
-    pub fn get_audio_receiver(&mut self) -> HeapCons<i16> {
+    pub fn get_audio_receiver(&mut self) -> HeapCons<f32> {
         self.audio_receiver.take().unwrap()
     }
 }
@@ -147,7 +147,7 @@ pub fn init(debug: bool) -> (Arc<Mutex<EmuContext>>, MainCommunicator, Option<De
     let vram = Arc::new(Mutex::new([0; 0x2000]));
     let gamepad_state = Arc::new(Mutex::new(GamepadState::new()));
 
-    let rb = ringbuf::HeapRb::<i16>::new(8192);
+    let rb = ringbuf::HeapRb::<f32>::new(8192);
     let (prod, cons) = rb.split();
 
     let main_communicator = MainCommunicator {

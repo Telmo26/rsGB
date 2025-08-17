@@ -17,7 +17,7 @@ type Channel = (u8, u8, u8, u8, u8);
 
 pub struct APU {
     // Communication data
-    sender: HeapProd<i16>,
+    sender: HeapProd<f32>,
     sampling_timer: Timer,
 
     // APU internals
@@ -46,7 +46,7 @@ pub struct APU {
 }
 
 impl APU {
-    pub fn new(sender: HeapProd<i16>) -> APU {
+    pub fn new(sender: HeapProd<f32>) -> APU {
         APU {
             sender,
             sampling_timer: Timer::new(87),
@@ -84,9 +84,9 @@ impl APU {
         let pattern = WAVEFORMS[duty];
 
         let output = if pattern[self.ch2_waveform_pointer as usize] {
-            self.ch2.initial_volume() as i16
+            self.ch2.initial_volume() as f32
         } else {
-            0
+            0.0
         };
 
         if self.sampling_timer.tick() {

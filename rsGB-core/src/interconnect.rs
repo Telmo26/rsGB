@@ -41,7 +41,7 @@ pub struct Interconnect {
 }
 
 impl Interconnect {
-    pub fn new(vram: Arc<Mutex<[u8; 0x2000]>>, gamepad_state: Arc<Mutex<GamepadState>>, audio_sender: HeapProd<i16>) -> Interconnect {
+    pub fn new(vram: Arc<Mutex<[u8; 0x2000]>>, gamepad_state: Arc<Mutex<GamepadState>>, audio_sender: HeapProd<f32>) -> Interconnect {
         Interconnect { 
             cart: None,
             vram,

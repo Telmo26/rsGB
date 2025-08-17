@@ -1,9 +1,10 @@
 use std::{env, sync::{Arc, Mutex}, thread};
 
 use ringbuf::traits::Consumer;
-use rs_gb_core::{init, run, EmuContext};
-
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use minifb::Key;
+
+use rs_gb_core::{init, run, EmuContext};
 
 mod main_window;
 mod debug_window;
@@ -27,8 +28,26 @@ fn main() {
     // Loading the file into the context
     context.lock().unwrap().load_file(&args[1]);
 
-    // Getting the audio receiver
+    // Getting the audio receiver and setting up the audio playback
     let mut audio_receiver = main_communicator.get_audio_receiver();
+    let host = cpal::default_host();
+    let device = host.default_output_device().expect("No output device detected");
+    let config = device.default_output_config().unwrap();
+
+    let stream = device.build_output_stream(
+        &config.config(), 
+        move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+            for sample in data.iter_mut() {
+                *sample = audio_receiver.try_pop().unwrap_or(0.0);
+            }
+        }, 
+        move |err| {
+            eprintln!("Stream error: {:?}", err);
+        }, 
+        None
+    ).unwrap();
+
+    stream.play().unwrap();
 
     // Creation of the windows
     let mut windows = Vec::new();
@@ -57,10 +76,6 @@ fn main() {
                 false
             }
         );
-
-        if let Some(audio) = audio_receiver.try_pop() {
-            println!("Audio received: {audio}");
-        }
     }
     
     // When the window is shut, we stop the emulation and dump the frames
