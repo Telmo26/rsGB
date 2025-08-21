@@ -8,7 +8,7 @@ mod dbg;
 mod communicators;
 
 use std::{
-    sync::{mpsc::{self, Sender}, Arc, Mutex, MutexGuard}, 
+    sync::{Arc, Mutex, MutexGuard}, 
     thread, 
     time::Duration
 };
@@ -118,6 +118,7 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
     loop {
         let ctx = context.lock().unwrap();
         if !ctx.is_running() {
+            println!("{:?}", emulator.cpu.opcode_cycles);
             break
         }
 

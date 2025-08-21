@@ -40,7 +40,10 @@ fn main() {
         &config.config(), 
         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
             for sample in data.iter_mut() {
-                *sample = audio_receiver.try_pop().unwrap_or(0.0);
+                match audio_receiver.try_pop() {
+                    Some(audio) => *sample = audio,
+                    None => continue,
+                }
             }
         }, 
         move |err| {

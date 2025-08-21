@@ -147,7 +147,7 @@ pub fn init(debug: bool) -> (Arc<Mutex<EmuContext>>, MainCommunicator, Option<De
     let vram = Arc::new(Mutex::new([0; 0x2000]));
     let gamepad_state = Arc::new(Mutex::new(GamepadState::new()));
 
-    let rb = ringbuf::HeapRb::<f32>::new(16384);
+    let rb = ringbuf::HeapRb::<f32>::new(8192);
     let (prod, cons) = rb.split();
 
     let main_communicator = MainCommunicator {

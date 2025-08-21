@@ -161,7 +161,7 @@ impl Interconnect {
     }
 
     /// This function ticks all the devices that tick once
-    /// per clock cycle, like the DMA.
+    /// per clock cycle, like the timer.
     pub fn tick_t(&mut self) {
         self.io.tick_timer();
         self.io.tick_apu();

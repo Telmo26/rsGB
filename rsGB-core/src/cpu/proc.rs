@@ -76,12 +76,12 @@ fn proc_ld(cpu: &mut CPU, dev: &mut Devices) {
             cpu.registers.read(cpu.curr_inst.reg_2).wrapping_add_signed(e));
     } else if cpu.dest_is_mem {
         if cpu.curr_inst.reg_2.is_16bit() {
-            dev.incr_cycle(1);
+            cpu.incr_cycle_exec(dev, 1);
             dev.bus.write16(cpu.mem_dest, cpu.fetched_data);
         } else {
             dev.bus.write(cpu.mem_dest, cpu.fetched_data as u8);
         }
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, cpu.fetched_data);
     }
@@ -93,20 +93,19 @@ fn proc_ldh(cpu: &mut CPU, dev: &mut Devices) {
         cpu.registers.set(RegType::A, cpu.fetched_data);
     } else {
         // Loading A into a memory region
-        dev.bus.write(cpu.mem_dest, cpu.fetched_data as u8)
+        dev.bus.write(cpu.mem_dest, cpu.fetched_data as u8);
+        cpu.incr_cycle_exec(dev, 1);
     }
-
-    dev.incr_cycle(1);
 }
 
 fn goto_addr(cpu: &mut CPU, dev: &mut Devices, address: u16, push_pc: bool) {
     if cpu.check_cond() {
         if push_pc {
-            dev.incr_cycle(2);
+            cpu.incr_cycle_exec(dev, 2);
             cpu.push16(&mut dev.bus, cpu.registers.pc);
         }
         cpu.registers.pc = address;
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
     }
 }
 
@@ -130,19 +129,19 @@ fn proc_rst(cpu: &mut CPU, dev: &mut Devices) {
 
 fn proc_ret(cpu: &mut CPU, dev: &mut Devices) {
     if cpu.curr_inst.cond != CondType::NONE {
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
     }
 
     if cpu.check_cond() {
         let low: u16 = cpu.pop(&mut dev.bus) as u16;
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
 
         let high: u16 = cpu.pop(&mut dev.bus) as u16;
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
 
         cpu.registers.pc = (high << 8) | low;
 
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
     }
 }
 
@@ -157,10 +156,10 @@ fn proc_di(cpu: &mut CPU, _dev: &mut Devices) {
 
 fn proc_pop(cpu: &mut CPU, dev: &mut Devices) {
     let low = cpu.pop(&mut dev.bus) as u16;
-    dev.incr_cycle(1);
+    cpu.incr_cycle_exec(dev, 1);
 
     let high = cpu.pop(&mut dev.bus) as u16;
-    dev.incr_cycle(1);
+    cpu.incr_cycle_exec(dev, 1);
 
     let data = (high << 8) | low;
 
@@ -173,21 +172,21 @@ fn proc_pop(cpu: &mut CPU, dev: &mut Devices) {
 
 fn proc_push(cpu: &mut CPU, dev: &mut Devices) {
     let high = (cpu.registers.read(cpu.curr_inst.reg_1) >> 8) as u8;
-    dev.incr_cycle(1);
+    cpu.incr_cycle_exec(dev, 1);
     cpu.push(&mut dev.bus, high);
 
     let low = cpu.registers.read(cpu.curr_inst.reg_1) as u8;
-    dev.incr_cycle(1);
+    cpu.incr_cycle_exec(dev, 1);
     cpu.push(&mut dev.bus, low);
 
-    dev.incr_cycle(1);
+    cpu.incr_cycle_exec(dev, 1);
 }
 
 fn proc_inc(cpu: &mut CPU, dev: &mut Devices) {
     let mut val = cpu.fetched_data;
     
     if cpu.curr_inst.reg_1.is_16bit() && !cpu.dest_is_mem {
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
         val = val.wrapping_add(1);
     } else {
         val = (cpu.fetched_data as u8).wrapping_add(1) as u16;
@@ -208,7 +207,7 @@ fn proc_dec(cpu: &mut CPU, dev: &mut Devices) {
     let mut val = cpu.fetched_data;
 
     if cpu.curr_inst.reg_1.is_16bit() {
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
         val = val.wrapping_sub(1);
     } else {
         val = (cpu.fetched_data as u8).wrapping_sub(1) as u16;
@@ -230,7 +229,7 @@ fn proc_add(cpu: &mut CPU, dev: &mut Devices) {
 
     if cpu.curr_inst.reg_1.is_16bit() {
         value = cpu.registers.read(cpu.curr_inst.reg_1).wrapping_add(cpu.fetched_data);
-        dev.incr_cycle(1);
+        cpu.incr_cycle_exec(dev, 1);
     } else {
         value = (cpu.registers.read(cpu.curr_inst.reg_1) as u8).wrapping_add(cpu.fetched_data as u8) as u16;
     }
@@ -327,10 +326,10 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
 
     let mut reg_val = cpu.registers.read_reg8(&dev.bus, register);
 
-    dev.incr_cycle(1);
+    cpu.incr_cycle_exec(dev, 1);
 
     if register == RegType::HL {
-        dev.incr_cycle(2);
+        cpu.incr_cycle_exec(dev, 2);
     }
 
     match bit_op {

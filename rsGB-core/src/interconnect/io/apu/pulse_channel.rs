@@ -10,14 +10,15 @@ const WAVEFORMS: [[bool; 8]; 4] = [
 #[derive(Debug, Default)]
 pub struct PulseChannel {
     // Registers
-    pub sweep: u8,
-    pub length_timer_duty_cycle: u8,
-    pub volume_envelope: u8,
-    pub period_low: u8,
-    pub period_high_ctrl: u8,
+    sweep: u8,
+    length_timer_duty_cycle: u8,
+    volume_envelope: u8,
+    period_low: u8,
+    period_high_ctrl: u8,
 
     // Internal values
-    pub enabled: bool,
+    enabled: bool,
+    has_sweep: bool,
 
     sweep_enabled: bool,
     sweep_timer: u8,
@@ -35,57 +36,75 @@ pub struct PulseChannel {
 }
 
 impl PulseChannel {
+    pub fn new(has_sweep: bool) -> PulseChannel {
+        PulseChannel {
+            has_sweep,
+            ..PulseChannel::default()
+        }
+    }
+
     pub fn read(&self, address: u16) -> u8 {
         match address {
-            0 => self.sweep,
-            1 => self.length_timer_duty_cycle,
+            0 => if self.has_sweep { self.sweep | 0x80 } else { 0xFF },
+            1 => self.length_timer_duty_cycle | 0x3F,
             2 => self.volume_envelope,
-            3 => self.period_low,
-            4 => self.period_high_ctrl,
+            3 => 0xFF,
+            4 => self.period_high_ctrl | 0xBF,
             _ => unreachable!()
         }
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
-            0 => self.sweep = value,
-            1 => self.length_timer_duty_cycle = value,
-            2 => self.volume_envelope = value,
+            0 => self.sweep = value & 0x7F,
+            1 => {
+                self.length_timer_duty_cycle = value;
+                self.length_timer = 64 - self.initial_length_timer();
+            },
+            2 => {
+                self.volume_envelope = value;
+                if !self.is_dac_enabled() {
+                    self.enabled = false;
+                }
+            } 
             3 => self.period_low = value,
             4 => {
-                self.period_high_ctrl = value;
-                if self.trigger() {
-                    self.enabled = true;
+                let old_length_enable = self.length_enable();
+                self.period_high_ctrl = value & 0xC7; // Only bits 7,6,2-0 are writable
+                
+                if !old_length_enable && self.length_enable() && self.length_timer == 0 {
+                    self.enabled = false;
+                }
+
+                if self.trigger(value) {
+                    self.enabled = self.is_dac_enabled();
 
                     if self.length_timer == 0 {
-                        self.length_timer = 64 - self.initial_length_timer();
+                        self.length_timer = 64;
+                        if self.length_enable() {
+                            self.length_timer = 63;
+                        }
                     }
 
                     self.timer.set_period((2048 - self.period()) * 4);
-                    self.timer.reset();
 
                     self.enveloppe_direction = self.enveloppe_direction();
-                    self.enveloppe_timer = self.enveloppe_pace();
+                    self.enveloppe_timer = if self.enveloppe_pace() == 0 {
+                        8
+                    } else {
+                        self.enveloppe_pace()
+                    };
                     self.enveloppe_pace = self.enveloppe_pace();
 
                     self.volume = self.initial_volume();
                     self.waveform_pointer = 0;
 
                     self.shadow_register = self.period();
-                    self.sweep_timer = self.pace();
+                    self.sweep_timer = if self.pace() == 0 { 8 } else { self.pace() };
                     self.sweep_enabled = self.pace() != 0 || self.step() != 0;
 
                     if self.step() != 0 {
-                        let change = if self.direction() { (self.shadow_register >> self.step()) as i16}
-                            else { - ((self.shadow_register >> self.step()) as i16) };
-                        let freq = self.shadow_register.wrapping_add_signed(change);
-                        if freq > 0x7FF {
-                            self.enabled = false;
-                        } else {
-                            self.shadow_register = freq;
-                            self.period_low = freq as u8;
-                            self.period_high_ctrl = (self.period_high_ctrl & 0xF8) | ((freq >> 8) as u8 & 0x7);
-                        }
+                        self.calculate_sweep_frequency();
                     }
                 }
             }
@@ -104,14 +123,13 @@ impl PulseChannel {
             let duty = self.wave_duty() as usize;
             let pattern = WAVEFORMS[duty];
 
-            let sample = self.volume as f32 / 15.0;
-            let bipolar = 2.0 * sample - 1.0; 
-
-            if pattern[self.waveform_pointer as usize] {
-                bipolar
+            let sample = if pattern[self.waveform_pointer as usize] {
+                self.volume as f32
             } else {
-                -bipolar
-            }
+                0.0
+            };
+
+            (7.5 - sample) / 7.5
         } else {
             0.0
         }  
@@ -127,49 +145,79 @@ impl PulseChannel {
     }
 
     pub fn enveloppe_tick(&mut self) {
-        if self.enveloppe_timer == 0 {
-            if self.enveloppe_pace != 0 {
-                if self.enveloppe_direction {
-                    if self.volume < 15 {
-                        self.volume += 1;
-                    }
-                } else {
-                    self.volume = self.volume.saturating_sub(1);
+        self.enveloppe_timer -= 1;
+        if self.enveloppe_timer == 0 && self.enveloppe_pace != 0 {
+            if self.enveloppe_direction {
+                if self.volume < 15 {
+                    self.volume += 1;
                 }
-                self.enveloppe_timer = self.enveloppe_pace;
+            } else {
+                self.volume = self.volume.saturating_sub(1);
             }
-        } else {
-            self.enveloppe_timer -= 1;
+            self.enveloppe_timer = self.enveloppe_pace;
         }
     }
 
     pub fn sweep_tick(&mut self) {
-        if !self.sweep_enabled || self.step() == 0 || self.pace() == 0 {
+        if !self.sweep_enabled {
             return;
         }
 
+        self.sweep_timer -= 1;
         if self.sweep_timer == 0 {
-            let change = if self.direction() { (self.shadow_register >> self.step()) as i16}
-                                else { - ((self.shadow_register >> self.step()) as i16) };
-            let freq = self.shadow_register.wrapping_add_signed(change);
-            if freq > 0x7FF {
-                self.enabled = false;
-            } else if self.step() != 0 {
-                self.shadow_register = freq;
-                self.period_low = freq as u8;
-                self.period_high_ctrl = (self.period_high_ctrl & 0xF8) | ((freq >> 8) as u8 & 0x7);
-
-                let change = if self.direction() { (self.shadow_register >> self.step()) as i16}
-                else { - ((self.shadow_register >> self.step()) as i16) };
-                let freq = self.shadow_register.wrapping_add_signed(change);
-                if freq > 0x7FF {
-                    self.enabled = false;
-                }
-            }
             self.sweep_timer = self.pace();
-        } else {
-            self.sweep_timer -= 1;
+
+            if self.pace() > 0 {
+                self.calculate_sweep_frequency();
+            }
         }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn power_off(&mut self) {
+        self.sweep = 0;
+        self.length_timer_duty_cycle = 0;
+        self.volume_envelope = 0;
+        self.period_low = 0;
+        self.period_high_ctrl = 0;
+        self.enabled = false;
+    }
+
+    fn calculate_sweep_frequency(&mut self) {
+        let new_freq = {
+            let change = self.shadow_register >> self.step();
+            if self.direction() { // Increasing
+                self.shadow_register.wrapping_add(change)
+            } else { // Decreasing
+                self.shadow_register.wrapping_sub(change)
+            }
+        };
+        if new_freq > 0x7FF {
+            self.enabled = false;
+        } else if self.step() != 0 {
+            self.shadow_register = new_freq;
+            self.period_low = new_freq as u8;
+            self.period_high_ctrl = (self.period_high_ctrl & 0xF8) | ((new_freq >> 8) as u8 & 0x7);
+
+            let second_change = self.shadow_register >> self.step();
+            let second_new_freq = if self.direction() {
+                self.shadow_register.wrapping_add(second_change)
+            } else {
+                self.shadow_register.wrapping_sub(second_change)
+            };
+
+            if second_new_freq > 0x7FF {
+                self.enabled = false;
+            }
+        }
+    }
+
+    fn is_dac_enabled(&self) -> bool {
+        // DAC is enabled if the upper 5 bits of NRx2 are non-zero.
+        self.volume_envelope & 0xF8 != 0
     }
 
     fn pace(&self) -> u8 {
@@ -216,7 +264,7 @@ impl PulseChannel {
         self.period_high_ctrl & 0b1000000 != 0
     }
 
-    fn trigger(&self) -> bool {
-        self.period_high_ctrl & 0b10000000 != 0
+    fn trigger(&self, value: u8) -> bool {
+        value & 0b10000000 != 0
     }
 }

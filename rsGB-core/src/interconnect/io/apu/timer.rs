@@ -15,7 +15,7 @@ impl Timer {
     pub fn tick(&mut self) -> bool {
         self.value = self.value.wrapping_sub(1);
         if self.value == 0 {
-            self.reset();
+            self.value = self.period;
             return true
         }
         false
@@ -23,9 +23,5 @@ impl Timer {
 
     pub fn set_period(&mut self, period: u16) {
         self.period = period;
-    }
-
-    pub fn reset(&mut self) {
-        self.value = self.period;
     }
 }

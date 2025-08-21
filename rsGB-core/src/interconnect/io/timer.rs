@@ -34,12 +34,12 @@ impl Timer {
         }
 
         if timer_update && ((self.tac & (1 << 2)) != 0) {
-            self.tima = self.tima.wrapping_add(1);
+            let (new_tima, did_overflow) = self.tima.overflowing_add(1);
+            self.tima = new_tima;
 
-            if self.tima == 0xFF {
+            if did_overflow {
                 self.tima = self.tma;
-
-                return Some(InterruptType::Timer)
+                return Some(InterruptType::Timer);
             }
         }
         None
