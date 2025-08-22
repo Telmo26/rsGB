@@ -12,6 +12,63 @@ use crate::{
 pub use instruction::*;
 use registers::*;
 
+const CYCLE_LENGTH: [u8; 0xFF + 1] = [
+    1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
+	0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
+	2,3,2,2,1,1,2,1,2,2,2,2,1,1,2,1,
+	2,3,2,2,3,3,3,1,2,2,2,2,1,1,2,1,
+	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+	2,2,2,2,2,2,0,2,1,1,1,1,1,1,2,1,
+	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+	2,3,3,4,3,4,2,4,2,4,3,0,3,6,2,4,
+	2,3,3,0,3,4,2,4,2,4,3,0,3,0,2,4,
+	3,3,2,0,0,4,2,4,4,1,4,0,0,0,2,4,
+	3,3,2,1,0,4,2,4,3,2,4,1,0,0,2,4
+];
+
+const CYCLE_LENGTH_CONDITIONAL: [u8; 0xFF + 1] = [
+    1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
+    0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
+    3,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
+    3,3,2,2,3,3,3,1,3,2,2,2,1,1,2,1,
+    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+    2,2,2,2,2,2,0,2,1,1,1,1,1,1,2,1,
+    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
+    5,3,4,4,6,4,2,4,5,4,4,0,6,6,2,4,
+    5,3,4,0,6,4,2,4,5,4,4,0,6,0,2,4,
+    3,3,2,0,0,4,2,4,4,1,4,0,0,0,2,4,
+    3,3,2,1,0,4,2,4,3,2,4,1,0,0,2,4,
+];
+
+const CYCLE_LENGTH_CB_PREFIXED: [u8; 0xFF + 1] = [
+    2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
+	2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
+	2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
+	2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
+	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2
+];
+
 pub struct CPU {
     pub registers: CpuRegisters,
 
@@ -31,8 +88,6 @@ pub struct CPU {
     pub cycles_this_inst: u16,
     pub cycles_fetch: u16,
     pub cycles_exec: u16,
-
-    pub opcode_cycles: [[Vec<u8>; 16]; 16]
 }
 
 impl CPU {
@@ -56,8 +111,6 @@ impl CPU {
             cycles_this_inst: 0,
             cycles_fetch: 0,
             cycles_exec: 0,
-
-            opcode_cycles: [const { [const { Vec::new() }; 16] }; 16]
         }
     }
 
@@ -92,7 +145,7 @@ impl CPU {
             //         self.cycles_this_inst,
             //     );
             // }
-            self.update_counter();
+            // self.update_counter();
             self.reset_cycle_counters();
             
         } else {
@@ -183,13 +236,18 @@ impl CPU {
     }
 
     fn update_counter(&mut self) {
-        let first_nibble = (self.curr_opcode >> 4) as usize;
-        let second_nibble = (self.curr_opcode & 0xF) as usize;
+        let index = self.curr_opcode as usize;
 
         let ticks = self.cycles_this_inst as u8;
 
-        if !self.opcode_cycles[first_nibble][second_nibble].contains(&ticks) {
-            self.opcode_cycles[first_nibble][second_nibble].push(ticks);
+        if self.curr_inst.in_type != InType::CB {
+            if ticks != CYCLE_LENGTH[index] && ticks != CYCLE_LENGTH_CONDITIONAL[index] {
+                panic!("Incorrect cycle length {ticks} for {:?} with opcode {index:X}", self.curr_inst);
+            }
+        } else {
+            if ticks != CYCLE_LENGTH_CB_PREFIXED[self.fetched_data as usize] {
+                panic!("Incorrect cycle length {ticks} for CB {:X}", self.fetched_data);
+            }
         }
     }
 

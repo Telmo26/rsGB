@@ -118,7 +118,6 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
     loop {
         let ctx = context.lock().unwrap();
         if !ctx.is_running() {
-            println!("{:?}", emulator.cpu.opcode_cycles);
             break
         }
 

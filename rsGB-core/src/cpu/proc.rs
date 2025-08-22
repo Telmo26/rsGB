@@ -74,6 +74,7 @@ fn proc_ld(cpu: &mut CPU, dev: &mut Devices) {
         let e: i16 = (cpu.fetched_data as u8).cast_signed() as i16;
         cpu.registers.set(cpu.curr_inst.reg_1,
             cpu.registers.read(cpu.curr_inst.reg_2).wrapping_add_signed(e));
+        cpu.incr_cycle_exec(dev, 1);
     } else if cpu.dest_is_mem {
         if cpu.curr_inst.reg_2.is_16bit() {
             cpu.incr_cycle_exec(dev, 1);
@@ -84,6 +85,9 @@ fn proc_ld(cpu: &mut CPU, dev: &mut Devices) {
         cpu.incr_cycle_exec(dev, 1);
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, cpu.fetched_data);
+        if cpu.curr_inst.reg_1.is_16bit() && cpu.curr_inst.reg_2.is_16bit() {
+            cpu.incr_cycle_exec(dev, 1);
+        }
     }
 }
 
@@ -105,7 +109,10 @@ fn goto_addr(cpu: &mut CPU, dev: &mut Devices, address: u16, push_pc: bool) {
             cpu.push16(&mut dev.bus, cpu.registers.pc);
         }
         cpu.registers.pc = address;
-        cpu.incr_cycle_exec(dev, 1);
+        if cpu.curr_inst.mode != AddrMode::R {
+            // We want to avoid increasing cycles for 0xE9 : JP HL
+            cpu.incr_cycle_exec(dev, 1);
+        }
     }
 }
 
@@ -194,6 +201,7 @@ fn proc_inc(cpu: &mut CPU, dev: &mut Devices) {
 
     if cpu.dest_is_mem {
         dev.bus.write(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
+        cpu.incr_cycle_exec(dev, 1);
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
@@ -206,7 +214,7 @@ fn proc_inc(cpu: &mut CPU, dev: &mut Devices) {
 fn proc_dec(cpu: &mut CPU, dev: &mut Devices) {
     let mut val = cpu.fetched_data;
 
-    if cpu.curr_inst.reg_1.is_16bit() {
+    if cpu.curr_inst.reg_1.is_16bit() && !cpu.dest_is_mem {
         cpu.incr_cycle_exec(dev, 1);
         val = val.wrapping_sub(1);
     } else {
@@ -215,6 +223,7 @@ fn proc_dec(cpu: &mut CPU, dev: &mut Devices) {
 
     if cpu.dest_is_mem {
         dev.bus.write(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
+        cpu.incr_cycle_exec(dev, 1);
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
@@ -237,6 +246,7 @@ fn proc_add(cpu: &mut CPU, dev: &mut Devices) {
     if cpu.curr_inst.reg_1 == RegType::SP {
         let e = (cpu.fetched_data as u8).cast_signed();
         value = cpu.registers.read(cpu.curr_inst.reg_1).wrapping_add_signed(e as i16);
+        cpu.incr_cycle_exec(dev, 1);
     }
 
     let mut z = (value == 0) as u8;
@@ -326,23 +336,21 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
 
     let mut reg_val = cpu.registers.read_reg8(&dev.bus, register);
 
-    cpu.incr_cycle_exec(dev, 1);
-
     if register == RegType::HL {
-        cpu.incr_cycle_exec(dev, 2);
+        cpu.incr_cycle_exec(dev, 1);
     }
 
     match bit_op {
         1 => { // BIT
-            cpu.set_flags(((reg_val & (1 << bit)) == 0) as u8, 0, 1, BIT_IGNORE)
+            cpu.set_flags(((reg_val & (1 << bit)) == 0) as u8, 0, 1, BIT_IGNORE);
         }, 
         2 => { // RES
             reg_val &= !(1 << bit);
-            cpu.registers.set_reg8(&mut dev.bus, register, reg_val)
+            cpu.registers.set_reg8(&mut dev.bus, register, reg_val);
         },
         3 => { // SET
             reg_val |= 1 << bit;
-            cpu.registers.set_reg8(&mut dev.bus, register, reg_val)
+            cpu.registers.set_reg8(&mut dev.bus, register, reg_val);
         },
         0 => { // OTHER
             let cflag = cpu.c_flag() as u8;
@@ -412,6 +420,10 @@ fn proc_cb(cpu: &mut CPU, dev: &mut Devices) {
             }
         }
         _ => panic!("Invalid bit operator in CB")
+    }
+
+    if register == RegType::HL && bit_op != 1 {
+        cpu.incr_cycle_exec(dev, 1);
     }
 }
 

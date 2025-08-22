@@ -219,7 +219,7 @@ impl CartridgeHeader {
             if data[0x143] == 0x80 {
                 // println!("This game supports CGB enhancements")
             } else if data[0x143] == 0xC0 {
-                // println!("This is a CGB game")
+                panic!("This is a CGB game")
             }
             title = String::from_utf8(data[0x134..0x143].to_vec()).unwrap()
         }
