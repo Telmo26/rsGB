@@ -50,9 +50,6 @@ impl NoiseChannel {
 
                     if self.length_timer == 0 {
                         self.length_timer = 64;
-                        if self.length_enable() {
-                            self.length_timer = 63;
-                        }
                     }
 
                     self.enveloppe_direction = self.enveloppe_direction();
