@@ -11,11 +11,6 @@ use wave_channel::WaveChannel;
 mod noise_channel;
 use noise_channel::NoiseChannel;
 
-mod wav_writer;
-use wav_writer::WavWriter;
-
-type Channel = (u8, u8, u8, u8, u8);
-
 mod timer;
 use timer::Timer;
 
@@ -24,7 +19,7 @@ use sample_timer::SampleTimer;
 
 pub struct APU {
     // Communication data
-    sender: HeapProd<f32>,
+    sender: HeapProd<(f32, f32)>,
     sample_timer: SampleTimer,
     output_buffer: Vec<(f32, f32)>,
 
@@ -45,15 +40,11 @@ pub struct APU {
     // Global control registers
     master_vol: u8,
     sound_panning: u8,
-    audio_master_ctrl: u8,
-
-    // Debug data
-    wav_writer: WavWriter,
-    
+    audio_master_ctrl: u8,    
 }
 
 impl APU {
-    pub fn new(sender: HeapProd<f32>) -> APU {
+    pub fn new(sender: HeapProd<(f32, f32)>) -> APU {
         APU {
             sender,
             sample_timer: SampleTimer::new(4_194_304.0, 44_100.0),
@@ -72,8 +63,6 @@ impl APU {
             master_vol: 0,
             sound_panning: 0,
             audio_master_ctrl: 0,
-
-            wav_writer: WavWriter::new("test.wav", 44100).unwrap(),
         }
     }
 
@@ -133,22 +122,26 @@ impl APU {
         left *= left_vol as f32 / 7.0;
         right *= right_vol as f32 / 7.0;
 
-        // Add conservative headroom (channels can stack)
-        const MASTER_GAIN: f32 = 1.0; // ≈ -6 dB
-        left *= MASTER_GAIN;
-        right *= MASTER_GAIN;
+        // Normalise for the 4 channels
+        left /= 4.0;
+        right /= 4.0;
 
+        // Clamp for safety
         left = left.clamp(-1.0, 1.0);
         right = right.clamp(-1.0, 1.0);
 
         self.output_buffer.push((left, right));
 
+        if self.output_buffer.len() > 1024 {
+            self.output_buffer.clear();
+        }
+
         if self.sample_timer.tick() && self.audio_enabled() {
             let (output_l, output_r) = self.filter_audio();
-            self.wav_writer.write_sample(output_l, output_r).unwrap();
 
-            let _ = self.sender.try_push(output_l);
-            let _ = self.sender.try_push(output_r); 
+            while let Err(_) = self.sender.try_push((output_l, output_r)) {
+                continue
+            }
 
             self.output_buffer.clear();
         }

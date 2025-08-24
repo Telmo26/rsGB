@@ -5,13 +5,6 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(period: u16) -> Timer {
-        Timer {
-            period,
-            ..Timer::default()
-        }
-    }
-
     pub fn tick(&mut self) -> bool {
         self.value = self.value.wrapping_sub(1);
         if self.value == 0 {

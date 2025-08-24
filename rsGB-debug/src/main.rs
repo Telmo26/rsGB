@@ -30,6 +30,8 @@ fn main() {
 
     // Getting the audio receiver and setting up the audio playback
     let mut audio_receiver = main_communicator.get_audio_receiver();
+    let mut previous_audio = (0.0, 0.0);
+
     let host = cpal::default_host();
     let device = host.default_output_device().expect("No output device detected");
     let config = device.default_output_config().unwrap();
@@ -39,10 +41,13 @@ fn main() {
     let stream = device.build_output_stream(
         &config.config(), 
         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-            for sample in data.iter_mut() {
+            for sample in data.chunks_mut(2) {
+                // while let None = audio_receiver.try_peek() {
+                //     continue;
+                // }
                 match audio_receiver.try_pop() {
-                    Some(audio) => *sample = audio,
-                    None => continue,
+                    Some((left, right)) => {sample[0] = left ; sample[1] = right ; previous_audio = (left, right)}
+                    None => {sample[0] = previous_audio.0 ; sample[1] = previous_audio.1},
                 }
             }
         }, 

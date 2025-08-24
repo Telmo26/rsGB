@@ -52,7 +52,7 @@ pub struct IO {
 }
 
 impl IO {
-    pub fn new(gamepad_state: Arc<Mutex<GamepadState>>, audio_sender: HeapProd<f32>) -> IO {
+    pub fn new(gamepad_state: Arc<Mutex<GamepadState>>, audio_sender: HeapProd<(f32, f32)>) -> IO {
         IO { 
             gamepad: Gamepad::new(gamepad_state),
             serial: [0; 2],
