@@ -46,7 +46,7 @@ impl PulseChannel {
         }
     }
 
-    pub fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8, first_period: bool) {
         match address {
             0 => self.sweep = value & 0x7F,
             1 => {
@@ -61,13 +61,24 @@ impl PulseChannel {
             } 
             3 => self.period_low = value,
             4 => {
-                self.period_high_ctrl = value & 0xC7; // Only bits 7,6,2-0 are writable
-
+                let old_length_enable = self.length_enable();
+                
+                self.period_high_ctrl = value & 0xC7;
+                
+                if !old_length_enable && self.length_enable() && self.length_timer != 0 {
+                    if first_period {
+                        self.length_tick();
+                    }
+                }
+                
                 if self.trigger(value) {
                     self.enabled = self.is_dac_enabled();
 
                     if self.length_timer == 0 {
                         self.length_timer = 64;
+                        if first_period {
+                            self.length_tick();
+                        }
                     }
 
                     self.timer.set_period((2048 - self.period()) * 4);

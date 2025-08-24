@@ -155,23 +155,23 @@ impl APU {
         }
 
         match address {
-            0xFF10..0xFF15 => self.ch1.write(address - 0xFF10, value),
+            0xFF10..0xFF15 => self.ch1.write(address - 0xFF10, value, self.div_apu & 1 == 0),
 
             0xFF15 => (),
 
-            0xFF16..0xFF1A => self.ch2.write(address - 0xFF15, value),
+            0xFF16..0xFF1A => self.ch2.write(address - 0xFF15, value, self.div_apu & 1 == 0),
 
-            0xFF1A..0xFF1F => self.ch3.write(address, value),
+            0xFF1A..0xFF1F => self.ch3.write(address, value, self.div_apu & 1 == 0),
 
             0xFF1F => (),
 
-            0xFF20..0xFF24 => self.ch4.write(address, value),
+            0xFF20..0xFF24 => self.ch4.write(address, value, self.div_apu & 1 == 0),
 
             0xFF24 => self.master_vol = value,
             0xFF25 => self.sound_panning = value,
             0xFF26 => self.write_nr52(value),
 
-            0xFF30..0xFF40 => self.ch3.write(address, value), // Wave RAM
+            0xFF30..0xFF40 => self.ch3.write(address, value, false), // Wave RAM
             
             _ => (), //println!("Unimplemented audio register {address:X}")
         }

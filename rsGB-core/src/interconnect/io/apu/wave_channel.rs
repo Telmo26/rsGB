@@ -42,7 +42,7 @@ impl WaveChannel {
         }
     }
 
-    pub fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8, first_period: bool) {
         match address {
             0xFF1A => {
                 self.dac_enable = value & 0x80;
@@ -56,10 +56,13 @@ impl WaveChannel {
             0xFF1D => self.period_low = value,
             0xFF1E => {
                 let old_length_enable = self.length_enable();
-                self.period_high_ctrl = value & 0xC7; // Only bits 7,6,2-0 are writable
                 
-                if !old_length_enable && self.length_enable() && self.length_timer == 0 {
-                    self.enabled = false;
+                self.period_high_ctrl = value & 0xC7;
+                
+                if !old_length_enable && self.length_enable() && self.length_timer != 0 {
+                    if first_period {
+                        self.length_tick();
+                    }
                 }
 
                 if self.trigger() {
@@ -67,6 +70,9 @@ impl WaveChannel {
                     
                     if self.length_timer == 0 {
                         self.length_timer = 256;
+                        if first_period {
+                            self.length_tick();
+                        }
                     }
 
                     self.period_divider.set_period((2048 - self.period()) * 2);

@@ -30,7 +30,7 @@ impl NoiseChannel {
         }
     }
 
-    pub fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8, first_period: bool) {
         match address {
             0xFF20 => {
                 self.length_timer_reg = value & 0x3F;
@@ -44,12 +44,24 @@ impl NoiseChannel {
             } 
             0xFF22 => self.freq_randomness = value,
             0xFF23 => {
+                let old_length_enable = self.length_enable();
+
                 self.control = value & 0xC0;
+
+                if !old_length_enable && self.length_enable() && self.length_timer != 0 {
+                    if first_period {
+                        self.length_tick();
+                    }
+                }
+
                 if self.trigger(value) {
                     self.enabled = self.is_dac_enabled();
 
                     if self.length_timer == 0 {
                         self.length_timer = 64;
+                        if first_period {
+                            self.length_tick();
+                        }
                     }
 
                     self.enveloppe_direction = self.enveloppe_direction();
