@@ -5,3 +5,4 @@ debug.txt
 /test_roms/drm.gb
 /test_roms/zelda.gb
 /test_roms/*.sav
+/test_roms/*/*.sav
