@@ -18,7 +18,6 @@ pub struct PulseChannel {
 
     // Internal values
     enabled: bool,
-    has_sweep: bool,
 
     sweep_enabled: bool,
     sweep_timer: u8,
@@ -36,16 +35,9 @@ pub struct PulseChannel {
 }
 
 impl PulseChannel {
-    pub fn new(has_sweep: bool) -> PulseChannel {
-        PulseChannel {
-            has_sweep,
-            ..PulseChannel::default()
-        }
-    }
-
     pub fn read(&self, address: u16) -> u8 {
         match address {
-            0 => if self.has_sweep { self.sweep | 0x80 } else { 0xFF },
+            0 => self.sweep | 0x80,
             1 => self.length_timer_duty_cycle | 0x3F,
             2 => self.volume_envelope,
             3 => 0xFF,
@@ -69,21 +61,13 @@ impl PulseChannel {
             } 
             3 => self.period_low = value,
             4 => {
-                let old_length_enable = self.length_enable();
                 self.period_high_ctrl = value & 0xC7; // Only bits 7,6,2-0 are writable
-                
-                if !old_length_enable && self.length_enable() && self.length_timer == 0 {
-                    self.enabled = false;
-                }
 
                 if self.trigger(value) {
                     self.enabled = self.is_dac_enabled();
 
                     if self.length_timer == 0 {
                         self.length_timer = 64;
-                        if self.length_enable() {
-                            self.length_timer = 63;
-                        }
                     }
 
                     self.timer.set_period((2048 - self.period()) * 4);
@@ -136,8 +120,8 @@ impl PulseChannel {
     }
 
     pub fn length_tick(&mut self) {
-        if self.enabled && self.length_enable() {
-            self.length_timer -= 1;
+        if self.length_enable() {
+            self.length_timer = self.length_timer.saturating_sub(1);
             if self.length_timer == 0 {
                 self.enabled = false;
             }
@@ -145,7 +129,7 @@ impl PulseChannel {
     }
 
     pub fn enveloppe_tick(&mut self) {
-        self.enveloppe_timer -= 1;
+        self.enveloppe_timer = self.enveloppe_timer.saturating_sub(1);
         if self.enveloppe_timer == 0 && self.enveloppe_pace != 0 {
             if self.enveloppe_direction {
                 if self.volume < 15 {
@@ -163,7 +147,7 @@ impl PulseChannel {
             return;
         }
 
-        self.sweep_timer -= 1;
+        self.sweep_timer = self.sweep_timer.saturating_sub(1);
         if self.sweep_timer == 0 {
             self.sweep_timer = self.pace();
 

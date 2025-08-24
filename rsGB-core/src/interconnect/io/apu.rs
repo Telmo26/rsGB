@@ -52,9 +52,9 @@ impl APU {
 
             div_apu: 0,
             
-            ch1: PulseChannel::new(true),
+            ch1: PulseChannel::default(),
 
-            ch2: PulseChannel::new(false),
+            ch2: PulseChannel::default(),
 
             ch3: WaveChannel::default(),
 
@@ -73,6 +73,7 @@ impl APU {
                 self.ch1.length_tick();
                 self.ch2.length_tick();
                 self.ch3.length_tick();
+                self.ch4.length_tick();
             }
             
             if self.div_apu == 2 || self.div_apu == 6 { // Sweep step
@@ -82,6 +83,7 @@ impl APU {
             if self.div_apu == 7 { // Envelope step  
                 self.ch1.enveloppe_tick();
                 self.ch2.enveloppe_tick();
+                self.ch4.enveloppe_tick();
             }
         }
 
@@ -155,7 +157,9 @@ impl APU {
         match address {
             0xFF10..0xFF15 => self.ch1.write(address - 0xFF10, value),
 
-            0xFF15..0xFF1A => self.ch2.write(address - 0xFF15, value),
+            0xFF15 => (),
+
+            0xFF16..0xFF1A => self.ch2.write(address - 0xFF15, value),
 
             0xFF1A..0xFF1F => self.ch3.write(address, value),
 
@@ -223,7 +227,6 @@ impl APU {
             self.ch4.power_off();
             self.master_vol = 0;
             self.sound_panning = 0;
-            // Wave RAM is NOT cleared
         }
     }
 

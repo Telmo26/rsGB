@@ -102,13 +102,17 @@ impl IO {
     pub fn tick_timer(&mut self) {
         let interrupt = self.timer.tick();
         
-        let div = self.timer.div;
-        if div & (1 << 4) == 1 && self.prev_div & (1 << 4) == 0 {
+        let div_bit = (self.timer.div >> 12) & 1;
+        let prev_bit = (self.prev_div >> 12) & 1;
+
+        if div_bit == 0 && prev_bit == 1 {
+            // We read the 12th bit of DIV because it reprensents the full 16-bit internal counter,
+            // instead of the 8-bit register
             self.falling_edge = true;
         } else {
             self.falling_edge = false;
         }
-        self.prev_div = div;
+        self.prev_div = self.timer.div;
 
         if let Some(interrupt) = interrupt {
             self.if_register |= interrupt as u8;

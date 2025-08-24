@@ -46,7 +46,7 @@ impl WaveChannel {
         match address {
             0xFF1A => {
                 self.dac_enable = value & 0x80;
-                if !self.dac_enable() { self.enabled = false }
+                if !self.is_dac_enabled() { self.enabled = false }
             },
             0xFF1B => {
                 self.initial_length_timer = value;
@@ -63,13 +63,10 @@ impl WaveChannel {
                 }
 
                 if self.trigger() {
-                    self.enabled = true;
+                    self.enabled = self.is_dac_enabled();
                     
                     if self.length_timer == 0 {
                         self.length_timer = 256;
-                        if self.length_enable() {
-                            self.length_timer = 255;
-                        }
                     }
 
                     self.period_divider.set_period((2048 - self.period()) * 2);
@@ -101,8 +98,8 @@ impl WaveChannel {
     }
 
     pub fn length_tick(&mut self) {
-        if self.enabled && self.length_enable() {
-            self.length_timer -= 1;
+        if self.length_enable() {
+            self.length_timer = self.length_timer.wrapping_sub(1);
             if self.length_timer == 0 {
                 self.enabled = false;
             }
@@ -131,7 +128,7 @@ impl WaveChannel {
         self.enabled = false;
     }
 
-    fn dac_enable(&self) -> bool {
+    fn is_dac_enabled(&self) -> bool {
         self.dac_enable & (1 << 7) != 0
     }
 
