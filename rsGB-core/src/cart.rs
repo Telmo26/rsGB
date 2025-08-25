@@ -213,7 +213,7 @@ impl CartridgeHeader {
 
         if data[0x143] < 127 {
             // ASCII max
-            title = String::from_utf8(data[0x134..0x144].to_vec()).unwrap();
+            title = String::from_utf8(data[0x134..0x144].to_vec()).unwrap_or("".to_string());
             // println!("This is a DMG game")
         } else {
             if data[0x143] == 0x80 {

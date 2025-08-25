@@ -1,5 +1,3 @@
-use std::{thread, time::Duration};
-
 pub struct DMA {
     active: bool,
     byte: u8,

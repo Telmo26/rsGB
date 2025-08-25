@@ -107,10 +107,12 @@ impl NoiseChannel {
     }
 
     pub fn power_off(&mut self) {
-        self.length_timer = 0;
+        // println!("Powering off - Length Counter : {}", self.length_timer);
+        self.length_timer_reg = 0;
         self.volume_envelope = 0;
         self.freq_randomness = 0;
         self.control = 0;
+        self.enabled = false;
     }
 
     fn initial_length_timer(&self) -> u8 {

@@ -105,7 +105,7 @@ impl WaveChannel {
 
     pub fn length_tick(&mut self) {
         if self.length_enable() {
-            self.length_timer = self.length_timer.wrapping_sub(1);
+            self.length_timer = self.length_timer.saturating_sub(1);
             if self.length_timer == 0 {
                 self.enabled = false;
             }
@@ -126,6 +126,7 @@ impl WaveChannel {
     }
 
     pub fn power_off(&mut self) {
+        // println!("Powering off - Length Counter : {}", self.length_timer);
         self.dac_enable = 0;
         self.initial_length_timer = 0;
         self.output_level = 0;

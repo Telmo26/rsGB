@@ -33,7 +33,7 @@ use ringbuf::HeapProd;
 
 pub struct Interconnect {
     cart: Option<Cartridge>,
-    pub(crate) vram: Arc<Mutex<[u8; 0x2000]>>,
+    vram: Arc<Mutex<[u8; 0x2000]>>,
     ram: RAM,
     oam_ram: [OAMEntry; 40],
     io: IO,

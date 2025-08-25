@@ -67,113 +67,128 @@ impl APU {
     }
 
     pub fn tick(&mut self, div_falling_edge: bool) {
-        if div_falling_edge {
-            self.div_apu = (self.div_apu + 1) % 8;
-            if self.div_apu & 1 == 0 { // Length counter step
-                self.ch1.length_tick();
-                self.ch2.length_tick();
-                self.ch3.length_tick();
-                self.ch4.length_tick();
+        if self.audio_enabled() {
+            if div_falling_edge {
+                self.div_apu = (self.div_apu + 1) % 8;
+                if self.div_apu & 1 == 0 { // Length counter step
+                    self.ch1.length_tick();
+                    self.ch2.length_tick();
+                    self.ch3.length_tick();
+                    self.ch4.length_tick();
+                }
+                
+                if self.div_apu == 2 || self.div_apu == 6 { // Sweep step
+                    self.ch1.sweep_tick();
+                }
+                
+                if self.div_apu == 7 { // Envelope step  
+                    self.ch1.enveloppe_tick();
+                    self.ch2.enveloppe_tick();
+                    self.ch4.enveloppe_tick();
+                }
             }
-            
-            if self.div_apu == 2 || self.div_apu == 6 { // Sweep step
-                self.ch1.sweep_tick();
-            }
-            
-            if self.div_apu == 7 { // Envelope step  
-                self.ch1.enveloppe_tick();
-                self.ch2.enveloppe_tick();
-                self.ch4.enveloppe_tick();
+
+            self.ch1.tick();
+            self.ch2.tick();
+            self.ch3.tick();
+
+            let ch1_output = self.ch1.output();
+            let ch2_output = self.ch2.output();
+            let ch3_output = self.ch3.output();
+            let ch4_output = 0.0;
+
+            let left_vol = (self.master_vol >> 4) & 0x07;
+            let right_vol = self.master_vol & 0x07;
+
+            let pan = self.sound_panning;
+
+            let mut left = 0.0;
+            let mut right = 0.0;
+
+            // CH1
+            if pan & 0b0001 != 0 { right += ch1_output; }
+            if pan & 0b0001_0000 != 0 { left += ch1_output; }
+
+            // CH2
+            if pan & 0b0010 != 0 { right += ch2_output; }
+            if pan & 0b0010_0000 != 0 { left += ch2_output; }
+
+            // CH3
+            if pan & 0b0100 != 0 { right += ch3_output; }
+            if pan & 0b0100_0000 != 0 { left += ch3_output; }
+
+            // CH4
+            if pan & 0b1000 != 0 { right += ch4_output; }
+            if pan & 0b1000_0000 != 0 { left += ch4_output; }
+
+            // Apply master volume scaling
+            left *= left_vol as f32 / 7.0;
+            right *= right_vol as f32 / 7.0;
+
+            // Normalise for the 4 channels
+            left /= 4.0;
+            right /= 4.0;
+
+            // Clamp for safety
+            left = left.clamp(-1.0, 1.0);
+            right = right.clamp(-1.0, 1.0);
+
+            self.output_buffer.push((left, right));
+
+            if self.sample_timer.tick() {
+                let (output_l, output_r) = self.filter_audio();
+
+                while let Err(_) = self.sender.try_push((output_l, output_r)) {
+                    continue
+                }
+
+                self.output_buffer.clear();
             }
         }
-
-        self.ch1.tick();
-        self.ch2.tick();
-        self.ch3.tick();
-
-        let ch1_output = self.ch1.output();
-        let ch2_output = self.ch2.output();
-        let ch3_output = self.ch3.output();
-        let ch4_output = 0.0;
-
-        let left_vol = (self.master_vol >> 4) & 0x07;
-        let right_vol = self.master_vol & 0x07;
-
-        let pan = self.sound_panning;
-
-        let mut left = 0.0;
-        let mut right = 0.0;
-
-        // CH1
-        if pan & 0b0001 != 0 { right += ch1_output; }
-        if pan & 0b0001_0000 != 0 { left += ch1_output; }
-
-        // CH2
-        if pan & 0b0010 != 0 { right += ch2_output; }
-        if pan & 0b0010_0000 != 0 { left += ch2_output; }
-
-        // CH3
-        if pan & 0b0100 != 0 { right += ch3_output; }
-        if pan & 0b0100_0000 != 0 { left += ch3_output; }
-
-        // CH4
-        if pan & 0b1000 != 0 { right += ch4_output; }
-        if pan & 0b1000_0000 != 0 { left += ch4_output; }
-
-        // Apply master volume scaling
-        left *= left_vol as f32 / 7.0;
-        right *= right_vol as f32 / 7.0;
-
-        // Normalise for the 4 channels
-        left /= 4.0;
-        right /= 4.0;
-
-        // Clamp for safety
-        left = left.clamp(-1.0, 1.0);
-        right = right.clamp(-1.0, 1.0);
-
-        self.output_buffer.push((left, right));
-
-        if self.output_buffer.len() > 1024 {
-            self.output_buffer.clear();
-        }
-
-        if self.sample_timer.tick() && self.audio_enabled() {
-            let (output_l, output_r) = self.filter_audio();
-
-            while let Err(_) = self.sender.try_push((output_l, output_r)) {
-                continue
-            }
-
-            self.output_buffer.clear();
-        }
+        
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
-        if (self.audio_master_ctrl & 0x80) == 0 && address <= 0xFF25 {
-            return; // Ignore writes when APU is off
-        }
+        // On DMG, the timer length registers are writable even with the APU off
+        // but they can only modify the length, not the duty cycle
+        if self.audio_enabled() || address > 0xFF25 || address == 0xFF1B || address == 0xFF20 {     
+            match address {
+                0xFF10..0xFF15 => self.ch1.write(address - 0xFF10, value, self.div_apu & 1 == 0),
 
-        match address {
-            0xFF10..0xFF15 => self.ch1.write(address - 0xFF10, value, self.div_apu & 1 == 0),
+                0xFF15 => (),
 
-            0xFF15 => (),
+                0xFF16..0xFF1A => self.ch2.write(address - 0xFF15, value, self.div_apu & 1 == 0),
 
-            0xFF16..0xFF1A => self.ch2.write(address - 0xFF15, value, self.div_apu & 1 == 0),
+                0xFF1A..0xFF1F => self.ch3.write(address, value, self.div_apu & 1 == 0),
 
-            0xFF1A..0xFF1F => self.ch3.write(address, value, self.div_apu & 1 == 0),
+                0xFF1F => (),
 
-            0xFF1F => (),
+                0xFF20..0xFF24 => self.ch4.write(address, value, self.div_apu & 1 == 0),
 
-            0xFF20..0xFF24 => self.ch4.write(address, value, self.div_apu & 1 == 0),
+                0xFF24 => self.master_vol = value,
+                0xFF25 => self.sound_panning = value,
+                0xFF26 => self.write_nr52(value),
 
-            0xFF24 => self.master_vol = value,
-            0xFF25 => self.sound_panning = value,
-            0xFF26 => self.write_nr52(value),
-
-            0xFF30..0xFF40 => self.ch3.write(address, value, false), // Wave RAM
-            
-            _ => (), //println!("Unimplemented audio register {address:X}")
+                0xFF30..0xFF40 => self.ch3.write(address, value, false), // Wave RAM
+                
+                _ => (), //println!("Unimplemented audio register {address:X}")
+            }
+        } else if address == 0xFF11 || address == 0xFF16 {
+            match address {
+                0xFF11 => {
+                    let prev = self.ch1.read(address - 0xFF10);
+                    let new = (prev & 0xC0) | (value & 0x3F);
+                    self.ch1.write(address - 0xFF10, new, self.div_apu & 1 == 0);
+                }
+                0xFF16 => {
+                    let prev = self.ch2.read(address - 0xFF15);
+                    let new = (prev & 0xC0) | (value & 0x3F);
+                    self.ch2.write(address - 0xFF15, new, self.div_apu & 1 == 0);
+                },
+                _ => unreachable!()
+            }
+        } else {
+            println!("Trying to write {value} to {address:X} while APU is off")
         }
     }
 
@@ -199,6 +214,10 @@ impl APU {
                 if self.ch2.is_enabled() { value |= 0x02; }
                 if self.ch3.is_enabled()   { value |= 0x04; }
                 if self.ch4.is_enabled()  { value |= 0x08; }
+                // println!("{:?}", self.ch1);
+                // println!("{:?}", self.ch2);
+                // println!("{:?}", self.ch3);
+                // println!("{:?}", self.ch4);
                 value | 0x70  // Apply mask $70
             },
 
@@ -227,6 +246,15 @@ impl APU {
             self.ch4.power_off();
             self.master_vol = 0;
             self.sound_panning = 0;
+        }
+
+        if !was_on && now_on {
+            self.div_apu = 7; // Next step is 0
+            // println!("Powering on");
+            // println!("{:?}", self.ch1);
+            // println!("{:?}", self.ch2);
+            // println!("{:?}", self.ch3);
+            // println!("{:?}", self.ch4);
         }
     }
 

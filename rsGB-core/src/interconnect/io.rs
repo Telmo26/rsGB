@@ -76,6 +76,7 @@ impl IO {
             0xFF0F => self.if_register,
             0xFF10..0xFF40 => self.apu.read(address),
             0xFF40..=0xFF4B => self.lcd.read(address),
+            0xFF50 => 0x01,
             _ => {
                 // eprintln!("Read at address {address:X} not implemented!");
                 0

@@ -22,6 +22,7 @@ pub struct PulseChannel {
     sweep_enabled: bool,
     sweep_timer: u8,
     shadow_register: u16,
+    negate_has_been_used: bool,
 
     volume: u8,
     enveloppe_pace: u8,
@@ -48,7 +49,17 @@ impl PulseChannel {
 
     pub fn write(&mut self, address: u16, value: u8, first_period: bool) {
         match address {
-            0 => self.sweep = value & 0x7F,
+            0 => { 
+                let prev_dir = self.direction();
+
+                self.sweep = value & 0x7F;
+
+                if self.sweep_enabled {
+                    if !prev_dir && self.direction() && self.negate_has_been_used {
+                        self.enabled = false;
+                    }
+                }
+            }
             1 => {
                 self.length_timer_duty_cycle = value;
                 self.length_timer = 64 - self.initial_length_timer();
@@ -95,11 +106,12 @@ impl PulseChannel {
                     self.waveform_pointer = 0;
 
                     self.shadow_register = self.period();
-                    self.sweep_timer = if self.pace() == 0 { 8 } else { self.pace() };
-                    self.sweep_enabled = self.pace() != 0 || self.step() != 0;
+                    self.sweep_timer = if self.sweep_pace() == 0 { 8 } else { self.sweep_pace() };
+                    self.sweep_enabled = self.sweep_pace() != 0 || self.step() != 0;
+                    self.negate_has_been_used = false;
 
                     if self.step() != 0 {
-                        self.calculate_sweep_frequency();
+                        self.calculate_frequency();
                     }
                 }
             }
@@ -154,16 +166,21 @@ impl PulseChannel {
     }
 
     pub fn sweep_tick(&mut self) {
-        if !self.sweep_enabled {
-            return;
-        }
-
         self.sweep_timer = self.sweep_timer.saturating_sub(1);
-        if self.sweep_timer == 0 {
-            self.sweep_timer = self.pace();
 
-            if self.pace() > 0 {
-                self.calculate_sweep_frequency();
+        if self.sweep_timer == 0 {
+            self.sweep_timer = if self.sweep_pace() == 0 { 8 } else { self.sweep_pace() };
+
+            if self.sweep_enabled && self.sweep_pace() > 0 {
+                let new_freq = self.calculate_frequency();
+
+                if new_freq < 0x800 && self.step() > 0 {
+                    self.shadow_register = new_freq;
+                    self.period_low = new_freq as u8;
+                    self.period_high_ctrl = (self.period_high_ctrl & 0xF8) | ((new_freq >> 8) as u8 & 0x7);
+
+                    let _ = self.calculate_frequency();
+                }
             }
         }
     }
@@ -173,6 +190,7 @@ impl PulseChannel {
     }
 
     pub fn power_off(&mut self) {
+        // println!("Powering off - Length Counter : {}", self.length_timer);
         self.sweep = 0;
         self.length_timer_duty_cycle = 0;
         self.volume_envelope = 0;
@@ -181,33 +199,20 @@ impl PulseChannel {
         self.enabled = false;
     }
 
-    fn calculate_sweep_frequency(&mut self) {
+    fn calculate_frequency(&mut self) -> u16 {
         let new_freq = {
             let change = self.shadow_register >> self.step();
             if self.direction() { // Increasing
                 self.shadow_register.wrapping_add(change)
             } else { // Decreasing
+                self.negate_has_been_used = true;
                 self.shadow_register.wrapping_sub(change)
             }
         };
         if new_freq > 0x7FF {
             self.enabled = false;
-        } else if self.step() != 0 {
-            self.shadow_register = new_freq;
-            self.period_low = new_freq as u8;
-            self.period_high_ctrl = (self.period_high_ctrl & 0xF8) | ((new_freq >> 8) as u8 & 0x7);
-
-            let second_change = self.shadow_register >> self.step();
-            let second_new_freq = if self.direction() {
-                self.shadow_register.wrapping_add(second_change)
-            } else {
-                self.shadow_register.wrapping_sub(second_change)
-            };
-
-            if second_new_freq > 0x7FF {
-                self.enabled = false;
-            }
         }
+        new_freq
     }
 
     fn is_dac_enabled(&self) -> bool {
@@ -215,7 +220,7 @@ impl PulseChannel {
         self.volume_envelope & 0xF8 != 0
     }
 
-    fn pace(&self) -> u8 {
+    fn sweep_pace(&self) -> u8 {
         (self.sweep >> 4) & 0b111
     }
     

@@ -1,6 +1,4 @@
 
-use super::DMA;
-
 const COLORS_DEFAULT : [u32; 4] = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000]; 
 
 pub struct LCD {

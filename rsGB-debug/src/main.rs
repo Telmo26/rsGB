@@ -2,7 +2,6 @@ use std::{env, sync::{Arc, Mutex}, thread};
 
 use ringbuf::traits::Consumer;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use minifb::Key;
 
 use rs_gb_core::{init, run, EmuContext};
 
@@ -116,14 +115,6 @@ impl CustomWindow {
         match self {
             CustomWindow::MainWindow(_) => true,
             _ => false
-        }
-    }
-
-    fn is_key_down(&self, key: Key) -> bool {
-        if let CustomWindow::MainWindow(w) = self {
-            w.is_key_down(key)
-        } else {
-            false
         }
     }
 

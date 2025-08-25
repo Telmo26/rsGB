@@ -118,6 +118,9 @@ pub fn run(context: Arc<Mutex<EmuContext>>) {
     loop {
         let ctx = context.lock().unwrap();
         if !ctx.is_running() {
+            for address in 0xC000..0xC010 {
+                println!("{address:X} : {:b}", emulator.devices.bus.read(address));
+            }
             break
         }
 
