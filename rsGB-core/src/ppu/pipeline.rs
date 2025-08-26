@@ -174,21 +174,15 @@ impl PPU {
         if !self.window_visible(bus) {
             return;
         }
-        let window_visible = self.window_visible(bus);
+
         let window_y = lcd_read_win_y(bus);
         let window_x = lcd_read_win_x(bus);
         let ly = lcd_read_ly(bus);
-        
-        // println!("Window check: visible={}, WX={}, WY={}, LY={}, fetch_x={}, window_line={}", 
-        //      window_visible, window_x, window_y, ly, self.pixel_fifo.fetch_x, self.window_line);
 
         if self.pixel_fifo.fetch_x.wrapping_add(7) >= window_x &&
             self.pixel_fifo.fetch_x.wrapping_add(7) < window_x.wrapping_add(YRES as u8).wrapping_add(14) {
 
-            // println!("  → X condition met");
-
             if ly >= window_y && ly < window_y.wrapping_add(XRES as u8) {
-                // println!("  → Y condition met, loading window tile");
                 let w_tile_y = (self.window_line / 8) as u16;
 
                 let map_area = lcdc_win_map_area(bus);
@@ -275,7 +269,7 @@ impl PPU {
     pub fn pipeline_process(&mut self, bus: &mut Interconnect) {
         self.pixel_fifo.map_y = lcd_read_ly(bus).wrapping_add(lcd_read_scroll_y(bus));
         self.pixel_fifo.map_x = self.pixel_fifo.fetch_x.wrapping_add(lcd_read_scroll_x(bus)); // Fetched X + SCROLL_X
-        self.pixel_fifo.tile_y = (lcd_read_ly(bus).wrapping_add(lcd_read_scroll_y(bus)) % 8).wrapping_mul(2);
+        self.pixel_fifo.tile_y = (self.pixel_fifo.map_y % 8).wrapping_mul(2);
 
         if self.line_ticks % 2 == 0 {
             self.pipeline_fetch(bus);

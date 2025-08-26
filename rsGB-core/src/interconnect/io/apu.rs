@@ -187,8 +187,6 @@ impl APU {
                 },
                 _ => unreachable!()
             }
-        } else {
-            println!("Trying to write {value} to {address:X} while APU is off")
         }
     }
 

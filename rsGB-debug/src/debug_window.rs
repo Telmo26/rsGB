@@ -41,8 +41,7 @@ impl DebugWindow {
     pub fn update(&mut self) {
         let vram = &*self.comm.vram_recv();
         self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
-        let tiles: &[[u8; 16]; 384] = 
-            unsafe { &*(vram.as_ptr() as *const [[u8; 16]; 384]) };
+        let (tiles, _) = vram.as_chunks::<16>();
 
         for y in 0..24 {
             for x in 0..16 {

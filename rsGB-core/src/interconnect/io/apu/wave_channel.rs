@@ -33,7 +33,7 @@ impl WaveChannel {
 
             0xFF30..0xFF40 => {
                 if self.enabled {
-                    self.wave_pattern_ram[self.wave_ram_pointer as usize / 2]
+                    self.buffer << 4 | self.buffer
                 } else {
                     self.wave_pattern_ram[address as usize - 0xFF30]
                 }

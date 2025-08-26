@@ -71,7 +71,7 @@ impl IO {
         match address {
             0xFF00 => self.gamepad.get_output(),
             0xFF01 => self.serial[0],
-            0xFF02 => self.serial[1],
+            0xFF02 => self.serial[1] | 0b01111100,
             0xFF04..=0xFF07 => self.timer.read(address),
             0xFF0F => self.if_register,
             0xFF10..0xFF40 => self.apu.read(address),
