@@ -95,7 +95,7 @@ impl Emulator {
         res
     }
 
-    fn need_save(&self) -> bool {
+    fn need_save(&mut self) -> bool {
         self.devices.bus.need_save()
     }
 
