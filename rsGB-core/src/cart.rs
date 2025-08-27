@@ -321,24 +321,24 @@ impl Cartridge {
         let battery = header.cart_type == 3;
         let need_save = false;
 
-        // RAM Banks initialization
+        let ram_enabled = header.ram_size != 0;
+
         let mut ram_banks: [Option<Box<[u8; 8192]>>; 16] = [const { None }; 16];
-        for i in 0..16 {
-            ram_banks[i] = match header.ram_size {
-                2 if i == 0 => Some(Box::new([0; 0x2000])),
-                3 if i < 4 => Some(Box::new([0; 0x2000])),
-                4 if i < 16 => Some(Box::new([0; 0x2000])),
-                5 if i < 8 => Some(Box::new([0; 0x2000])),
-                _ => None,
+        if ram_enabled {
+            // RAM Banks initialization
+            for i in 0..16 {
+                ram_banks[i] = match header.ram_size {
+                    2 if i == 0 => Some(Box::new([0; 0x2000])),
+                    3 if i < 4 => Some(Box::new([0; 0x2000])),
+                    4 if i < 16 => Some(Box::new([0; 0x2000])),
+                    5 if i < 8 => Some(Box::new([0; 0x2000])),
+                    _ => None,
+                }
             }
         }
 
         let active_ram_bank = 0;
         let active_rom_bank = 1; // ROM bank 1
-        
-        if battery {
-
-        }
 
         Ok(Cartridge {
             filename: path.to_string(),
@@ -346,7 +346,7 @@ impl Cartridge {
             rom_data,
             header,
 
-            ram_enabled: true,
+            ram_enabled,
             ram_banking: true,
 
             active_rom_bank, 
