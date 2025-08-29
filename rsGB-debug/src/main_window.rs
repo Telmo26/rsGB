@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use minifb::{Key, Scale, Window, WindowOptions};
-use rs_gb_core::{Button, Gameboy};
+use rs_gb_core::{Button, Gameboy, ThreadedGameboy};
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -9,13 +9,13 @@ const SCALE: Scale = Scale::X4;
 
 pub struct MainWindow {
     window: Window,
-    gameboy: Gameboy,
+    gameboy: ThreadedGameboy,
     previous_frame_time: Instant,
     frame_count: u8,
 }
 
 impl MainWindow {
-    pub fn new(gameboy: Gameboy) -> MainWindow {
+    pub fn new(gameboy: ThreadedGameboy) -> MainWindow {
         let mut window = Window::new(
             "rsGB - A GameBoy Emulator in Rust",
             WIDTH, 
@@ -56,11 +56,14 @@ impl MainWindow {
 
         self.gameboy.update_button(Button::SELECT, self.window.is_key_down(Key::M));
 
-        let new_frame = self.gameboy.next_frame();
-        self.window.update_with_buffer(new_frame, WIDTH, HEIGHT).unwrap();
+        if let Some(new_frame) = self.gameboy.recv_frame(Duration::from_micros(16_600)) {
+            self.window.update_with_buffer(&*new_frame, WIDTH, HEIGHT).unwrap();
+            self.frame_count += 1;
+        } else {
+            self.window.update();
+        }
 
         // FPS tracking
-        self.frame_count += 1;
         let elapsed = self.previous_frame_time.elapsed();
         if elapsed >= Duration::from_secs(1) {
             let fps = self.frame_count as f64 / elapsed.as_secs_f64();

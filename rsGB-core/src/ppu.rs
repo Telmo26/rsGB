@@ -26,8 +26,11 @@ pub struct PPU {
     current_frame: u32,
     line_ticks: u32,
 
-    framebuffer: [u32; PIXELS],
+    framebuffer: Arc<Mutex<[u32; PIXELS]>>,
+    frame_available: Arc<(Mutex<bool>, Condvar)>,
     new_frame: bool,
+
+    threading_enabled: bool
 }
 
 impl PPU {
@@ -44,8 +47,11 @@ impl PPU {
             current_frame: 0,
             line_ticks: 0,
 
-            framebuffer: [0; PIXELS],
+            framebuffer: Arc::new(Mutex::new([0; PIXELS])),
+            frame_available: Arc::new((Mutex::new(false), Condvar::new())),
             new_frame: false,
+
+            threading_enabled: false,
         }
     }
 
@@ -67,12 +73,30 @@ impl PPU {
         self.new_frame
     }
 
-    pub fn get_frame(&mut self) -> Option<&Frame>{
+    pub fn get_frame(&mut self) -> Option<&Arc<Mutex<Frame>>> {
         if !self.new_frame {
-            None
-        } else {
-            self.new_frame = false;
-            Some(&self.framebuffer)
+            return None
+        } 
+
+        self.new_frame = false;
+
+        if self.threading_enabled {
+            let (lock, cvar) = &*self.frame_available;
+            let mut frame_ready = lock.lock().unwrap();
+
+            while *frame_ready {
+                frame_ready = cvar.wait(frame_ready).unwrap();
+            }
+
+            *frame_ready = true;
+            cvar.notify_one();
         }
+
+        Some(&self.framebuffer)
+    }
+
+    pub fn enable_threading(&mut self) -> (Arc<Mutex<Frame>>, Arc<(Mutex<bool>, Condvar)>) {
+        self.threading_enabled = true;
+        (self.framebuffer.clone(), self.frame_available.clone())
     }
 }

@@ -5,11 +5,7 @@ mod ppu;
 mod utils;
 mod dbg;
 
-use std::{
-    sync::{Arc, Condvar, Mutex, MutexGuard}, 
-    thread, 
-    time::Duration
-};
+use std::{sync::{mpsc::{self, Receiver, Sender}, Arc, Condvar, Mutex, MutexGuard}, thread::{self, JoinHandle}, time::Duration};
 
 use crate::{
     cart::Cartridge, 
@@ -19,7 +15,7 @@ use crate::{
     dbg::Debugger,
 };
 
-use ringbuf::{traits::Split, HeapCons};
+use ringbuf::{traits::{Consumer, Producer, Split}, HeapCons, HeapProd};
 
 pub type Frame = [u32; 0x5A00];
 pub type VRAM = [u8; 0x2000];
@@ -34,17 +30,6 @@ pub enum Button {
     LEFT,
     RIGHT
 }
-
-/*
-    Emu components :
-
-    |Cart|
-    |CPU|
-    |Address Bus|
-    |PPU|
-    |Timer|
-
-*/
 
 struct Devices {
     bus: Interconnect,
@@ -88,7 +73,7 @@ impl Gameboy {
 
         let cartridge = Cartridge::load(rom_path).unwrap();
         bus.set_cart(cartridge);
-        bus.load(&save_path);
+        bus.load_save(&save_path);
 
         let devices = Devices {
             bus,
@@ -107,15 +92,15 @@ impl Gameboy {
         }
     }
 
-    pub fn next_frame(&mut self) -> &Frame {
+    pub fn next_frame(&mut self) -> &Arc<Mutex<Frame>> {
         while !self.devices.ppu.is_new_frame() {
             self.cpu.step(&mut self.devices);
         }
         if self.devices.bus.need_save() {
             self.devices.bus.save(&self.save_path);
         }
-        let frame = self.devices.ppu.get_frame();
-        frame.unwrap()
+        let frame = &*self.devices.ppu.get_frame().unwrap();
+        frame
     }
 
     pub fn update_button(&mut self, button: Button, value: bool) {
@@ -124,5 +109,76 @@ impl Gameboy {
 
     pub fn audio_receiver(&mut self) -> HeapCons<(f32, f32)> {
         self.audio_receiver.take().unwrap()
+    }
+
+    fn enable_threading(&mut self) -> (Arc<Mutex<Frame>>, Arc<(Mutex<bool>, Condvar)>) {
+        let (framebuffer, frame_available) = self.devices.ppu.enable_threading();
+        (framebuffer, frame_available)
+    }
+}
+
+pub struct ThreadedGameboy {
+    gameboy_thread: JoinHandle<()>,
+
+    framebuffer: Arc<Mutex<Frame>>,
+    frame_available: Arc<(Mutex<bool>, Condvar)>,
+
+    audio_receiver: Option<HeapCons<(f32, f32)>>,
+    input_send: HeapProd<(Button, bool)>
+}
+
+impl ThreadedGameboy {
+    pub fn new(rom_path: &str, debug: bool) -> ThreadedGameboy {
+        let mut gameboy = Gameboy::new(rom_path, debug);
+
+        let audio_receiver = gameboy.audio_receiver();
+
+        let (input_send, mut input_recv) = ringbuf::SharedRb::new(10).split();
+
+        let (framebuffer, frame_available) = gameboy.enable_threading();
+
+        let gameboy_thread = thread::spawn(move ||
+            loop {
+                while let Some((button, value)) = input_recv.try_pop() {
+                    gameboy.update_button(button, value);
+                }
+                let _ = gameboy.next_frame();
+            }
+        );
+        ThreadedGameboy { gameboy_thread, framebuffer, frame_available, audio_receiver: Some(audio_receiver), input_send }
+    }
+
+    pub fn recv_frame(&mut self, timeout: Duration) -> Option<MutexGuard<'_, Frame>> {
+        let (lock, cvar) = &*self.frame_available;
+        
+        let mut frame_ready = lock.lock().unwrap();
+
+        while !*frame_ready {
+            match cvar.wait_timeout(frame_ready, timeout) {
+                Ok((value, timed_out)) => {
+                    if !timed_out.timed_out() {
+                        frame_ready = value;
+                    } else {
+                        return None
+                    }
+                },
+                Err(_) => return None
+            }
+        }
+
+        let frame_lock = self.framebuffer.lock().unwrap();
+
+        *frame_ready = false;
+        cvar.notify_one();
+
+        Some(frame_lock)
+    }
+
+    pub fn audio_receiver(&mut self) -> HeapCons<(f32, f32)> {
+        self.audio_receiver.take().unwrap()
+    }
+
+    pub fn update_button(&mut self, button: Button, value: bool) {
+        let _ = self.input_send.try_push((button, value));
     }
 }

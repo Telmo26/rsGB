@@ -3,7 +3,7 @@ use std::{env, sync::{Arc, Mutex}, thread};
 use ringbuf::traits::Consumer;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rs_gb_core::Gameboy;
+use rs_gb_core::{Gameboy, ThreadedGameboy};
 
 mod main_window;
 // mod debug_window;
@@ -21,7 +21,7 @@ fn main() {
     }
 
     // Creation of the gameboy
-    let mut gameboy = Gameboy::new(&args[1], CORE_DEBUG);
+    let mut gameboy = ThreadedGameboy::new(&args[1], CORE_DEBUG);
 
     // Preparation of the audio stream
     let mut audio_receiver = gameboy.audio_receiver();
@@ -55,7 +55,6 @@ fn main() {
     let main_window = MainWindow::new(gameboy);
     windows.push(CustomWindow::MainWindow(main_window));    
 
-    
     // Updating the windows
     while windows.iter().any(|w| w.is_main() && w.is_open()) {
         windows.retain_mut(|window|

@@ -201,7 +201,7 @@ impl Interconnect {
         self.cart.as_ref().unwrap().save(save_path);
     }
 
-    pub fn load(&mut self, save_path: &str) {
+    pub fn load_save(&mut self, save_path: &str) {
         self.cart.as_mut().unwrap().load_save(save_path);
     }
 
