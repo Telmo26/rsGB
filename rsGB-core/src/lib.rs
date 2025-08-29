@@ -5,10 +5,8 @@ mod ppu;
 mod utils;
 mod dbg;
 
-mod communicators;
-
 use std::{
-    sync::{Arc, Mutex, MutexGuard}, 
+    sync::{Arc, Condvar, Mutex, MutexGuard}, 
     thread, 
     time::Duration
 };
@@ -21,9 +19,21 @@ use crate::{
     dbg::Debugger,
 };
 
-pub use communicators::*;
+use ringbuf::{traits::Split, HeapCons};
 
-// use minifb;
+pub type Frame = [u32; 0x5A00];
+pub type VRAM = [u8; 0x2000];
+
+pub enum Button {
+    A,
+    B,
+    START,
+    SELECT,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT
+}
 
 /*
     Emu components :
@@ -57,82 +67,62 @@ impl Devices {
     }
 }
 
-struct Emulator {
+pub struct Gameboy {
     cpu: CPU,
     devices: Devices,
+
+    audio_receiver: Option<HeapCons<(f32, f32)>>,
 
     save_path: String,
 }
 
-impl Emulator {
-    fn new(ctx: &mut MutexGuard<'_, EmuContext>) -> Emulator {
-        let save_path = ctx.file_path.clone().replace(".gb", ".sav");
-        let devices = ctx.emulator_devices.take().unwrap();
+impl Gameboy {
+    pub fn new(rom_path: &str, debug: bool) -> Gameboy {
+        let save_path = rom_path.replace(".gb", ".sav");
+
+        let rb = ringbuf::HeapRb::<(f32, f32)>::new(8192);
+        let (audio_sender, audio_receiver) = rb.split();
+
+        let mut bus = Interconnect::new(audio_sender);
+        let ppu = PPU::new();
+
+        let cartridge = Cartridge::load(rom_path).unwrap();
+        bus.set_cart(cartridge);
+        bus.load(&save_path);
+
+        let devices = Devices {
+            bus,
+            ppu,
+            debugger: if debug { Some(Debugger::new()) } else { None },
+
+            ticks: 0,
+        };
         
-        Emulator {
+        Gameboy {
             cpu: CPU::new(),
             devices,
 
+            audio_receiver: Some(audio_receiver),
             save_path,
         }
     }
 
-    fn load_cart(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let cartridge = Cartridge::load(path)?;
-        self.devices.bus.set_cart(cartridge);
-        self.devices.bus.load(&self.save_path);
-        Ok(())
-    }
-
-    fn step(&mut self) -> bool {
-        let res = self.cpu.step(&mut self.devices);
-
-        if self.devices.ppu.send_new_frame() {
-            if self.need_save() {
-                self.save();
-            }
+    pub fn next_frame(&mut self) -> &Frame {
+        while !self.devices.ppu.is_new_frame() {
+            self.cpu.step(&mut self.devices);
         }
-        res
-    }
-
-    fn need_save(&mut self) -> bool {
-        self.devices.bus.need_save()
-    }
-
-    fn save(&mut self) {
-        self.devices.bus.save(&self.save_path);
-    }
-}
-
-pub fn run(context: Arc<Mutex<EmuContext>>) {
-    let mut ctx: MutexGuard<'_, EmuContext> = context.lock().unwrap();
-
-    let mut emulator = Emulator::new(&mut ctx);
-
-    emulator.load_cart(&ctx.file_path).expect("Failed to load the cartridge");
-
-    // println!("Cart loaded...");
-
-    start_emulation(ctx);
-
-    loop {
-        let ctx = context.lock().unwrap();
-        if !ctx.is_running() {
-            break
+        if self.devices.bus.need_save() {
+            self.devices.bus.save(&self.save_path);
         }
-
-        if ctx.is_paused() {
-            thread::sleep(Duration::from_millis(10));
-            continue;
-        }
-
-        if !emulator.step() {
-            println!("CPU Stopped");
-            break;
-        }
+        let frame = self.devices.ppu.get_frame();
+        frame.unwrap()
     }
-}
 
-fn start_emulation(mut ctx: MutexGuard<'_, EmuContext>) {
-    ctx.start();
+    pub fn update_button(&mut self, button: Button, value: bool) {
+        self.devices.bus.update_button(button, value);        
+    }
+
+    pub fn audio_receiver(&mut self) -> HeapCons<(f32, f32)> {
+        self.audio_receiver.take().unwrap()
+    }
 }

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Condvar, Mutex};
 
-use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}};
+use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}, Frame};
 
 mod state_machine;
 mod pipeline;
@@ -26,13 +26,12 @@ pub struct PPU {
     current_frame: u32,
     line_ticks: u32,
 
-    framebuffer: Arc<Mutex<[u32; PIXELS]>>,
-    frame_sent: Arc<(Mutex<bool>, Condvar)>,
+    framebuffer: [u32; PIXELS],
     new_frame: bool,
 }
 
 impl PPU {
-    pub fn new(framebuffer: Arc<Mutex<[u32; PIXELS]>>, frame_sent: Arc<(Mutex<bool>, Condvar)>) -> PPU {
+    pub fn new() -> PPU {
         PPU {
             line_sprites: Vec::with_capacity(10),
 
@@ -45,8 +44,7 @@ impl PPU {
             current_frame: 0,
             line_ticks: 0,
 
-            framebuffer,
-            frame_sent,
+            framebuffer: [0; PIXELS],
             new_frame: false,
         }
     }
@@ -65,20 +63,16 @@ impl PPU {
         }
     }
 
-    pub fn send_new_frame(&self) -> bool{
-        if self.new_frame {
-            let (lock, cvar) = &*self.frame_sent;
-            let mut frame_ready = lock.lock().unwrap();
+    pub fn is_new_frame(&self) -> bool {
+        self.new_frame
+    }
 
-            while *frame_ready {
-                frame_ready = cvar.wait(frame_ready).unwrap();
-            }
-
-            *frame_ready = true;
-            cvar.notify_one();
-            true
+    pub fn get_frame(&mut self) -> Option<&Frame>{
+        if !self.new_frame {
+            None
         } else {
-            false
+            self.new_frame = false;
+            Some(&self.framebuffer)
         }
     }
 }

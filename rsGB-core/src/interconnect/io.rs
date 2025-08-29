@@ -13,7 +13,7 @@ use lcd::LCD;
 use gamepad::Gamepad;
 use apu::APU;
 
-use crate::GamepadState;
+use crate::Button;
 
 use super::InterruptType;
 
@@ -52,9 +52,9 @@ pub struct IO {
 }
 
 impl IO {
-    pub fn new(gamepad_state: Arc<Mutex<GamepadState>>, audio_sender: HeapProd<(f32, f32)>) -> IO {
+    pub fn new(audio_sender: HeapProd<(f32, f32)>) -> IO {
         IO { 
-            gamepad: Gamepad::new(gamepad_state),
+            gamepad: Gamepad::default(),
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
@@ -134,5 +134,9 @@ impl IO {
 
     pub fn dma_transferring(&self) -> bool {
         self.dma.transferring()
+    }
+
+    pub fn update_button(&mut self, button: Button, value: bool) {
+        self.gamepad.update_button(button, value);
     }
 }
