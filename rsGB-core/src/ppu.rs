@@ -55,7 +55,7 @@ impl PPU {
         }
     }
 
-    pub fn tick(&mut self, bus: &mut Interconnect) {
+    pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
         self.line_ticks += 1;
         self.new_frame = false;
 
@@ -65,7 +65,7 @@ impl PPU {
             LCDMode::HBlank => self.hblank(bus),
             LCDMode::VBlank => self.vblank(bus),
             LCDMode::OAM => self.oam(bus),
-            LCDMode::XFer => self.xfer(bus),
+            LCDMode::XFer => self.xfer(bus, framebuffer),
         }
     }
 
@@ -73,11 +73,7 @@ impl PPU {
         self.new_frame
     }
 
-    pub fn get_frame(&mut self) -> Option<&Frame> {
-        if !self.new_frame {
-            return None
-        } 
-
+    pub fn get_frame(&mut self) {
         self.new_frame = false;
 
         // if self.threading_enabled {
@@ -91,8 +87,6 @@ impl PPU {
         //     *frame_ready = true;
         //     cvar.notify_one();
         // }
-
-        Some(&self.framebuffer)
     }
 
     pub fn enable_threading(&mut self) { //-> (Arc<Mutex<Frame>>, Arc<(Mutex<bool>, Condvar)>) {

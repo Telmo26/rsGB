@@ -52,13 +52,13 @@ pub struct IO {
 }
 
 impl IO {
-    pub fn new(audio_sender: HeapProd<(f32, f32)>) -> IO {
+    pub fn new() -> IO {
         IO { 
             gamepad: Gamepad::default(),
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
-            apu: APU::new(audio_sender),
+            apu: APU::new(),
             lcd: LCD::new(),
             dma: DMA::new(),
 
@@ -138,5 +138,9 @@ impl IO {
 
     pub fn update_button(&mut self, button: Button, value: bool) {
         self.gamepad.update_button(button, value);
+    }
+
+    pub fn apu_output(&self) -> Option<(f32, f32)> {
+        self.apu.output()
     }
 }

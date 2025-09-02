@@ -41,13 +41,13 @@ pub struct Interconnect {
 }
 
 impl Interconnect {
-    pub fn new(audio_sender: HeapProd<(f32, f32)>) -> Interconnect {
+    pub fn new() -> Interconnect {
         Interconnect { 
             cart: None,
             vram: [0; 0x2000],
             ram: RAM::new(),
             oam_ram: [OAMEntry::new(); 40],
-            io: IO::new(audio_sender),
+            io: IO::new(),
             ie_register: 0,
         }
     }
@@ -158,7 +158,7 @@ impl Interconnect {
     /// per clock cycle, like the timer.
     pub fn tick_t(&mut self) {
         self.io.tick_timer();
-        // self.io.tick_apu();
+        self.io.tick_apu();
     }
 
 
@@ -207,6 +207,10 @@ impl Interconnect {
 
     pub fn update_button(&mut self, button: Button, value: bool) {
         self.io.update_button(button, value);
+    }
+
+    pub fn apu_output(&self) -> Option<(f32, f32)> {
+        self.io.apu_output()
     }
 }
 

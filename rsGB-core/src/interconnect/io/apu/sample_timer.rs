@@ -1,6 +1,7 @@
 pub struct SampleTimer {
     accumulator: f64,
     step: f64, // how many samples per APU tick
+    retry: bool,
 }
 
 impl SampleTimer {
@@ -10,10 +11,15 @@ impl SampleTimer {
         Self {
             accumulator: 0.0,
             step,
+            retry: false,
         }
     }
 
     pub fn tick(&mut self) -> bool {
+        if self.retry {
+            self.retry = false;
+            return true
+        }
         self.accumulator += self.step;
         if self.accumulator >= 1.0 {
             self.accumulator -= 1.0;
