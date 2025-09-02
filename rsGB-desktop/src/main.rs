@@ -12,6 +12,7 @@ use iced::{
     widget::{column, image::Handle},
 };
 
+use ringbuf::traits::Consumer;
 use rs_gb_core;
 use rs_gb_core::ThreadedGameboy;
 
@@ -50,7 +51,7 @@ impl Default for MainWindow {
     fn default() -> MainWindow {
         let mut gameboy = ThreadedGameboy::new("test_roms/tetris.gb", false);
 
-        let audio_receiver = gameboy.audio_receiver();
+        let mut audio_receiver = gameboy.audio_receiver();
         let mut previous_audio = (0.0, 0.0);
 
         let host = cpal::default_host();
@@ -64,13 +65,13 @@ impl Default for MainWindow {
                 &config.config(),
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     for sample in data.chunks_mut(2) {
-                        match audio_receiver.try_recv() {
-                            Ok((left, right)) => {
+                        match audio_receiver.try_pop() {
+                            Some((left, right)) => {
                                 sample[0] = left;
                                 sample[1] = right;
                                 previous_audio = (left, right)
                             }
-                            Err(_) => {
+                            None => {
                                 sample[0] = previous_audio.0;
                                 sample[1] = previous_audio.1
                             }

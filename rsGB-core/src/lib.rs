@@ -7,11 +7,10 @@ mod utils;
 
 use std::{
     sync::{
-        Arc, Condvar, Mutex, MutexGuard,
-        mpsc::{self, Receiver, Sender},
+        mpsc::{self, Receiver, Sender}, Arc, Condvar, Mutex, MutexGuard
     },
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{cart::Cartridge, cpu::CPU, dbg::Debugger, interconnect::Interconnect, ppu::PPU};
@@ -42,26 +41,35 @@ struct Devices {
     bus: Interconnect,
     ppu: PPU,
 
-    audio_callback: fn((f32, f32)),
+    audio_callback: Box<dyn FnMut((f32, f32)) + Send>,
     framebuffer: Option<*mut [u32]>,
+    new_frame: bool,
 
     debugger: Option<Debugger>,
     ticks: u64,
     last_sample_tick: u64,
+
+    last_sample_time: Instant,
+    sample_counter: u32,
 }
 
 unsafe impl Send for Devices {}
 
 impl Devices {
-    fn new(bus: Interconnect, ppu: PPU, audio_callback: fn((f32, f32)), debug: bool) -> Devices {
+    fn new<F>(bus: Interconnect, ppu: PPU, audio_callback: F, debug: bool) -> Devices 
+    where F: FnMut((f32, f32)) + Send + 'static {
         Devices {
             bus,
             ppu,
-            audio_callback,
+            audio_callback: Box::new(audio_callback),
             framebuffer: None,
+            new_frame: false,
             debugger: if debug { Some(Debugger::new()) } else { None },
             ticks: 0,
             last_sample_tick: 0,
+
+            last_sample_time: Instant::now(),
+            sample_counter: 0
         }
     }
 
@@ -73,9 +81,10 @@ impl Devices {
                 if let Some(ptr) = self.framebuffer {
                     unsafe {
                         let fb = &mut *ptr;
-                        self.ppu.tick(&mut self.bus, fb);
-                    }
-                    
+                        if self.ppu.tick(&mut self.bus, fb) { // Frame updated
+                            self.new_frame = true;
+                        }
+                    } 
                 }
 
                 if self.ticks - self.last_sample_tick >= TICKS_PER_SAMPLE {
@@ -83,6 +92,7 @@ impl Devices {
                         (self.audio_callback)(sample)
                     }
                     self.last_sample_tick = self.ticks;
+                    self.sample_counter += 1;
                 }
             }
             self.bus.tick_m();
@@ -109,7 +119,8 @@ pub struct Gameboy {
 }
 
 impl Gameboy {
-    pub fn new(rom_path: &str, audio_callback: fn((f32, f32)), debug: bool) -> Gameboy {
+    pub fn new<F>(rom_path: &str, audio_callback: F, debug: bool) -> Gameboy 
+    where F: FnMut((f32, f32)) + Send + 'static {
         let save_path = rom_path.replace(".gb", ".sav");
 
         let mut bus = Interconnect::new();
@@ -130,14 +141,14 @@ impl Gameboy {
 
     pub fn next_frame(&mut self, framebuffer: &mut [u32]) {
         self.devices.attach_buffer(framebuffer);
-        while !self.devices.ppu.is_new_frame() {
+        while !self.devices.new_frame {
             self.cpu.step(&mut self.devices);
         }
 
         if self.devices.bus.need_save() {
             self.devices.bus.save(&self.save_path);
         }
-        self.devices.ppu.get_frame();
+        self.devices.new_frame = false;
         self.devices.detach_buffer();
     }
 
@@ -156,20 +167,26 @@ impl Gameboy {
 pub struct ThreadedGameboy {
     _gameboy_thread: JoinHandle<()>,
 
-    frame_recv: HeapCons<Frame>,
     framebuffer: Arc<Mutex<Frame>>,
     frame_available: Arc<(Mutex<bool>, Condvar)>,
 
-    audio_receiver: Option<Receiver<(f32, f32)>>,
+    audio_receiver: Option<HeapCons<(f32, f32)>>,
     input_send: HeapProd<(Button, bool)>,
 }
 
 impl ThreadedGameboy {
     pub fn new(rom_path: &str, debug: bool) -> ThreadedGameboy {
         // let (mut audio_sender, audio_receiver) = ringbuf::HeapRb::<(f32, f32)>::new(8192).split();
-        let (audio_sender, audio_receiver) = mpsc::channel();
+        let (mut audio_sender, audio_receiver) = ringbuf::SharedRb::new(8192).split();
 
-        let mut gameboy = Gameboy::new(rom_path, |sample| {}, debug);
+        let mut gameboy = Gameboy::new(
+            rom_path,
+            move |sample| { 
+                
+                let _ = audio_sender.try_push(sample);
+            },
+            debug
+        );
 
         let framebuffer = Arc::new(Mutex::new([0_u32; 0x5A00]));
         let framebuffer_emu = framebuffer.clone();
@@ -179,9 +196,6 @@ impl ThreadedGameboy {
 
         let (input_send, mut input_recv) = ringbuf::SharedRb::new(10).split();
 
-        let (mut frame_send, frame_recv) = ringbuf::SharedRb::new(2).split();
-
-        // let (framebuffer, frame_available) = gameboy.enable_threading();
         gameboy.enable_threading();
 
         let _gameboy_thread = thread::spawn(move || {
@@ -206,7 +220,6 @@ impl ThreadedGameboy {
         ThreadedGameboy {
             _gameboy_thread,
 
-            frame_recv,
             framebuffer,
             frame_available,
 
@@ -245,7 +258,7 @@ impl ThreadedGameboy {
         // self.frame_recv.try_pop()
     }
 
-    pub fn audio_receiver(&mut self) -> Receiver<(f32, f32)> {
+    pub fn audio_receiver(&mut self) -> HeapCons<(f32, f32)> {
         self.audio_receiver.take().unwrap()
     }
 
