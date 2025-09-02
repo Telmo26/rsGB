@@ -52,11 +52,6 @@ impl PPU {
     }
 
     pub fn tick(&mut self, bus: &mut Interconnect, pending_frame: bool, framebuffer: &mut [u32]) -> bool {
-        if self.new_frame {
-            self.new_frame = false;
-            return true
-        }
-
         self.line_ticks += 1;
 
         let lcd_mode = status_mode(bus);
@@ -73,6 +68,12 @@ impl PPU {
             LCDMode::OAM => self.oam(bus),
             LCDMode::XFer => self.xfer(bus, pending_frame, framebuffer),
         };
-        false       
+        
+        if self.new_frame {
+            self.new_frame = false;
+            return true
+        } else {
+            return false
+        }       
     }
 }
