@@ -57,7 +57,7 @@ impl MainWindow {
         self.gameboy.update_button(Button::SELECT, self.window.is_key_down(Key::M));
 
         if let Some(new_frame) = self.gameboy.recv_frame(Duration::from_micros(16_600)) {
-            self.window.update_with_buffer(&new_frame, WIDTH, HEIGHT).unwrap();
+            self.window.update_with_buffer(new_frame.as_slice(), WIDTH, HEIGHT).unwrap();
             self.frame_count += 1;
         } else {
             self.window.update();
