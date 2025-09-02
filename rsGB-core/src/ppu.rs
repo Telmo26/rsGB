@@ -1,6 +1,4 @@
-use std::sync::{Arc, Condvar, Mutex};
-
-use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}, Frame};
+use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}};
 
 mod state_machine;
 mod pipeline;
@@ -27,10 +25,9 @@ pub struct PPU {
     line_ticks: u32,
 
     framebuffer: [u32; PIXELS],
-    frame_available: Arc<(Mutex<bool>, Condvar)>,
     new_frame: bool,
 
-    threading_enabled: bool
+    previous_pending_state: bool
 }
 
 impl PPU {
@@ -48,16 +45,15 @@ impl PPU {
             line_ticks: 0,
 
             framebuffer: [0; PIXELS],
-            frame_available: Arc::new((Mutex::new(false), Condvar::new())),
             new_frame: false,
 
-            threading_enabled: false,
+            previous_pending_state: false,
         }
     }
 
-    pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) -> bool {
+    pub fn tick(&mut self, bus: &mut Interconnect, pending_frame: bool, framebuffer: &mut [u32]) -> bool {
         if self.new_frame {
-            self.send_frame(framebuffer);
+            self.new_frame = false;
             return true
         }
 
@@ -65,22 +61,18 @@ impl PPU {
 
         let lcd_mode = status_mode(bus);
 
+        if self.previous_pending_state && !pending_frame {
+            framebuffer.copy_from_slice(&self.framebuffer);
+        }
+
+        self.previous_pending_state = pending_frame;
+
         match lcd_mode {
             LCDMode::HBlank => self.hblank(bus),
             LCDMode::VBlank => self.vblank(bus),
             LCDMode::OAM => self.oam(bus),
-            LCDMode::XFer => self.xfer(bus),
+            LCDMode::XFer => self.xfer(bus, pending_frame, framebuffer),
         };
         false       
-    }
-
-    pub fn send_frame(&mut self, framebuffer: &mut [u32]) {
-        framebuffer.copy_from_slice(&self.framebuffer);
-        self.new_frame = false;
-    }
-
-    pub fn enable_threading(&mut self) { //-> (Arc<Mutex<Frame>>, Arc<(Mutex<bool>, Condvar)>) {
-        self.threading_enabled = true;
-        // (self.framebuffer.clone(), self.frame_available.clone())
     }
 }

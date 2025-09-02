@@ -43,7 +43,7 @@ struct Devices {
 
     audio_callback: Box<dyn FnMut((f32, f32)) + Send>,
     framebuffer: Option<*mut [u32]>,
-    new_frame: bool,
+    pending_frame: bool,
 
     debugger: Option<Debugger>,
     ticks: u64,
@@ -63,7 +63,7 @@ impl Devices {
             ppu,
             audio_callback: Box::new(audio_callback),
             framebuffer: None,
-            new_frame: false,
+            pending_frame: false,
             debugger: if debug { Some(Debugger::new()) } else { None },
             ticks: 0,
             last_sample_tick: 0,
@@ -81,8 +81,8 @@ impl Devices {
                 if let Some(ptr) = self.framebuffer {
                     unsafe {
                         let fb = &mut *ptr;
-                        if self.ppu.tick(&mut self.bus, fb) { // Frame updated
-                            self.new_frame = true;
+                        if self.ppu.tick(&mut self.bus, self.pending_frame, fb) { // Frame updated
+                            self.pending_frame = true;
                         }
                     } 
                 }
@@ -141,26 +141,19 @@ impl Gameboy {
 
     pub fn next_frame(&mut self, framebuffer: &mut [u32]) {
         self.devices.attach_buffer(framebuffer);
-        while !self.devices.new_frame {
+        while !self.devices.pending_frame {
             self.cpu.step(&mut self.devices);
         }
 
         if self.devices.bus.need_save() {
             self.devices.bus.save(&self.save_path);
         }
-        self.devices.new_frame = false;
+        self.devices.pending_frame = false;
         self.devices.detach_buffer();
     }
 
     pub fn update_button(&mut self, button: Button, value: bool) {
         self.devices.bus.update_button(button, value);
-    }
-
-    fn enable_threading(&mut self) {
-        //-> (Arc<Mutex<Frame>>, Arc<(Mutex<bool>, Condvar)>) {
-        self.devices.ppu.enable_threading();
-        // let (framebuffer, frame_available) = self.devices.ppu.enable_threading();
-        // (framebuffer, frame_available)
     }
 }
 
@@ -195,8 +188,6 @@ impl ThreadedGameboy {
         let frame_available_emu = frame_available.clone();
 
         let (input_send, mut input_recv) = ringbuf::SharedRb::new(10).split();
-
-        gameboy.enable_threading();
 
         let _gameboy_thread = thread::spawn(move || {
             loop {

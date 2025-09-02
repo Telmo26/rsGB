@@ -49,7 +49,7 @@ struct MainWindow {
 
 impl Default for MainWindow {
     fn default() -> MainWindow {
-        let mut gameboy = ThreadedGameboy::new("test_roms/tetris.gb", false);
+        let mut gameboy = ThreadedGameboy::new("test_roms/zelda.gb", false);
 
         let mut audio_receiver = gameboy.audio_receiver();
         let mut previous_audio = (0.0, 0.0);
