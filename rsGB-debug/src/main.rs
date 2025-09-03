@@ -1,9 +1,9 @@
-use std::env;
+use std::{env, sync::{Arc, Mutex}, thread};
 
 use ringbuf::traits::Consumer;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rs_gb_core::{ThreadedGameboy};
+use rs_gb_core::{Gameboy, ThreadedGameboy};
 
 mod main_window;
 // mod debug_window;
@@ -83,6 +83,7 @@ impl CustomWindow {
     fn is_main(&self) -> bool {
         match self {
             CustomWindow::MainWindow(_) => true,
+            _ => false
         }
     }
 

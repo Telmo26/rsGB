@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use minifb::{Key, Scale, Window, WindowOptions};
-use rs_gb_core::{Button, ThreadedGameboy};
+use rs_gb_core::{Button, Gameboy, ThreadedGameboy};
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -71,5 +71,9 @@ impl MainWindow {
             self.frame_count = 0;
             self.previous_frame_time = Instant::now();
         }
+    }
+
+    pub fn is_key_down(&self, key: Key) -> bool {
+        self.window.is_key_down(key)
     }
 }

@@ -7,10 +7,10 @@ mod utils;
 
 use std::{
     sync::{
-        Arc, Condvar, Mutex, MutexGuard
+        mpsc::{self, Receiver, Sender}, Arc, Condvar, Mutex, MutexGuard
     },
     thread::{self, JoinHandle},
-    time::{Duration},
+    time::{Duration, Instant},
 };
 
 use crate::{cart::Cartridge, cpu::CPU, dbg::Debugger, interconnect::Interconnect, ppu::PPU};
@@ -48,6 +48,9 @@ struct Devices {
     debugger: Option<Debugger>,
     ticks: u64,
     last_sample_tick: u64,
+
+    last_sample_time: Instant,
+    sample_counter: u32,
 }
 
 unsafe impl Send for Devices {}
@@ -64,6 +67,9 @@ impl Devices {
             debugger: if debug { Some(Debugger::new()) } else { None },
             ticks: 0,
             last_sample_tick: 0,
+
+            last_sample_time: Instant::now(),
+            sample_counter: 0
         }
     }
 
@@ -75,7 +81,7 @@ impl Devices {
                 if let Some(ptr) = self.framebuffer {
                     unsafe {
                         let fb = &mut *ptr;
-                        if self.ppu.tick(&mut self.bus, fb) { // Frame updated
+                        if self.ppu.tick(&mut self.bus, self.pending_frame, fb) { // Frame updated
                             self.pending_frame = true;
                         }
                     } 
@@ -85,6 +91,8 @@ impl Devices {
                     if let Some(sample) = self.bus.apu_output() {
                         (self.audio_callback)(sample)
                     }
+                    self.last_sample_tick = self.ticks;
+                    self.sample_counter += 1;
                 }
             }
             self.bus.tick_m();

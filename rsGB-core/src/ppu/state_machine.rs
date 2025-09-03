@@ -83,8 +83,8 @@ impl PPU {
         }
     }
 
-    pub fn xfer(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
-        self.pipeline_process(bus, framebuffer);
+    pub fn xfer(&mut self, bus: &mut Interconnect, pending_frame: bool, framebuffer: &mut [u32]) {
+        self.pipeline_process(bus, pending_frame, framebuffer);
         
         if self.pixel_fifo.pushed_x >= XRES as u8 {
             self.pipeline_reset();
