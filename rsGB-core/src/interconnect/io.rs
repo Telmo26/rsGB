@@ -4,9 +4,6 @@ mod lcd;
 mod gamepad;
 mod apu;
 
-use std::sync::{Arc, Mutex};
-use ringbuf::HeapProd;
-
 use timer::Timer;
 use dma::DMA;
 use lcd::LCD;

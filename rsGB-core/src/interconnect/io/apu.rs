@@ -1,7 +1,3 @@
-use core::panic;
-
-use ringbuf::{traits::{Observer, Producer}, HeapProd};
-
 mod pulse_channel;
 use pulse_channel::PulseChannel;
 
@@ -13,9 +9,6 @@ use noise_channel::NoiseChannel;
 
 mod timer;
 use timer::Timer;
-
-mod sample_timer;
-use sample_timer::SampleTimer;
 
 pub struct APU {
     // APU internals
@@ -82,16 +75,6 @@ impl APU {
             self.ch1.tick();
             self.ch2.tick();
             self.ch3.tick();
-
-            // self.output_buffer.push((left, right));
-
-            // if self.sample_timer.tick() {
-            //     let (output_l, output_r) = self.filter_audio();
-
-            //     let _  = self.sender.try_push((output_l, output_r));
-
-            //     self.output_buffer.clear();
-            // }
         }
     }
 
@@ -204,17 +187,12 @@ impl APU {
             if pan & 0b1000 != 0 { right += ch4_output; }
             if pan & 0b1000_0000 != 0 { left += ch4_output; }
 
-            // Apply master volume scaling
             left *= left_vol as f32 / 7.0;
             right *= right_vol as f32 / 7.0;
 
             // Normalise for the 4 channels
             left /= 4.0;
             right /= 4.0;
-
-            // Clamp for safety
-            left = left.clamp(-1.0, 1.0);
-            right = right.clamp(-1.0, 1.0);
 
             Some((left, right))
         }

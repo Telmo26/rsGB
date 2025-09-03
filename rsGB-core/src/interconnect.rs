@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use crate::{
     cart::Cartridge, Button
 };
@@ -15,7 +13,6 @@ mod oam;
 use ram::*;
 use io::*;
 pub use oam::OAMEntry;
-use ringbuf::HeapProd;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable

@@ -249,18 +249,14 @@ impl PPU {
         }
     }
 
-    fn pipeline_push_pixel(&mut self, bus: &mut Interconnect, pending_frame: bool, framebuffer: &mut [u32]) {
+    fn pipeline_push_pixel(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
         if self.pixel_fifo.len() > 8 {
             let pixel_data = self.pixel_fifo.pop();
 
             if self.pixel_fifo.line_x >= (lcd_read_scroll_x(bus) % 8) {
                 let x = self.pixel_fifo.pushed_x as usize + lcd_read_ly(bus) as usize * XRES;
                 
-                if pending_frame {
-                    self.framebuffer[x] = pixel_data;
-                } else {
-                    framebuffer[x] = pixel_data;
-                }
+                framebuffer[x] = pixel_data;
 
                 self.pixel_fifo.pushed_x += 1;
             }
@@ -269,7 +265,7 @@ impl PPU {
         }
     }
 
-    pub fn pipeline_process(&mut self, bus: &mut Interconnect, pending_frame: bool, framebuffer: &mut [u32]) {
+    pub fn pipeline_process(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
         self.pixel_fifo.map_y = lcd_read_ly(bus).wrapping_add(lcd_read_scroll_y(bus));
         self.pixel_fifo.map_x = self.pixel_fifo.fetch_x.wrapping_add(lcd_read_scroll_x(bus)); // Fetched X + SCROLL_X
         self.pixel_fifo.tile_y = (self.pixel_fifo.map_y % 8).wrapping_mul(2);
@@ -278,7 +274,7 @@ impl PPU {
             self.pipeline_fetch(bus);
         }
 
-        self.pipeline_push_pixel(bus, pending_frame, framebuffer);
+        self.pipeline_push_pixel(bus, framebuffer);
     }
 
     pub fn pipeline_reset(&mut self) {
