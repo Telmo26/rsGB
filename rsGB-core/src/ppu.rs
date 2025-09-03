@@ -60,12 +60,6 @@ impl PPU {
             LCDMode::OAM => self.oam(bus),
             LCDMode::XFer => self.xfer(bus, framebuffer),
         };
-        
-        if self.new_frame {
-            self.new_frame = false;
-            return true
-        } else {
-            return false
-        }       
+        false       
     }
 }
