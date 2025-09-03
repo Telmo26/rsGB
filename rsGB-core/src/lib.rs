@@ -81,7 +81,7 @@ impl Devices {
                 if let Some(ptr) = self.framebuffer {
                     unsafe {
                         let fb = &mut *ptr;
-                        if self.ppu.tick(&mut self.bus, self.pending_frame, fb) { // Frame updated
+                        if self.ppu.tick(&mut self.bus, fb) { // Frame updated
                             self.pending_frame = true;
                         }
                     } 

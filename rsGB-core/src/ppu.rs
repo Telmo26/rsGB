@@ -23,11 +23,7 @@ pub struct PPU {
     
     current_frame: u32,
     line_ticks: u32,
-
-    framebuffer: [u32; PIXELS],
     new_frame: bool,
-
-    previous_pending_state: bool
 }
 
 impl PPU {
@@ -43,30 +39,20 @@ impl PPU {
 
             current_frame: 0,
             line_ticks: 0,
-
-            framebuffer: [0; PIXELS],
             new_frame: false,
-
-            previous_pending_state: false,
         }
     }
 
-    pub fn tick(&mut self, bus: &mut Interconnect, pending_frame: bool, framebuffer: &mut [u32]) -> bool {
+    pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) -> bool {
         self.line_ticks += 1;
 
         let lcd_mode = status_mode(bus);
-
-        if self.previous_pending_state && !pending_frame {
-            framebuffer.copy_from_slice(&self.framebuffer);
-        }
-
-        self.previous_pending_state = pending_frame;
 
         match lcd_mode {
             LCDMode::HBlank => self.hblank(bus),
             LCDMode::VBlank => self.vblank(bus),
             LCDMode::OAM => self.oam(bus),
-            LCDMode::XFer => self.xfer(bus, pending_frame, framebuffer),
+            LCDMode::XFer => self.xfer(bus, framebuffer),
         };
 
         if self.new_frame {
