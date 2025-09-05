@@ -1,15 +1,11 @@
-use std::time::{Duration, Instant};
+use std::{env, process::exit, time::{Duration, Instant}};
 
 use cpal::{
     Stream,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
 use iced::{
-    Event, Settings, Subscription,
-    event::{self, Status},
-    keyboard::{Key, key::Named},
-    time,
-    widget::{column, image::Handle},
+    event::{self, Status}, keyboard::{key::Named, Key}, time, widget::{column, image::Handle}, Event, Settings, Subscription, Task
 };
 
 use ringbuf::traits::Consumer;
@@ -17,6 +13,12 @@ use rs_gb_core;
 use rs_gb_core::ThreadedGameboy;
 
 fn main() -> iced::Result {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        println!("Usage: rsgb <rom_file>");
+        exit(1)
+    }
+
     iced::application(
         "rsGB - A GameBoy Emulator in Rust",
         MainWindow::update,
@@ -27,7 +29,7 @@ fn main() -> iced::Result {
         antialiasing: true,
         ..Default::default()
     })
-    .run()
+    .run_with(move || (MainWindow::new(&args[1]), Task::none()))
 }
 
 #[derive(Debug)]
@@ -47,9 +49,9 @@ struct MainWindow {
     frame_buffer: Vec<u8>,
 }
 
-impl Default for MainWindow {
-    fn default() -> MainWindow {
-        let mut gameboy = ThreadedGameboy::new("test_roms/zelda.gb", false);
+impl MainWindow {
+    fn new(path: &str) -> MainWindow {
+        let mut gameboy = ThreadedGameboy::new(&path, false);
 
         let mut audio_receiver = gameboy.audio_receiver();
         let mut previous_audio = (0.0, 0.0);
@@ -98,9 +100,7 @@ impl Default for MainWindow {
             frame_buffer: Vec::with_capacity(160 * 144 * 4),
         }
     }
-}
 
-impl MainWindow {
     fn update(&mut self, message: Message) {
         match message {
             Message::FrameUpdate => {
