@@ -1,5 +1,3 @@
-use std::sync::{Arc, Condvar, Mutex};
-
 use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}};
 
 mod state_machine;
@@ -12,7 +10,6 @@ const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;
 const YRES: usize = 144;
 const XRES: usize = 160;
-const PIXELS: usize = 0x5A00;
 
 pub struct PPU {
     line_sprites: Vec<OAMEntry>, // Capacity: 10
@@ -25,14 +22,11 @@ pub struct PPU {
     
     current_frame: u32,
     line_ticks: u32,
-
-    framebuffer: Arc<Mutex<[u32; PIXELS]>>,
-    frame_sent: Arc<(Mutex<bool>, Condvar)>,
     new_frame: bool,
 }
 
 impl PPU {
-    pub fn new(framebuffer: Arc<Mutex<[u32; PIXELS]>>, frame_sent: Arc<(Mutex<bool>, Condvar)>) -> PPU {
+    pub fn new() -> PPU {
         PPU {
             line_sprites: Vec::with_capacity(10),
 
@@ -44,16 +38,12 @@ impl PPU {
 
             current_frame: 0,
             line_ticks: 0,
-
-            framebuffer,
-            frame_sent,
             new_frame: false,
         }
     }
 
-    pub fn tick(&mut self, bus: &mut Interconnect) {
+    pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) -> bool {
         self.line_ticks += 1;
-        self.new_frame = false;
 
         let lcd_mode = status_mode(bus);
 
@@ -61,21 +51,11 @@ impl PPU {
             LCDMode::HBlank => self.hblank(bus),
             LCDMode::VBlank => self.vblank(bus),
             LCDMode::OAM => self.oam(bus),
-            LCDMode::XFer => self.xfer(bus),
-        }
-    }
+            LCDMode::XFer => self.xfer(bus, framebuffer),
+        };
 
-    pub fn send_new_frame(&self) -> bool{
         if self.new_frame {
-            let (lock, cvar) = &*self.frame_sent;
-            let mut frame_ready = lock.lock().unwrap();
-
-            while *frame_ready {
-                frame_ready = cvar.wait(frame_ready).unwrap();
-            }
-
-            *frame_ready = true;
-            cvar.notify_one();
+            self.new_frame = false;
             true
         } else {
             false

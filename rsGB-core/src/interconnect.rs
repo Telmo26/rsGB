@@ -1,7 +1,5 @@
-use std::sync::{Arc, Mutex};
-
 use crate::{
-    cart::Cartridge, GamepadState,
+    cart::Cartridge, Button
 };
 
 pub use crate::{
@@ -15,7 +13,6 @@ mod oam;
 use ram::*;
 use io::*;
 pub use oam::OAMEntry;
-use ringbuf::HeapProd;
 
 // 0x0000 - 0x3FFF : ROM Bank 0
 // 0x4000 - 0x7FFF : ROM Bank 1 - Switchable
@@ -33,7 +30,7 @@ use ringbuf::HeapProd;
 
 pub struct Interconnect {
     cart: Option<Cartridge>,
-    vram: Arc<Mutex<[u8; 0x2000]>>,
+    vram: [u8; 0x2000],
     ram: RAM,
     oam_ram: [OAMEntry; 40],
     io: IO,
@@ -41,13 +38,13 @@ pub struct Interconnect {
 }
 
 impl Interconnect {
-    pub fn new(vram: Arc<Mutex<[u8; 0x2000]>>, gamepad_state: Arc<Mutex<GamepadState>>, audio_sender: HeapProd<(f32, f32)>) -> Interconnect {
+    pub fn new() -> Interconnect {
         Interconnect { 
             cart: None,
-            vram,
+            vram: [0; 0x2000],
             ram: RAM::new(),
             oam_ram: [OAMEntry::new(); 40],
-            io: IO::new(gamepad_state, audio_sender),
+            io: IO::new(),
             ie_register: 0,
         }
     }
@@ -63,10 +60,7 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_ref().unwrap().read(address),
 
             // Char/Map Data
-            0x8000..0xA000 => {
-                let vram = self.vram.lock().unwrap();
-                vram[(address - 0x8000) as usize]
-            }
+            0x8000..0xA000 => self.vram[(address - 0x8000) as usize],
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_ref().unwrap().read(address),
@@ -108,10 +102,7 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),
 
            // Char/Map Data
-            0x8000..0xA000 => {
-                let mut vram = self.vram.lock().unwrap();
-                vram[(address - 0x8000) as usize] = value;
-            },
+            0x8000..0xA000 => self.vram[(address - 0x8000) as usize] = value,
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_mut().unwrap().write(address, value),
@@ -207,8 +198,16 @@ impl Interconnect {
         self.cart.as_ref().unwrap().save(save_path);
     }
 
-    pub fn load(&mut self, save_path: &str) {
+    pub fn load_save(&mut self, save_path: &str) {
         self.cart.as_mut().unwrap().load_save(save_path);
+    }
+
+    pub fn update_button(&mut self, button: Button, value: bool) {
+        self.io.update_button(button, value);
+    }
+
+    pub fn apu_output(&self) -> Option<(f32, f32)> {
+        self.io.apu_output()
     }
 }
 

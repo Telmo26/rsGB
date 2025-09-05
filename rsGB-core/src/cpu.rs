@@ -6,68 +6,11 @@ pub mod interrupts;
 mod fetch_data;
 
 use crate::{
-    utils::{bit_set, BIT_IGNORE}, Devices, Interconnect
+    utils::{bit_set, BIT_IGNORE}, Devices
 };
 
 pub use instruction::*;
 use registers::*;
-
-const CYCLE_LENGTH: [u8; 0xFF + 1] = [
-    1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
-	0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
-	2,3,2,2,1,1,2,1,2,2,2,2,1,1,2,1,
-	2,3,2,2,3,3,3,1,2,2,2,2,1,1,2,1,
-	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-	2,2,2,2,2,2,0,2,1,1,1,1,1,1,2,1,
-	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-	1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-	2,3,3,4,3,4,2,4,2,4,3,0,3,6,2,4,
-	2,3,3,0,3,4,2,4,2,4,3,0,3,0,2,4,
-	3,3,2,0,0,4,2,4,4,1,4,0,0,0,2,4,
-	3,3,2,1,0,4,2,4,3,2,4,1,0,0,2,4
-];
-
-const CYCLE_LENGTH_CONDITIONAL: [u8; 0xFF + 1] = [
-    1,3,2,2,1,1,2,1,5,2,2,2,1,1,2,1,
-    0,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
-    3,3,2,2,1,1,2,1,3,2,2,2,1,1,2,1,
-    3,3,2,2,3,3,3,1,3,2,2,2,1,1,2,1,
-    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-    2,2,2,2,2,2,0,2,1,1,1,1,1,1,2,1,
-    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-    1,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,
-    5,3,4,4,6,4,2,4,5,4,4,0,6,6,2,4,
-    5,3,4,0,6,4,2,4,5,4,4,0,6,0,2,4,
-    3,3,2,0,0,4,2,4,4,1,4,0,0,0,2,4,
-    3,3,2,1,0,4,2,4,3,2,4,1,0,0,2,4,
-];
-
-const CYCLE_LENGTH_CB_PREFIXED: [u8; 0xFF + 1] = [
-    2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
-	2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
-	2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
-	2,2,2,2,2,2,3,2,2,2,2,2,2,2,3,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2,
-	2,2,2,2,2,2,4,2,2,2,2,2,2,2,4,2
-];
 
 pub struct CPU {
     pub registers: CpuRegisters,
@@ -80,14 +23,9 @@ pub struct CPU {
     pub curr_inst: Instruction,
 
     halted: bool,
-    stepping: bool,
 
     int_master_enabled: bool,
     enabling_ime: bool,
-
-    pub cycles_this_inst: u16,
-    pub cycles_fetch: u16,
-    pub cycles_exec: u16,
 }
 
 impl CPU {
@@ -103,14 +41,9 @@ impl CPU {
             curr_inst: INSTRUCTIONS[0x00].unwrap(),
 
             halted: false,
-            stepping: false,
 
             int_master_enabled: false,
             enabling_ime: false,
-
-            cycles_this_inst: 0,
-            cycles_fetch: 0,
-            cycles_exec: 0,
         }
     }
 
@@ -124,29 +57,14 @@ impl CPU {
             let previous_pc = self.registers.pc;
 
             self.fetch_instruction(dev);
-            self.incr_cycle_fetch(dev, 1);
+            dev.incr_cycle(1);
             self.fetch_data(dev);
 
             if let Some(debugger) = &mut dev.debugger {
                 debugger.debug_info(self, &mut dev.bus, dev.ticks, previous_pc);
-                // debugger.gameboy_doctor(self, &mut dev.bus, previous_pc);
             }
 
             self.execute(dev, self.curr_inst.in_type);
-            
-            // if let Some(_) = &mut dev.debugger {
-            //     println!(
-            //         "PC={:04X} OPC={:02X} INST={} | fetch={} exec={} total={}",
-            //         previous_pc,
-            //         self.curr_opcode,
-            //         self.curr_inst.to_str(self),
-            //         self.cycles_fetch,
-            //         self.cycles_exec,
-            //         self.cycles_this_inst,
-            //     );
-            // }
-            // self.update_counter();
-            self.reset_cycle_counters();
             
         } else {
             dev.incr_cycle(1);
@@ -221,39 +139,5 @@ impl CPU {
 
     fn set_int_flags(&mut self, dev: &mut Devices, value: u8) {
         dev.bus.write(0xFF0F, value);
-    }
-
-    fn incr_cycle_fetch(&mut self, dev: &mut Devices, n: u16) {
-        self.cycles_fetch += n;
-        self.cycles_this_inst += n;
-        dev.incr_cycle(n);
-    }
-
-    fn incr_cycle_exec(&mut self, dev: &mut Devices, n: u16) {
-        self.cycles_exec += n;
-        self.cycles_this_inst += n;
-        dev.incr_cycle(n);
-    }
-
-    fn update_counter(&mut self) {
-        let index = self.curr_opcode as usize;
-
-        let ticks = self.cycles_this_inst as u8;
-
-        if self.curr_inst.in_type != InType::CB {
-            if ticks != CYCLE_LENGTH[index] && ticks != CYCLE_LENGTH_CONDITIONAL[index] {
-                panic!("Incorrect cycle length {ticks} for {:?} with opcode {index:X}", self.curr_inst);
-            }
-        } else {
-            if ticks != CYCLE_LENGTH_CB_PREFIXED[self.fetched_data as usize] {
-                panic!("Incorrect cycle length {ticks} for CB {:X}", self.fetched_data);
-            }
-        }
-    }
-
-    fn reset_cycle_counters(&mut self) {
-        self.cycles_this_inst = 0;
-        self.cycles_fetch = 0;
-        self.cycles_exec = 0;
     }
 }

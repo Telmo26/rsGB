@@ -181,7 +181,7 @@ pub struct CartridgeHeader {
     new_lic_code: [u8; 2],
     sgb_flag: u8,
     pub cart_type: u8,
-    pub rom_size: u8,
+    rom_size: u8,
     pub ram_size: u8,
     dest_code: u8,
     lic_code: u8,

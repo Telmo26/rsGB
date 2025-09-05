@@ -3,7 +3,8 @@ use std::{error::Error, fs};
 mod header;
 use header::CartridgeHeader;
 
-mod rom_only;
+mod rom;
+use rom::ROM;
 
 mod mbc1;
 use mbc1::MBC1;
@@ -17,9 +18,9 @@ trait CartridgeInternals {
 }
 
 pub struct Cartridge {
-    filename: String,
-    rom_size: u32,
-    header: CartridgeHeader,
+    _filename: String,
+    _rom_size: u32,
+    _header: CartridgeHeader,
     cart_internals: Box<dyn CartridgeInternals + Send>,
 }
 
@@ -30,12 +31,11 @@ impl Cartridge {
 
         let header = CartridgeHeader::from_bytes(&rom_data)?;
 
-        let cart_internals = Box::new(
-            match header.cart_type {
-                1..4 => MBC1::new(&header, rom_data),
-                _ => unreachable!()
-            }
-        );
+        let cart_internals: Box<dyn CartridgeInternals + Send> = match header.cart_type {
+            0 => Box::new(ROM::new(rom_data)),
+            1..4 => Box::new(MBC1::new(&header, rom_data)),
+            _ => unreachable!()
+        };
 
         // println!("Cartridge successfully loaded");
         // println!("\t Title    : {}", header.title);
@@ -58,9 +58,9 @@ impl Cartridge {
         // println!("\t ROM Vers : {}", header.version);
 
         Ok(Cartridge {
-            filename: path.to_string(),
-            rom_size,
-            header,
+            _filename: path.to_string(),
+            _rom_size: rom_size,
+            _header: header,
             cart_internals,
         })
     }

@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use minifb::{Key, Scale, Window, WindowOptions};
-use rs_gb_core::{MainCommunicator, Button};
+use rs_gb_core::{Button, ThreadedGameboy};
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -9,13 +9,13 @@ const SCALE: Scale = Scale::X4;
 
 pub struct MainWindow {
     window: Window,
-    comm: MainCommunicator,
+    gameboy: ThreadedGameboy,
     previous_frame_time: Instant,
     frame_count: u8,
 }
 
 impl MainWindow {
-    pub fn new(comm: MainCommunicator) -> MainWindow {
+    pub fn new(gameboy: ThreadedGameboy) -> MainWindow {
         let mut window = Window::new(
             "rsGB - A GameBoy Emulator in Rust",
             WIDTH, 
@@ -29,7 +29,7 @@ impl MainWindow {
 
         MainWindow { 
             window, 
-            comm,
+            gameboy,
             previous_frame_time: Instant::now(),
             frame_count: 0,
         }
@@ -40,30 +40,30 @@ impl MainWindow {
     }
 
     pub fn update(&mut self) {
-        self.comm.update_button(Button::A, self.window.is_key_down(Key::Z));
+        self.gameboy.update_button(Button::A, self.window.is_key_down(Key::Z));
 
-        self.comm.update_button(Button::B, self.window.is_key_down(Key::X));
+        self.gameboy.update_button(Button::B, self.window.is_key_down(Key::X));
 
-        self.comm.update_button(Button::UP, self.window.is_key_down(Key::Up));
+        self.gameboy.update_button(Button::UP, self.window.is_key_down(Key::Up));
 
-        self.comm.update_button(Button::DOWN, self.window.is_key_down(Key::Down));
+        self.gameboy.update_button(Button::DOWN, self.window.is_key_down(Key::Down));
 
-        self.comm.update_button(Button::LEFT, self.window.is_key_down(Key::Left));
+        self.gameboy.update_button(Button::LEFT, self.window.is_key_down(Key::Left));
 
-        self.comm.update_button(Button::RIGHT, self.window.is_key_down(Key::Right));
+        self.gameboy.update_button(Button::RIGHT, self.window.is_key_down(Key::Right));
 
-        self.comm.update_button(Button::START, self.window.is_key_down(Key::P));
+        self.gameboy.update_button(Button::START, self.window.is_key_down(Key::P));
 
-        self.comm.update_button(Button::SELECT, self.window.is_key_down(Key::M));
+        self.gameboy.update_button(Button::SELECT, self.window.is_key_down(Key::M));
 
-        if let Some(new_frame) = self.comm.frame_recv(Duration::from_micros(16600)).as_deref() {
-            self.window.update_with_buffer(new_frame, WIDTH, HEIGHT).unwrap();
+        if let Some(new_frame) = self.gameboy.recv_frame(Duration::from_micros(16_600)) {
+            self.window.update_with_buffer(new_frame.as_slice(), WIDTH, HEIGHT).unwrap();
+            self.frame_count += 1;
         } else {
             self.window.update();
         }
 
         // FPS tracking
-        self.frame_count += 1;
         let elapsed = self.previous_frame_time.elapsed();
         if elapsed >= Duration::from_secs(1) {
             let fps = self.frame_count as f64 / elapsed.as_secs_f64();
@@ -71,9 +71,5 @@ impl MainWindow {
             self.frame_count = 0;
             self.previous_frame_time = Instant::now();
         }
-    }
-
-    pub fn is_key_down(&self, key: Key) -> bool {
-        self.window.is_key_down(key)
     }
 }
