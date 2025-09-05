@@ -7,6 +7,7 @@ pub enum LCDMode {
     XFer = 3,
 }
 
+#[allow(dead_code)]
 pub enum StatusSrc {
     HBlank = (1 << 3),
     VBlank = (1 << 4),
@@ -71,7 +72,7 @@ pub fn lcdc_win_map_area(bus: &mut Interconnect) -> u16 {
     }
 }
 
-pub fn lcdc_lcd_enable(bus: &mut Interconnect) -> bool { (bus.read(0xFF40) & (1 << 7)) != 0 }
+pub fn _lcdc_lcd_enable(bus: &mut Interconnect) -> bool { (bus.read(0xFF40) & (1 << 7)) != 0 }
 
 pub fn status_mode(bus: &mut Interconnect) -> LCDMode {
     match bus.read(0xFF41) & 0b11 {
@@ -93,7 +94,7 @@ pub fn status_mode_set(bus: &mut Interconnect, mode: LCDMode) {
     bus.write(0xFF41, status)
 }
 
-pub fn status_lyc(bus: &mut Interconnect) -> bool { bus.read(0xFF41) & (1 << 2) != 0 }
+pub fn _status_lyc(bus: &mut Interconnect) -> bool { bus.read(0xFF41) & (1 << 2) != 0 }
 
 pub fn status_lyc_set(bus: &mut Interconnect, value: u8) {
     let status = bus.read(0xFF41) | (value << 2);

@@ -19,13 +19,13 @@ pub enum AddrMode {
     HL_SP,
     D16,
     D8,
-    D16_R,
     MR_D8,
     MR,
     A16_R,
     R_A16,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum RegType {
     NONE,
@@ -84,23 +84,9 @@ pub enum InType {
     CALL,
     RETI,
     LDH,
-    JPHL,
     DI,
     EI,
     RST,
-    ERR,
-    // CB INSTRUCTIONS...
-    RLC,
-    RRC,
-    RL,
-    RR,
-    SLA,
-    SRA,
-    SWAP,
-    SRL,
-    BIT,
-    RES,
-    SET,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -449,7 +435,6 @@ impl Instruction {
             HL_SP => format!("{:?} {:?}, SP+{:X}", self.in_type, self.reg_1, cpu.fetched_data),
             D16 => format!("{:?} {:04X}", self.in_type, cpu.fetched_data),
             D8 => format!("{:?} {:02X}", self.in_type, cpu.fetched_data),
-            D16_R => format!("{:?} {:04X}, {:?}", self.in_type, cpu.mem_dest, self.reg_2),
             MR_D8 => format!("{:?} ({:?}), {:02X}", self.in_type, self.reg_1, cpu.fetched_data),
             MR => format!("{:?} ({:?})", self.in_type, self.reg_1),
             A16_R => format!("{:?} ({:04X}), {:?}", self.in_type, cpu.mem_dest, self.reg_2),

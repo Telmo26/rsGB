@@ -1,7 +1,5 @@
 use core::panic;
 
-use ringbuf::{traits::{Observer, Producer}, HeapProd};
-
 mod pulse_channel;
 use pulse_channel::PulseChannel;
 
@@ -13,9 +11,6 @@ use noise_channel::NoiseChannel;
 
 mod timer;
 use timer::Timer;
-
-mod sample_timer;
-use sample_timer::SampleTimer;
 
 pub struct APU {
     // APU internals

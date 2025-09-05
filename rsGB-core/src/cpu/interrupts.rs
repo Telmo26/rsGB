@@ -1,6 +1,6 @@
 use crate::Devices;
 
-use super::{CPU, Interconnect};
+use super::CPU;
 
 #[derive(Clone, Debug)]
 pub enum InterruptType {

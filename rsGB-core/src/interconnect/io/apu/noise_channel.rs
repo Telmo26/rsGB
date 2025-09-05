@@ -16,7 +16,7 @@ pub struct NoiseChannel {
     enveloppe_direction: bool,
 
     length_timer: u8,
-    timer: Timer,
+    _timer: Timer,
 }
 
 impl NoiseChannel {

@@ -18,9 +18,9 @@ trait CartridgeInternals {
 }
 
 pub struct Cartridge {
-    filename: String,
-    rom_size: u32,
-    header: CartridgeHeader,
+    _filename: String,
+    _rom_size: u32,
+    _header: CartridgeHeader,
     cart_internals: Box<dyn CartridgeInternals + Send>,
 }
 
@@ -58,9 +58,9 @@ impl Cartridge {
         // println!("\t ROM Vers : {}", header.version);
 
         Ok(Cartridge {
-            filename: path.to_string(),
-            rom_size,
-            header,
+            _filename: path.to_string(),
+            _rom_size: rom_size,
+            _header: header,
             cart_internals,
         })
     }

@@ -10,7 +10,6 @@ const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;
 const YRES: usize = 144;
 const XRES: usize = 160;
-const PIXELS: usize = 0x5A00;
 
 pub struct PPU {
     line_sprites: Vec<OAMEntry>, // Capacity: 10

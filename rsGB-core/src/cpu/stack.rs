@@ -18,10 +18,4 @@ impl CPU {
         self.registers.sp = self.registers.sp.wrapping_add(1);
         val
     }
-
-    pub fn pop16(&mut self, bus: &mut Interconnect) -> u16 {
-        let low = self.pop(bus) as u16;
-        let high = self.pop(bus) as u16;
-        high << 8 | low
-    }
 }
