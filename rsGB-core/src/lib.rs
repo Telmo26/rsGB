@@ -6,11 +6,9 @@ mod ppu;
 mod utils;
 
 use std::{
-    sync::{
+    slice, sync::{
         Arc, Condvar, Mutex, MutexGuard
-    },
-    thread::{self, JoinHandle},
-    time::Duration,
+    }, thread::{self, JoinHandle}, time::Duration
 };
 
 use crate::{cart::Cartridge, cpu::CPU, dbg::Debugger, interconnect::Interconnect, ppu::PPU};
@@ -24,6 +22,12 @@ pub type Frame = [u32; 0x5A00];
 pub type VRAM = [u8; 0x2000];
 
 const TICKS_PER_SAMPLE: u64 = 95;
+
+#[derive(Debug, Clone, Copy)]
+pub enum ColorMode {
+    RGBA,
+    ARGB,
+}
 
 #[derive(Debug)]
 pub enum Button {
@@ -112,11 +116,11 @@ pub struct Gameboy {
 }
 
 impl Gameboy {
-    pub fn new<F>(rom_path: &str, audio_callback: F, debug: bool) -> Gameboy 
+    pub fn new<F>(rom_path: &str, color_mode: ColorMode, audio_callback: F, debug: bool) -> Gameboy 
     where F: FnMut((f32, f32)) + Send + 'static {
         let save_path = rom_path.replace(".gb", ".sav");
 
-        let mut bus = Interconnect::new();
+        let mut bus = Interconnect::new(color_mode);
         let ppu = PPU::new();
 
         let cartridge = Cartridge::load(rom_path).unwrap();
@@ -161,12 +165,13 @@ pub struct ThreadedGameboy {
 }
 
 impl ThreadedGameboy {
-    pub fn new(rom_path: &str, debug: bool) -> ThreadedGameboy {
+    pub fn new(rom_path: &str, color_mode: ColorMode, debug: bool) -> ThreadedGameboy {
         // let (mut audio_sender, audio_receiver) = ringbuf::HeapRb::<(f32, f32)>::new(8192).split();
         let (mut audio_sender, audio_receiver) = ringbuf::SharedRb::new(8192).split();
 
         let mut gameboy = Gameboy::new(
             rom_path,
+            color_mode,
             move |sample| { 
                 
                 let _ = audio_sender.try_push(sample);
@@ -212,7 +217,7 @@ impl ThreadedGameboy {
         }
     }
 
-    pub fn recv_frame(&mut self, timeout: Duration) -> Option<MutexGuard<'_, [u32; 0x5A00]>> {
+    pub fn recv_frame(&mut self, timeout: Duration) -> Option<FrameView> {
         let (lock, cvar) = &*self.frame_available;
 
         let mut frame_ready = lock.lock().unwrap();
@@ -229,7 +234,8 @@ impl ThreadedGameboy {
         *frame_ready = false;
         cvar.notify_one();
 
-        return Some(self.framebuffer.lock().unwrap())
+        let fv = FrameView { inner: self.framebuffer.lock().unwrap() };
+        return Some(fv)
 
         // let frame_lock = self.framebuffer.lock().unwrap();
         // Some(*frame_lock)
@@ -248,5 +254,22 @@ impl ThreadedGameboy {
 
     pub fn update_button(&mut self, button: Button, value: bool) {
         let _ = self.input_send.try_push((button, value));
+    }
+}
+
+pub struct FrameView<'fb> {
+    inner: MutexGuard<'fb, Frame>
+}
+
+impl<'fb> FrameView<'fb> {
+    pub fn as_slice(&self) -> &[u32] {
+        self.inner.as_slice()
+    }
+
+    pub fn as_u8_slice(&self) -> &[u8] {
+        let slice: &[u8] = unsafe {
+            slice::from_raw_parts(self.inner.as_ptr() as *const u8, self.inner.len() * 4)
+        };
+        slice
     }
 }

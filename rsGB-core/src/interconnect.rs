@@ -1,5 +1,5 @@
 use crate::{
-    cart::Cartridge, Button
+    cart::Cartridge, Button, ColorMode
 };
 
 pub use crate::{
@@ -38,13 +38,13 @@ pub struct Interconnect {
 }
 
 impl Interconnect {
-    pub fn new() -> Interconnect {
+    pub fn new(color_mode: ColorMode) -> Interconnect {
         Interconnect { 
             cart: None,
             vram: [0; 0x2000],
             ram: RAM::new(),
             oam_ram: [OAMEntry::new(); 40],
-            io: IO::new(),
+            io: IO::new(color_mode),
             ie_register: 0,
         }
     }

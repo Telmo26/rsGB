@@ -10,7 +10,7 @@ use lcd::LCD;
 use gamepad::Gamepad;
 use apu::APU;
 
-use crate::Button;
+use crate::{Button, ColorMode};
 
 use super::InterruptType;
 
@@ -49,14 +49,14 @@ pub struct IO {
 }
 
 impl IO {
-    pub fn new() -> IO {
+    pub fn new(color_mode: ColorMode) -> IO {
         IO { 
             gamepad: Gamepad::default(),
             serial: [0; 2],
             timer: Timer::new(),
             if_register: 0,
             apu: APU::new(),
-            lcd: LCD::new(),
+            lcd: LCD::new(color_mode),
             dma: DMA::new(),
 
             prev_div: 0,

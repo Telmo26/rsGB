@@ -1,5 +1,8 @@
+use crate::ColorMode;
 
-const COLORS_DEFAULT : [u32; 4] = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000]; 
+
+const COLORS_DEFAULT_ARGB : [u32; 4] = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000];
+const COLORS_DEFAULT_RGBA : [u32; 4] = [0xFFFFFFFF, 0xAAAAAAFF, 0x555555FF, 0x000000FF];
 
 pub struct LCD {
     // Registers
@@ -15,14 +18,19 @@ pub struct LCD {
     win_y: u8,
     win_x: u8,
 
-    pub(crate) // Other data
-    bg_colors: [u32; 4],
+    // Other data
+    color_mode: ColorMode,
+    pub(crate) bg_colors: [u32; 4],
     pub(crate) sp1_colors: [u32; 4],
     pub(crate) sp2_colors: [u32; 4],
 }
 
 impl LCD {
-    pub fn new() -> LCD {
+    pub fn new(color_mode: ColorMode) -> LCD {
+        let default = match color_mode {
+            ColorMode::ARGB => COLORS_DEFAULT_ARGB,
+            ColorMode::RGBA => COLORS_DEFAULT_RGBA,
+        };
         LCD {
             lcdc: 0x91,
             status: 0x02,
@@ -36,9 +44,10 @@ impl LCD {
             win_y: 0,
             win_x: 0,
 
-            bg_colors: COLORS_DEFAULT,
-            sp1_colors: COLORS_DEFAULT,
-            sp2_colors: COLORS_DEFAULT,
+            color_mode,
+            bg_colors: default,
+            sp1_colors: default,
+            sp2_colors: default,
         }
     }
 
@@ -94,9 +103,14 @@ impl LCD {
             p_colors = &mut self.sp2_colors;
         }
 
-        p_colors[0] = COLORS_DEFAULT[palette_data as usize & 0b11];
-        p_colors[1] = COLORS_DEFAULT[(palette_data >> 2) as usize & 0b11];
-        p_colors[2] = COLORS_DEFAULT[(palette_data >> 4) as usize & 0b11];
-        p_colors[3] = COLORS_DEFAULT[(palette_data >> 6) as usize & 0b11];
+        let colors = match self.color_mode {
+            ColorMode::ARGB => &COLORS_DEFAULT_ARGB,
+            ColorMode::RGBA => &COLORS_DEFAULT_RGBA,
+        };
+
+        p_colors[0] = colors[palette_data as usize & 0b11];
+        p_colors[1] = colors[(palette_data >> 2) as usize & 0b11];
+        p_colors[2] = colors[(palette_data >> 4) as usize & 0b11];
+        p_colors[3] = colors[(palette_data >> 6) as usize & 0b11];
     }
 }

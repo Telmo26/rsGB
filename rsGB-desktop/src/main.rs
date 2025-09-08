@@ -4,13 +4,16 @@ use cpal::{
     Stream,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
+
 use iced::{
     event::{self, Status}, keyboard::{key::Named, Key}, time, widget::{column, image::Handle}, Event, Settings, Subscription, Task
 };
 
 use ringbuf::traits::Consumer;
-use rs_gb_core;
-use rs_gb_core::ThreadedGameboy;
+
+use rs_gb_core::{ColorMode, ThreadedGameboy};
+
+const FRAME_SIZE: usize = 144*160*4;
 
 fn main() -> iced::Result {
     let args: Vec<String> = env::args().collect();
@@ -51,7 +54,7 @@ struct MainWindow {
 
 impl MainWindow {
     fn new(path: &str) -> MainWindow {
-        let mut gameboy = ThreadedGameboy::new(&path, false);
+        let mut gameboy = ThreadedGameboy::new(&path, ColorMode::ARGB, false);
 
         let mut audio_receiver = gameboy.audio_receiver();
         let mut previous_audio = (0.0, 0.0);
@@ -97,7 +100,7 @@ impl MainWindow {
             instant: Instant::now(),
             counter: 0,
 
-            frame_buffer: Vec::with_capacity(160 * 144 * 4),
+            frame_buffer: Vec::with_capacity(FRAME_SIZE),
         }
     }
 
@@ -106,9 +109,8 @@ impl MainWindow {
             Message::FrameUpdate => {
                 if let Some(pixels) = self.gameboy.recv_frame(Duration::from_micros(10_000)) {
                     self.counter += 1;
-
                     self.frame_buffer.clear();
-                    convert_framebuffer_u32_to_rgba_inplace(pixels.as_slice(), &mut self.frame_buffer);
+                    self.frame_buffer.extend_from_slice(pixels.as_u8_slice());
                     self.frame_handle = Some(Handle::from_rgba(160, 144, self.frame_buffer.clone()));
                 }
 
@@ -182,16 +184,5 @@ fn map_key_to_button(key: &Key) -> Option<rs_gb_core::Button> {
         },
 
         _ => None,
-    }
-}
-
-fn convert_framebuffer_u32_to_rgba_inplace(pixels: &[u32], out: &mut Vec<u8>) {
-    out.reserve(pixels.len() * 4);
-    for &px in pixels {
-        let r = ((px >> 16) & 0xFF) as u8;
-        let g = ((px >> 8) & 0xFF) as u8;
-        let b = (px & 0xFF) as u8;
-        let a = ((px >> 24) & 0xFF) as u8;
-        out.extend_from_slice(&[r, g, b, a]);
     }
 }
