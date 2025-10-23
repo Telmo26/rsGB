@@ -6,14 +6,19 @@ use cpal::{
 };
 
 use iced::{
-    event::{self, Status}, keyboard::{key::Named, Key}, time, widget::{column, image::Handle}, Event, Settings, Subscription, Task
+    event::{self, Status}, 
+    keyboard::{key::Named, Key}, 
+    time, 
+    widget::{column, image::Handle}, 
+    Event, 
+    Settings, 
+    Subscription, 
+    Task
 };
-
-use ringbuf::traits::Consumer;
 
 use rs_gb_core::{ColorMode, ThreadedGameboy};
 
-const FRAME_SIZE: usize = 144*160*4;
+const FRAME_SIZE: usize = 144 * 160 * 4;
 
 fn main() -> iced::Result {
     let args: Vec<String> = env::args().collect();
@@ -70,7 +75,7 @@ impl MainWindow {
                 &config.config(),
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     for sample in data.chunks_mut(2) {
-                        match audio_receiver.try_pop() {
+                        match audio_receiver.try_recv() {
                             Some((left, right)) => {
                                 sample[0] = left;
                                 sample[1] = right;

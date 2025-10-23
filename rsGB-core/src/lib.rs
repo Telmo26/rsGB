@@ -160,7 +160,7 @@ pub struct ThreadedGameboy {
     framebuffer: Arc<Mutex<Frame>>,
     frame_available: Arc<(Mutex<bool>, Condvar)>,
 
-    audio_receiver: Option<HeapCons<(f32, f32)>>,
+    audio_receiver: Option<AudioReceiver>,
     input_send: HeapProd<(Button, bool)>,
 }
 
@@ -212,7 +212,7 @@ impl ThreadedGameboy {
             framebuffer,
             frame_available,
 
-            audio_receiver: Some(audio_receiver),
+            audio_receiver: Some(AudioReceiver {inner: audio_receiver}),
             input_send,
         }
     }
@@ -248,7 +248,7 @@ impl ThreadedGameboy {
         // self.frame_recv.try_pop()
     }
 
-    pub fn audio_receiver(&mut self) -> HeapCons<(f32, f32)> {
+    pub fn audio_receiver(&mut self) -> AudioReceiver {
         self.audio_receiver.take().unwrap()
     }
 
@@ -271,5 +271,15 @@ impl<'fb> FrameView<'fb> {
             slice::from_raw_parts(self.inner.as_ptr() as *const u8, self.inner.len() * 4)
         };
         slice
+    }
+}
+
+pub struct AudioReceiver {
+    inner: HeapCons<(f32, f32)>,
+}
+
+impl AudioReceiver {
+    pub fn try_recv(&mut self) -> Option<(f32, f32)> {
+        self.inner.try_pop()
     }
 }

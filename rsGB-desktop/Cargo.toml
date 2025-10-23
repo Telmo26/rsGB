@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ringbuf = "0.4.8"
 cpal = "0.16.0"
 iced = { version = "0.13.1", features = ["image", "smol"] }
 rs_gb_core = { path = "../rsGB-core" }
