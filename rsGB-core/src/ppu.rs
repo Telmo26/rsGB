@@ -1,10 +1,13 @@
+use std::collections::VecDeque;
+
 use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}};
 
 mod state_machine;
 mod pipeline;
 mod utils;
+mod fetcher;
 
-use pipeline::PixelFifo;
+use fetcher::Fetcher;
 
 const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;
@@ -12,14 +15,12 @@ const YRES: usize = 144;
 const XRES: usize = 160;
 
 pub struct PPU {
-    line_sprites: Vec<OAMEntry>, // Capacity: 10
+    fetcher: Fetcher,
+    bgw_fifo: VecDeque<u32>,
 
-    fetched_entries: Vec<OAMEntry>, // Capacity: 3
+    pushed_x: u8, // The pixel position to push in the framebuffer
+    current_x: u8, // The current position we're dealing with on the screen
 
-    window_line: u8,
-
-    pixel_fifo: PixelFifo,
-    
     current_frame: u32,
     line_ticks: u32,
     new_frame: bool,
@@ -28,13 +29,11 @@ pub struct PPU {
 impl PPU {
     pub fn new() -> PPU {
         PPU {
-            line_sprites: Vec::with_capacity(10),
+            fetcher: Fetcher::new(),
+            bgw_fifo: VecDeque::with_capacity(8),
 
-            fetched_entries: Vec::with_capacity(3),
-
-            window_line: 0,
-
-            pixel_fifo: PixelFifo::new(),
+            pushed_x: 0,
+            current_x: 0,
 
             current_frame: 0,
             line_ticks: 0,
