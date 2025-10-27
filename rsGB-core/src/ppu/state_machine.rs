@@ -1,5 +1,5 @@
 use crate::{
-    interconnect::{Interconnect, InterruptType}, ppu::utils::{lcd_read_ly, lcd_read_win_y, lcd_write_ly, lcdc_obj_height}, 
+    interconnect::{Interconnect, InterruptType}, ppu::utils::{lcd_read_ly, lcd_read_win_x, lcd_read_win_y, lcd_write_ly, lcdc_obj_height, lcdc_win_enable}, 
 };
 
 use super::{
@@ -61,6 +61,12 @@ impl PPU {
                 bus.request_interrupt(InterruptType::LcdStat);
             }
         }
+    }
+
+    fn window_visible(&self, bus: &mut Interconnect) -> bool {
+        lcdc_win_enable(bus) && 
+            lcd_read_win_x(bus) < XRES as u8 + 7 &&
+            lcd_read_win_y(bus) < YRES as u8
     }
 }
 
