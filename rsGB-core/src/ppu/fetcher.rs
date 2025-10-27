@@ -1,4 +1,4 @@
-use crate::{interconnect::Interconnect, ppu::utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_scroll_y, lcdc_bg_map_area, lcdc_bgw_data_area, lcdc_bgw_enable}};
+use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_scroll_y, lcdc_bg_map_area, lcdc_bgw_data_area, lcdc_bgw_enable, lcdc_obj_height}};
 
 enum Step {
     First,
@@ -21,6 +21,11 @@ pub(super) struct Fetcher {
     data_address: u16,
 
     pushed_x: u8, // The position of the last pixel that was pushed to the FIFO
+
+    obj_slots: Vec<OAMEntry>,
+    oam_index: u8,
+    current_obj: Option<OAMEntry>,
+    oam_step: Step,
 }
 
 impl Fetcher {
@@ -34,13 +39,24 @@ impl Fetcher {
             data_address: 0,
 
             pushed_x: 0, 
+
+            obj_slots: Vec::with_capacity(10),
+            oam_index: 0,
+            current_obj: None,
+            oam_step: Step::First,
         }
     }
 
     pub fn reset(&mut self) {
         self.state = FetchState::TileID(Step::First);
+
         self.lx = 0;
         self.pushed_x = 0;
+
+        self.obj_slots.clear();
+        self.oam_index = 0;
+        self.current_obj = None;
+        self.oam_step = Step::First;
     }
 
     pub fn fetch(&mut self, bus: &mut Interconnect) {
@@ -107,15 +123,11 @@ impl Fetcher {
 
                 let high = ((self.bgw_fetched_data[2] & (1 << bit)) != 0) as u8;
 
-                let mut color = bus.lcd_bg_colors()[(high << 1  | low) as usize];
-
-                if !lcdc_bgw_enable(bus) {
-                    color = bus.lcd_bg_colors()[0];
-                }
-
-                // if lcdc_obj_enable(bus) {
-                //     color = self.pipeline_fetch_sprite_pixels(bus, color, high << 1 | low)
-                // }
+                let color = if lcdc_bgw_enable(bus) { 
+                    bus.lcd_bg_colors()[(high << 1  | low) as usize]
+                } else {                
+                    bus.lcd_bg_colors()[0]
+                };
 
                 pixels.push(color);
             }
@@ -124,6 +136,31 @@ impl Fetcher {
             Some(pixels)
         } else {
             None
+        }
+    }
+
+    pub fn oam(&mut self, bus: &mut Interconnect) {
+        if self.obj_slots.len() < 10 {
+            match self.oam_step {
+                Step::First => {
+                    self.current_obj = Some(bus.oam_sprite(self.oam_index));
+                    self.oam_index += 1;
+                    self.oam_step = Step::Second;
+                },
+                Step::Second => {
+                    let cur_y = lcd_read_ly(bus);
+                    let sprite_height = lcdc_obj_height(bus);
+
+                    if let Some(obj) = self.current_obj {
+                        if obj.x > 0 && obj.y <= cur_y + 16 && obj.y + sprite_height > cur_y + 16 { 
+                            // x = 0 means invisible
+                            // This sprite is on the current line
+                            self.obj_slots.push(obj);
+                        }
+                    }
+                }
+            }
+            
         }
     }
 }

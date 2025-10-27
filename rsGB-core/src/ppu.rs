@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}};
+use crate::interconnect::Interconnect;
 
 mod state_machine;
 mod pipeline;
@@ -8,6 +8,7 @@ mod utils;
 mod fetcher;
 
 use fetcher::Fetcher;
+use utils::{status_mode, LCDMode};
 
 const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;

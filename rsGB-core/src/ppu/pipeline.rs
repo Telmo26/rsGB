@@ -27,6 +27,10 @@ impl PPU {
         }
     }
 
+    pub fn fetch_oam(&mut self, bus: &mut Interconnect) {
+        self.fetcher.oam(bus)
+    }
+
     pub fn pipeline_reset(&mut self) {
         self.pushed_x = 0;
         self.current_x = 0;

@@ -47,6 +47,8 @@ impl PPU {
             change_lcd_mode(bus, LCDMode::XFer);
             self.pipeline_reset();
         }
+
+        self.fetch_oam(bus);
     }
 
     pub fn xfer(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
