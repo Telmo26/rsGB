@@ -4,7 +4,7 @@ use super::PPU;
 
 impl PPU {
     pub(super) fn process_fifo(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
-        // self.check_window_trigger(bus);
+        self.check_window_trigger(bus);
 
         if self.bgw_fifo.is_empty() {
             self.fetcher.fetch(bus);
@@ -53,11 +53,7 @@ impl PPU {
         let ly = lcd_read_ly(bus);
         let wy = lcd_read_win_y(bus);
         let wx = lcd_read_win_x(bus);
-
-        // Window X is offset by 7 in hardware
-        // Window becomes visible when pushed_x + 7 >= wx
-        // This means when pushed_x >= wx - 7
-        
+       
         // Check if we've reached the window Y position
         if ly < wy {
             return;
@@ -68,22 +64,20 @@ impl PPU {
         if wx < 7 {
             // Window starts before or at screen edge
             if self.pushed_x == 0 {
-                self.switch_to_window_mode(bus);
+                self.switch_to_window_mode();
             }
         } else if self.pushed_x + 7 >= wx {
             // Normal case: window starts mid-screen
-            self.switch_to_window_mode(bus);
+            self.switch_to_window_mode();
         }
     }
 
-    fn switch_to_window_mode(&mut self, bus: &mut Interconnect) {
+    fn switch_to_window_mode(&mut self) {
         // Clear the FIFO when switching to window
         self.bgw_fifo.clear();
         
         // Switch fetcher to window mode
         self.fetcher.switch_to_window();
-        
-        // The current_x counter continues, but we don't apply SCX discard anymore
     }
 
     pub fn scanline_complete(&mut self) {

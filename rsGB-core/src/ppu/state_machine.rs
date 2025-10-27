@@ -11,6 +11,7 @@ impl PPU {
     pub fn hblank(&mut self, bus: &mut Interconnect) {
         if self.line_ticks >= TICKS_PER_LINE {
             let ly = increment_ly(bus);
+            self.scanline_complete();
 
             if ly >= YRES as u8 {
                 change_lcd_mode(bus, LCDMode::VBlank);
@@ -34,6 +35,7 @@ impl PPU {
             let ly = increment_ly(bus);
 
             if ly >= LINES_PER_FRAME {
+                self.frame_complete();
                 change_lcd_mode(bus, LCDMode::OAM);
                 bus.write(0xFF44, 0);
             }
