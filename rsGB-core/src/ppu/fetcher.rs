@@ -62,6 +62,7 @@ impl Fetcher {
 
     pub fn reset(&mut self) {
         self.state = FetchState::TileID(Step::First);
+        self.mode = FetchMode::Background;
 
         self.lx = 0;
         self.pushed_x = 0;
