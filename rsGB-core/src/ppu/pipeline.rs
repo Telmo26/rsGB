@@ -1,4 +1,4 @@
-use crate::{interconnect::Interconnect, ppu::{XRES, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_win_enable}}};
+use crate::{interconnect::Interconnect, ppu::{XRES, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_height, lcdc_win_enable}}};
 
 use super::PPU;
 
@@ -31,10 +31,6 @@ impl PPU {
             framebuffer[x] = pixel_data;
             self.pushed_x += 1;
         }
-    }
-
-    pub fn fetch_oam(&mut self, bus: &mut Interconnect) {
-        self.fetcher.oam(bus)
     }
 
     pub fn pipeline_reset(&mut self) {
@@ -88,5 +84,29 @@ impl PPU {
     pub fn frame_complete(&mut self) {
         // Reset window line counter at the start of each frame
         self.fetcher.reset_window_line();
+    }
+
+    pub fn oam_fetch(&mut self, bus: &mut Interconnect) {
+        if self.visible_sprites.len() < 10 && self.line_ticks % 2 == 0 {
+            // It takes two ticks to read a single OAM entry
+            let ly = lcd_read_ly(bus);
+            let sprite_height = lcdc_obj_height(bus);
+
+            let index = (self.line_ticks / 2) as u8;
+            let obj = bus.oam_sprite(index);
+
+            if obj.x == 0 {
+                return;
+            }
+
+            if obj.y <= ly + 16 && obj.y + sprite_height > ly + 16 {
+                // This sprite is on the current line
+                self.visible_sprites.push(obj);
+            }
+
+            if self.visible_sprites.len() == 10 {
+                self.visible_sprites.sort_by_key(|e| e.x);
+            }
+        }
     }
 }

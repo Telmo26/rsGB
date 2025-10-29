@@ -48,9 +48,9 @@ impl PPU {
         if self.line_ticks >= 80 {
             change_lcd_mode(bus, LCDMode::XFer);
             self.pipeline_reset();
+        } else {
+            self.oam_fetch(bus);
         }
-
-        self.fetch_oam(bus);
     }
 
     pub fn xfer(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {

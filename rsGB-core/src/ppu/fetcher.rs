@@ -29,11 +29,6 @@ pub(super) struct Fetcher {
 
     window_line: u8,
 
-    obj_slots: Vec<OAMEntry>,
-    oam_index: u8,
-    current_obj: Option<OAMEntry>,
-    oam_step: Step,
-
     pushed_x: u8, // The position of the last pixel that was pushed to the FIFO
 
 }
@@ -51,11 +46,6 @@ impl Fetcher {
 
             window_line: 0,
 
-            obj_slots: Vec::with_capacity(10),
-            oam_index: 0,
-            current_obj: None,
-            oam_step: Step::First,
-
             pushed_x: 0,
         }
     }
@@ -66,11 +56,6 @@ impl Fetcher {
 
         self.lx = 0;
         self.pushed_x = 0;
-
-        self.obj_slots.clear();
-        self.oam_index = 0;
-        self.current_obj = None;
-        self.oam_step = Step::First;
     }
 
     pub fn reset_window_line(&mut self) {
@@ -182,31 +167,6 @@ impl Fetcher {
             Some(pixels)
         } else {
             None
-        }
-    }
-
-    pub fn oam(&mut self, bus: &mut Interconnect) {
-        if self.obj_slots.len() < 10 {
-            match self.oam_step {
-                Step::First => {
-                    self.current_obj = Some(bus.oam_sprite(self.oam_index));
-                    self.oam_index += 1;
-                    self.oam_step = Step::Second;
-                },
-                Step::Second => {
-                    let cur_y = lcd_read_ly(bus);
-                    let sprite_height = lcdc_obj_height(bus);
-
-                    if let Some(obj) = self.current_obj {
-                        if obj.x > 0 && obj.y <= cur_y + 16 && obj.y + sprite_height > cur_y + 16 { 
-                            // x = 0 means invisible
-                            // This sprite is on the current line
-                            self.obj_slots.push(obj);
-                        }
-                    }
-                }
-            }
-            
         }
     }
 }
