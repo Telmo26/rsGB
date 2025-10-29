@@ -34,9 +34,6 @@ pub(super) struct Fetcher {
     current_obj: Option<OAMEntry>,
     oam_step: Step,
 
-    fetching_sprite: bool,
-    sprite_fetched_data: [u8; 2],
-
     pushed_x: u8, // The position of the last pixel that was pushed to the FIFO
 
 }
@@ -59,9 +56,6 @@ impl Fetcher {
             current_obj: None,
             oam_step: Step::First,
 
-            fetching_sprite: false,
-            sprite_fetched_data: [0; 2],
-
             pushed_x: 0,
         }
     }
@@ -77,8 +71,6 @@ impl Fetcher {
         self.oam_index = 0;
         self.current_obj = None;
         self.oam_step = Step::First;
-
-        self.fetching_sprite = false;
     }
 
     pub fn reset_window_line(&mut self) {
@@ -102,24 +94,7 @@ impl Fetcher {
         self.mode == FetchMode::Window
     }
 
-    pub fn is_fetching_sprite(&self) -> bool {
-        self.fetching_sprite
-    }
-
-    pub fn start_sprite_fetch(&mut self) {
-        self.fetching_sprite = true;
-        self.state = FetchState::TileID(Step::First);
-    }
-
     pub fn fetch(&mut self, bus: &mut Interconnect) {
-        if self.fetching_sprite {
-            self.fetch_sprite(bus);
-        } else {
-            self.fetch_bgw(bus);
-        }
-    }
-
-    fn fetch_bgw(&mut self, bus: &mut Interconnect) {
         match self.state {
             FetchState::TileID(Step::First) => {                
                 self.tile_address = if self.mode == FetchMode::Background {
@@ -185,65 +160,6 @@ impl Fetcher {
         }
     }
 
-    fn fetch_sprite(&mut self, bus: &mut Interconnect) {
-        match self.state {
-            FetchState::TileID(Step::First) => {
-                for sprite_entry in &self.obj_slots {
-                    let sprite_x = sprite_entry.x.wrapping_sub(8).wrapping_add(lcd_read_scroll_x(bus) % 8);
-
-                    if (sprite_x >= self.lx && sprite_x < self.lx + 8) ||
-                       (sprite_x.wrapping_add(8) >= self.lx && sprite_x.wrapping_add(8) < self.lx + 8) {
-                        self.current_obj = Some(*sprite_entry)
-                    }
-                }
-                self.state = FetchState::TileID(Step::Second);
-            },
-            FetchState::TileID(Step::Second) => {
-                self.state = FetchState::TileRowLow(Step::First);
-            },
-            FetchState::TileRowLow(Step::First) => {
-                let ly = lcd_read_ly(bus);
-                let obj_height = lcdc_obj_height(bus);
-                let sprite = self.current_obj.unwrap();
-                
-                // Calculate which line of the sprite we're on
-                let mut sprite_line = ly - (sprite.y - 16);
-                
-                // Handle Y flip
-                if sprite.y_flip() {
-                    sprite_line = (obj_height - 1) - sprite_line;
-                }
-                
-                let tile_index = if obj_height == 16 {
-                    sprite.tile & !0b1
-                } else {
-                    sprite.tile
-                };
-                
-                let tile_row = (sprite_line % 8) as u16;
-                
-                // Sprites always use $8000 addressing mode
-                self.data_address = 0x8000 + ((tile_index as u16) << 4) + (tile_row << 1);
-                self.state = FetchState::TileRowLow(Step::Second);
-            },
-            FetchState::TileRowLow(Step::Second) => {
-                self.sprite_fetched_data[0] = bus.read(self.data_address);
-                self.state = FetchState::TileRowHigh(Step::First);
-            },
-            FetchState::TileRowHigh(Step::First) => {
-                self.data_address += 1;
-                self.state = FetchState::TileRowHigh(Step::Second);
-            },
-            FetchState::TileRowHigh(Step::Second) => {
-                self.sprite_fetched_data[1] = bus.read(self.data_address);
-                self.state = FetchState::Push;
-            },
-            FetchState::Push => {
-                
-            },
-        }
-    }
-
     pub fn push(&mut self, bus: &mut Interconnect) -> Option<Vec<u32>> {
         if let FetchState::Push = self.state {
             let mut pixels = Vec::new();
@@ -281,19 +197,16 @@ impl Fetcher {
                     let cur_y = lcd_read_ly(bus);
                     let sprite_height = lcdc_obj_height(bus);
 
-                    let obj = self.current_obj.unwrap();
-                    if obj.x > 0 && obj.y <= cur_y + 16 && obj.y + sprite_height > cur_y + 16 { 
-                        // x = 0 means invisible
-                        // This sprite is on the current line
-                        self.obj_slots.push(obj);
+                    if let Some(obj) = self.current_obj {
+                        if obj.x > 0 && obj.y <= cur_y + 16 && obj.y + sprite_height > cur_y + 16 { 
+                            // x = 0 means invisible
+                            // This sprite is on the current line
+                            self.obj_slots.push(obj);
+                        }
                     }
-                    self.oam_step = Step::First;
                 }
             }
-            if self.obj_slots.len() == 10 {
-                // After adding the last item, we sort them by x position
-                self.obj_slots.sort_by_key(|obj| obj.x);
-            }
+            
         }
     }
 }
