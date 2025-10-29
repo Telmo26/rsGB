@@ -15,9 +15,10 @@ const TICKS_PER_LINE: u32 = 456;
 const YRES: usize = 144;
 const XRES: usize = 160;
 
+#[derive(Debug)]
 pub struct PPU {
     fetcher: Fetcher,
-    bgw_fifo: VecDeque<u32>,
+    bgw_fifo: VecDeque<(u32, u8)>,
     obj_fifo: VecDeque<(u32, u8, bool)>,
 
     visible_sprites: Vec<OAMEntry>,

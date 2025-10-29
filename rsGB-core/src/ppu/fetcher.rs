@@ -2,11 +2,13 @@ use std::u32;
 
 use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_scroll_y, lcdc_bg_map_area, lcdc_bgw_data_area, lcdc_bgw_enable, lcdc_obj_height, lcdc_win_map_area}};
 
+#[derive(Debug)]
 enum Step {
     First,
     Second,
 }
 
+#[derive(Debug)]
 enum FetchState {
     TileID(Step),
     TileRowLow(Step),
@@ -20,11 +22,12 @@ enum FetchMode {
     Window,
 }
 
+#[derive(Debug)]
 pub(super) struct Fetcher {
     state: FetchState,
     mode: FetchMode,
 
-    lx: u8,
+    pub lx: u8,
     tile_address: u16,
     bgw_fetched_data: [u8; 3],
     data_address: u16,
@@ -35,7 +38,7 @@ pub(super) struct Fetcher {
     current_sprite: Option<OAMEntry>,
     sprite_data: [u8; 2],
 
-    pushed_x: u8, // The position of the last pixel that was pushed to the FIFO
+    pub pushed_x: u8, // The position of the last pixel that was pushed to the FIFO
 }
 
 impl Fetcher {
@@ -62,6 +65,7 @@ impl Fetcher {
     pub fn reset(&mut self) {
         self.state = FetchState::TileID(Step::First);
         self.mode = FetchMode::Background;
+        self.fetching_sprite = false;
 
         self.lx = 0;
         self.pushed_x = 0;
@@ -96,12 +100,6 @@ impl Fetcher {
         self.fetching_sprite = true;
         self.current_sprite = Some(sprite);
         self.state = FetchState::TileRowLow(Step::First);
-    }
-
-    pub fn reset_to_background(&mut self) {
-        self.fetching_sprite = false;
-        self.current_sprite = None;
-        self.state = FetchState::TileID(Step::First);
     }
 
     pub fn fetch(&mut self, bus: &mut Interconnect) {
@@ -215,11 +213,15 @@ impl Fetcher {
                 self.state = FetchState::Push;
             }
 
-            _ => { }
+            _ => { 
+                // println!("Fetcher: {:#?}", self);
+            }
         }
     }
 
-    pub fn push_bgw(&mut self, bus: &mut Interconnect) -> Option<Vec<u32>> {
+    // This function returns the color value for the background
+    // and the index, to handle transparency
+    pub fn push_bgw(&mut self, bus: &mut Interconnect) -> Option<Vec<(u32, u8)>> {
         if let FetchState::Push = self.state {
             let mut pixels = Vec::new();
             for i in 0..8 {
@@ -228,13 +230,13 @@ impl Fetcher {
 
                 let high = ((self.bgw_fetched_data[2] & (1 << bit)) != 0) as u8;
 
-                let color = if lcdc_bgw_enable(bus) { 
-                    bus.lcd_bg_colors()[(high << 1  | low) as usize]
-                } else {                
-                    bus.lcd_bg_colors()[0]
-                };
+                let index = if lcdc_bgw_enable(bus) {
+                    high << 1  | low
+                } else { 0 };
 
-                pixels.push(color);
+                let color = bus.lcd_bg_colors()[index as usize];
+
+                pixels.push((color, index));
             }
             self.pushed_x += 8;
             self.state = FetchState::TileID(Step::First);
@@ -267,7 +269,9 @@ impl Fetcher {
                 };
                 pixels.push((color, index as u8, bg_priority));
             };
-
+            self.fetching_sprite = false;
+            self.current_sprite = None;
+            self.state = FetchState::TileID(Step::First);
             return Some(pixels)
         }
         None        

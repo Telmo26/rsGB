@@ -1,4 +1,4 @@
-use crate::{interconnect::Interconnect, ppu::{XRES, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_height, lcdc_win_enable}}};
+use crate::{interconnect::Interconnect, ppu::{XRES, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_enable, lcdc_obj_height, lcdc_win_enable}}};
 
 use super::PPU;
 
@@ -6,7 +6,7 @@ impl PPU {
     pub(super) fn process_fifo(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
         self.check_window_trigger(bus);
 
-        self.check_sprite_displayed();
+        self.check_sprite_displayed(bus);
 
         if self.bgw_fifo.is_empty() && !self.fetcher.is_fetching_sprite() {
             self.fetcher.fetch(bus);
@@ -16,16 +16,15 @@ impl PPU {
         }
 
         if self.fetcher.is_fetching_sprite() {
-            println!("Fetching sprite data!");
             self.fetcher.fetch(bus);
             if let Some(data) = self.fetcher.push_obj(bus) {
                 self.obj_fifo.extend(data);
-                self.fetcher.reset_to_background();
             }
         }
 
         if !self.bgw_fifo.is_empty() {
-            let pixel_data = self.bgw_fifo.pop_front().unwrap();
+            let (bgw_pixel, bgw_index) = self.bgw_fifo.pop_front().unwrap();
+            let (obj_pixel, obj_index, bg_priority) = self.obj_fifo.pop_front().unwrap_or((u32::MAX, 0, true));
 
             if !self.fetcher.is_window_mode() {
                 let scx = lcd_read_scroll_x(bus);
@@ -37,9 +36,17 @@ impl PPU {
                 }
             }
 
+            let pixel = if obj_index == 0 {
+                bgw_pixel
+            } else if bg_priority && bgw_index != 0 {
+                bgw_pixel
+            } else {
+                obj_pixel
+            };
+
             let x = self.pushed_x as usize + lcd_read_ly(bus) as usize * XRES;
             
-            framebuffer[x] = pixel_data;
+            framebuffer[x] = pixel;
             self.pushed_x += 1;
         }
     }
@@ -49,6 +56,8 @@ impl PPU {
         self.current_x = 0;
 
         self.bgw_fifo.clear();
+        self.obj_fifo.clear();
+        self.fetched_sprites.fill(false);
         self.fetcher.reset();
     }
 
@@ -90,6 +99,7 @@ impl PPU {
     pub fn scanline_complete(&mut self) {
         // Increment window line counter if window was rendered this scanline
         self.fetcher.increment_window_line();
+        self.visible_sprites.clear();
     }
 
     pub fn frame_complete(&mut self) {
@@ -121,14 +131,16 @@ impl PPU {
         }
     }
 
-    fn check_sprite_displayed(&mut self) {
-        for (index, sprite) in self.visible_sprites.iter().enumerate() {
-            let sprite_x = sprite.x - 8;
+    fn check_sprite_displayed(&mut self, bus: &mut Interconnect) {
+        if lcdc_obj_enable(bus) && !self.fetcher.is_fetching_sprite() {
+            for (index, sprite) in self.visible_sprites.iter().enumerate() {
+                let sprite_x = sprite.x.wrapping_sub(8);
 
-            if !self.fetched_sprites[index] && sprite_x == self.pushed_x {
-                self.fetcher.trigger_sprite_fetching(*sprite);
-                self.fetched_sprites[index] = true;
-                break;
+                if !self.fetched_sprites[index] && self.pushed_x >= sprite_x && self.pushed_x < sprite_x + 8 {
+                    self.fetcher.trigger_sprite_fetching(*sprite);
+                    self.fetched_sprites[index] = true;
+                    break;
+                }
             }
         }
     }
