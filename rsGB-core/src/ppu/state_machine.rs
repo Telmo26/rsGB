@@ -48,6 +48,7 @@ impl PPU {
         if self.line_ticks >= 80 {
             change_lcd_mode(bus, LCDMode::XFer);
             self.pipeline_reset();
+            self.visible_sprites.sort_by_key(|e| e.x);
         } else {
             self.oam_fetch(bus);
         }

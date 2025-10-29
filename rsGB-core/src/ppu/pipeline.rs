@@ -8,23 +8,42 @@ impl PPU {
 
         self.check_sprite_displayed(bus);
 
-        if self.bgw_fifo.is_empty() && !self.fetcher.is_fetching_sprite() {
+        if self.fetcher.is_fetching_sprite() {
+            self.fetcher.fetch(bus);
+            if let Some(data) = self.fetcher.push_obj(bus) {
+                while self.obj_fifo.len() < 8 {
+                    self.obj_fifo.push_back((u32::MAX, 0, true));
+                }
+                for i in 0..8 {
+                    let (new_pixel, new_index, new_bg_priority) = data[i];
+
+                    // Only merge non-transparent pixels
+                    if new_index != 0 {
+                        let (_old_pixel, old_index, _old_bg_priority) = self.obj_fifo[i];
+
+                        // X-Coordinate Priority:
+                        // If the FIFO slot is empty (old_index 0), this new sprite wins.
+                        // If the slot is *already* full, the old sprite (which had a
+                        // lower X-coordinate) wins, and this new pixel is discarded.
+                        if old_index == 0 {
+                            self.obj_fifo[i] = (new_pixel, new_index, new_bg_priority);
+                        }
+                    }
+                }
+            } else {
+                return;
+            }
+        }
+
+        if self.bgw_fifo.is_empty() {
             self.fetcher.fetch(bus);
             if let Some(pixels) = self.fetcher.push_bgw(bus) {
                 self.bgw_fifo.extend(pixels);
             }
         }
 
-        if self.fetcher.is_fetching_sprite() {
-            self.fetcher.fetch(bus);
-            if let Some(data) = self.fetcher.push_obj(bus) {
-                self.obj_fifo.extend(data);
-            }
-        }
-
         if !self.bgw_fifo.is_empty() {
             let (bgw_pixel, bgw_index) = self.bgw_fifo.pop_front().unwrap();
-            let (obj_pixel, obj_index, bg_priority) = self.obj_fifo.pop_front().unwrap_or((u32::MAX, 0, true));
 
             if !self.fetcher.is_window_mode() {
                 let scx = lcd_read_scroll_x(bus);
@@ -35,6 +54,8 @@ impl PPU {
                     return;
                 }
             }
+
+            let (obj_pixel, obj_index, bg_priority) = self.obj_fifo.pop_front().unwrap_or((u32::MAX, 0, true));
 
             let pixel = if obj_index == 0 {
                 bgw_pixel
@@ -124,10 +145,6 @@ impl PPU {
                 // This sprite is on the current line
                 self.visible_sprites.push(obj);
             }
-
-            if self.visible_sprites.len() == 10 {
-                self.visible_sprites.sort_by_key(|e| e.x);
-            }
         }
     }
 
@@ -136,9 +153,15 @@ impl PPU {
             for (index, sprite) in self.visible_sprites.iter().enumerate() {
                 let sprite_x = sprite.x.wrapping_sub(8);
 
-                if !self.fetched_sprites[index] && self.pushed_x >= sprite_x && self.pushed_x < sprite_x + 8 {
+                if !self.fetched_sprites[index] && self.pushed_x == sprite_x {
                     self.fetcher.trigger_sprite_fetching(*sprite);
-                    self.fetched_sprites[index] = true;
+                    for i in index..self.visible_sprites.len() {
+                        // Lower OAM order gets priority
+                        let obj = self.visible_sprites[i];
+                        if sprite.x == obj.x {
+                            self.fetched_sprites[i] = true;
+                        }
+                    }
                     break;
                 }
             }

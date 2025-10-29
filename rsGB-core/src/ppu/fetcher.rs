@@ -231,7 +231,7 @@ impl Fetcher {
                 let high = ((self.bgw_fetched_data[2] & (1 << bit)) != 0) as u8;
 
                 let index = if lcdc_bgw_enable(bus) {
-                    high << 1  | low
+                    high << 1 | low
                 } else { 0 };
 
                 let color = bus.lcd_bg_colors()[index as usize];
