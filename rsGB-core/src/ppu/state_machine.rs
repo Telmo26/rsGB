@@ -37,7 +37,7 @@ impl PPU {
             if ly >= LINES_PER_FRAME {
                 self.frame_complete();
                 change_lcd_mode(bus, LCDMode::OAM);
-                bus.write(0xFF44, 0);
+                lcd_write_ly(bus, 0);
             }
 
             self.line_ticks = 0;
