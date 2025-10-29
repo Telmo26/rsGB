@@ -18,8 +18,10 @@ const XRES: usize = 160;
 pub struct PPU {
     fetcher: Fetcher,
     bgw_fifo: VecDeque<u32>,
+    obj_fifo: VecDeque<(u32, u8, bool)>,
 
     visible_sprites: Vec<OAMEntry>,
+    fetched_sprites: [bool; 10],
 
     pushed_x: u8, // The pixel position to push in the framebuffer
     current_x: u8, // The current position we're dealing with on the screen
@@ -34,8 +36,10 @@ impl PPU {
         PPU {
             fetcher: Fetcher::new(),
             bgw_fifo: VecDeque::with_capacity(8),
+            obj_fifo: VecDeque::with_capacity(8),
 
             visible_sprites: Vec::with_capacity(10),
+            fetched_sprites: [false; 10],
 
             pushed_x: 0,
             current_x: 0,

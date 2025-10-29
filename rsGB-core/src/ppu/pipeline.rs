@@ -6,10 +6,21 @@ impl PPU {
     pub(super) fn process_fifo(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
         self.check_window_trigger(bus);
 
-        if self.bgw_fifo.is_empty() {
+        self.check_sprite_displayed();
+
+        if self.bgw_fifo.is_empty() && !self.fetcher.is_fetching_sprite() {
             self.fetcher.fetch(bus);
-            if let Some(pixels) = self.fetcher.push(bus) {
+            if let Some(pixels) = self.fetcher.push_bgw(bus) {
                 self.bgw_fifo.extend(pixels);
+            }
+        }
+
+        if self.fetcher.is_fetching_sprite() {
+            println!("Fetching sprite data!");
+            self.fetcher.fetch(bus);
+            if let Some(data) = self.fetcher.push_obj(bus) {
+                self.obj_fifo.extend(data);
+                self.fetcher.reset_to_background();
             }
         }
 
@@ -106,6 +117,18 @@ impl PPU {
 
             if self.visible_sprites.len() == 10 {
                 self.visible_sprites.sort_by_key(|e| e.x);
+            }
+        }
+    }
+
+    fn check_sprite_displayed(&mut self) {
+        for (index, sprite) in self.visible_sprites.iter().enumerate() {
+            let sprite_x = sprite.x - 8;
+
+            if !self.fetched_sprites[index] && sprite_x == self.pushed_x {
+                self.fetcher.trigger_sprite_fetching(*sprite);
+                self.fetched_sprites[index] = true;
+                break;
             }
         }
     }

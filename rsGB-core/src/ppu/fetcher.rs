@@ -1,3 +1,5 @@
+use std::u32;
+
 use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_scroll_y, lcdc_bg_map_area, lcdc_bgw_data_area, lcdc_bgw_enable, lcdc_obj_height, lcdc_win_map_area}};
 
 enum Step {
@@ -29,8 +31,11 @@ pub(super) struct Fetcher {
 
     window_line: u8,
 
-    pushed_x: u8, // The position of the last pixel that was pushed to the FIFO
+    fetching_sprite: bool,
+    current_sprite: Option<OAMEntry>,
+    sprite_data: [u8; 2],
 
+    pushed_x: u8, // The position of the last pixel that was pushed to the FIFO
 }
 
 impl Fetcher {
@@ -45,6 +50,10 @@ impl Fetcher {
             data_address: 0, 
 
             window_line: 0,
+
+            fetching_sprite: false,
+            current_sprite: None,
+            sprite_data: [0; 2],
 
             pushed_x: 0,
         }
@@ -79,7 +88,31 @@ impl Fetcher {
         self.mode == FetchMode::Window
     }
 
+    pub fn is_fetching_sprite(&self) -> bool {
+        self.fetching_sprite
+    }
+
+    pub fn trigger_sprite_fetching(&mut self, sprite: OAMEntry) {
+        self.fetching_sprite = true;
+        self.current_sprite = Some(sprite);
+        self.state = FetchState::TileRowLow(Step::First);
+    }
+
+    pub fn reset_to_background(&mut self) {
+        self.fetching_sprite = false;
+        self.current_sprite = None;
+        self.state = FetchState::TileID(Step::First);
+    }
+
     pub fn fetch(&mut self, bus: &mut Interconnect) {
+        if self.fetching_sprite {
+            self.fetch_sprite(bus);
+        } else {
+            self.fetch_bgw(bus);
+        }
+    }
+
+    fn fetch_bgw(&mut self, bus: &mut Interconnect) {
         match self.state {
             FetchState::TileID(Step::First) => {                
                 self.tile_address = if self.mode == FetchMode::Background {
@@ -145,7 +178,48 @@ impl Fetcher {
         }
     }
 
-    pub fn push(&mut self, bus: &mut Interconnect) -> Option<Vec<u32>> {
+    fn fetch_sprite(&mut self, bus: &mut Interconnect) {
+        match self.state {
+            FetchState::TileRowLow(Step::First) => {
+                let ly = lcd_read_ly(bus);
+                let sprite_height = lcdc_obj_height(bus);         
+                let sprite = self.current_sprite.unwrap();
+
+                let mut tile_y = ly + 16 - sprite.y;
+                if sprite.y_flip() {
+                    tile_y = sprite_height - 1 - tile_y;
+                }
+
+                let tile_index = if sprite_height == 16 {
+                    sprite.tile as u16 & !0b1
+                } else {
+                    sprite.tile as u16
+                };
+
+                self.data_address = 0x8000 + (tile_index << 4) + ((tile_y as u16) << 1);
+                self.state = FetchState::TileRowLow(Step::Second);
+            }
+
+            FetchState::TileRowLow(Step::Second) => {
+                self.sprite_data[0] = bus.read(self.data_address);
+                self.state = FetchState::TileRowHigh(Step::First);
+            }
+
+            FetchState::TileRowHigh(Step::First) => { 
+                self.data_address += 1;
+                self.state = FetchState::TileRowHigh(Step::Second);
+            }
+
+            FetchState::TileRowHigh(Step::Second) => {
+                self.sprite_data[1] = bus.read(self.data_address);
+                self.state = FetchState::Push;
+            }
+
+            _ => { }
+        }
+    }
+
+    pub fn push_bgw(&mut self, bus: &mut Interconnect) -> Option<Vec<u32>> {
         if let FetchState::Push = self.state {
             let mut pixels = Vec::new();
             for i in 0..8 {
@@ -168,5 +242,34 @@ impl Fetcher {
         } else {
             None
         }
+    }
+
+    // This function returns the pixel value, with the palette number
+    // and the OBJ-to-BG priority flag
+    pub fn push_obj(&mut self, bus: &mut Interconnect) -> Option<Vec<(u32, u8, bool)>> {
+        if let FetchState::Push = self.state {
+            let mut pixels = Vec::with_capacity(8);
+            let sprite = self.current_sprite.unwrap();
+            
+            for i in 0..8 {
+                let bit = if sprite.x_flip() { i } else { 7 - i };
+                let low = (self.sprite_data[0] & (1 << bit) != 0) as u8;
+                let high = (self.sprite_data[1] & (1 << bit) != 0) as u8;
+
+                let bg_priority = sprite.bg_over_obj();
+                let index = (high << 1 | low) as usize;
+                let color = if index == 0 {
+                    u32::MAX // This will never be read, since index = 0 means transparent
+                } else if sprite.palette_nb() {
+                    bus.lcd_sp2_colors()[index]
+                } else {
+                    bus.lcd_sp1_colors()[index]
+                };
+                pixels.push((color, index as u8, bg_priority));
+            };
+
+            return Some(pixels)
+        }
+        None        
     }
 }
