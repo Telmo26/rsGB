@@ -252,9 +252,13 @@ impl Fetcher {
         if let FetchState::Push = self.state {
             let mut pixels = Vec::with_capacity(8);
             let sprite = self.current_sprite.unwrap();
+
+            // When a sprite is displayed with 0 < x < 8, some pixels
+            // are invisible, and that must be accounted for in the rendering
+            let mut invisible_pixels = 8 - sprite.x as i16;
             
             for i in 0..8 {
-                let bit = if sprite.x_flip() { i } else { 7 - i };
+                let bit: u8 = if sprite.x_flip() { i } else { 7 - i };
                 let low = (self.sprite_data[0] & (1 << bit) != 0) as u8;
                 let high = (self.sprite_data[1] & (1 << bit) != 0) as u8;
 
@@ -267,11 +271,18 @@ impl Fetcher {
                 } else {
                     bus.lcd_sp1_colors()[index]
                 };
-                pixels.push((color, index as u8, bg_priority));
+                if invisible_pixels > 0 {
+                    invisible_pixels -= 1;
+                } else {
+                    pixels.push((color, index as u8, bg_priority));
+                }
             };
             self.fetching_sprite = false;
             self.current_sprite = None;
             self.state = FetchState::TileID(Step::First);
+            while pixels.len() < 8 {
+                pixels.push((u32::MAX, 0, true));
+            }
             return Some(pixels)
         }
         None        

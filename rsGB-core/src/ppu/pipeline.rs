@@ -129,12 +129,13 @@ impl PPU {
     }
 
     pub fn oam_fetch(&mut self, bus: &mut Interconnect) {
-        if self.visible_sprites.len() < 10 && self.line_ticks % 2 == 0 {
+        if self.visible_sprites.len() < 10 && self.line_ticks % 2 == 1 {
             // It takes two ticks to read a single OAM entry
             let ly = lcd_read_ly(bus);
             let sprite_height = lcdc_obj_height(bus);
 
-            let index = (self.line_ticks / 2) as u8;
+            let index = ((self.line_ticks - 1) / 2) as u8;
+            // println!("Current OAM index: {index}");
             let obj = bus.oam_sprite(index);
 
             if obj.x == 0 {
@@ -151,17 +152,14 @@ impl PPU {
     fn check_sprite_displayed(&mut self, bus: &mut Interconnect) {
         if lcdc_obj_enable(bus) && !self.fetcher.is_fetching_sprite() {
             for (index, sprite) in self.visible_sprites.iter().enumerate() {
-                let sprite_x = sprite.x.wrapping_sub(8);
+                let sprite_x = sprite.x.saturating_sub(8);
 
-                if !self.fetched_sprites[index] && self.pushed_x == sprite_x {
+                if !self.fetched_sprites[index] && self.pushed_x >= sprite_x && self.pushed_x < sprite_x + 8 {
+                    // println!("Triggering sprite at X={}, pushed_x={}", sprite.x, self.pushed_x);
+                    // println!("SPRITES: {:#?}", self.visible_sprites);
+                    // println!("ALL SPRITES: {:#?}", bus.oam_ram);
                     self.fetcher.trigger_sprite_fetching(*sprite);
-                    for i in index..self.visible_sprites.len() {
-                        // Lower OAM order gets priority
-                        let obj = self.visible_sprites[i];
-                        if sprite.x == obj.x {
-                            self.fetched_sprites[i] = true;
-                        }
-                    }
+                    self.fetched_sprites[index] = true;
                     break;
                 }
             }
