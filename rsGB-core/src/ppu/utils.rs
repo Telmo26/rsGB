@@ -47,6 +47,7 @@ pub fn lcdc_obj_height(bus: &mut Interconnect) -> u8 {
 }
 
 pub fn lcdc_bg_map_area(bus: &mut Interconnect) -> u16 {
+    // If LCDC.3 is set
     if bus.read(0xFF40) & (1 << 3) != 0 {
         0x9C00
     } else {

@@ -25,7 +25,7 @@ impl MainWindow {
                 ..WindowOptions::default()
             }
         ).unwrap();
-        window.set_target_fps((60 + 1));
+        window.set_target_fps(60 + 1);
 
         MainWindow { 
             window, 

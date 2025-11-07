@@ -1,25 +1,32 @@
-use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{status_mode, LCDMode}};
+use std::collections::VecDeque;
+
+use crate::interconnect::{Interconnect, OAMEntry};
 
 mod state_machine;
 mod pipeline;
 mod utils;
+mod fetcher;
 
-use pipeline::PixelFifo;
+use fetcher::Fetcher;
+use utils::{status_mode, LCDMode};
 
 const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;
 const YRES: usize = 144;
 const XRES: usize = 160;
 
+#[derive(Debug)]
 pub struct PPU {
-    line_sprites: Vec<OAMEntry>, // Capacity: 10
+    fetcher: Fetcher,
+    bgw_fifo: VecDeque<(u32, u8)>,
+    obj_fifo: VecDeque<(u32, u8, bool)>,
 
-    fetched_entries: Vec<OAMEntry>, // Capacity: 3
+    visible_sprites: Vec<OAMEntry>,
+    fetched_sprites: [bool; 10],
 
-    window_line: u8,
+    pushed_x: u8, // The pixel position to push in the framebuffer
+    current_x: u8, // The current position we're dealing with on the screen
 
-    pixel_fifo: PixelFifo,
-    
     current_frame: u32,
     line_ticks: u32,
     new_frame: bool,
@@ -28,13 +35,15 @@ pub struct PPU {
 impl PPU {
     pub fn new() -> PPU {
         PPU {
-            line_sprites: Vec::with_capacity(10),
+            fetcher: Fetcher::new(),
+            bgw_fifo: VecDeque::with_capacity(8),
+            obj_fifo: VecDeque::with_capacity(8),
 
-            fetched_entries: Vec::with_capacity(3),
+            visible_sprites: Vec::with_capacity(10),
+            fetched_sprites: [false; 10],
 
-            window_line: 0,
-
-            pixel_fifo: PixelFifo::new(),
+            pushed_x: 0,
+            current_x: 0,
 
             current_frame: 0,
             line_ticks: 0,
