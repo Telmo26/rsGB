@@ -1,6 +1,6 @@
 use std::{error::Error, fmt};
 
-const ROM_TYPES: [&str; 0x23] = [
+pub(super) const ROM_TYPES: [&str; 0x23] = [
     "ROM ONLY",
     "MBC1",
     "MBC1+RAM",

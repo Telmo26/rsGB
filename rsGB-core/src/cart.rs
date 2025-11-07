@@ -1,7 +1,7 @@
 use std::{error::Error, fs};
 
 mod header;
-use header::CartridgeHeader;
+use header::{CartridgeHeader, ROM_TYPES};
 
 mod rom;
 use rom::ROM;

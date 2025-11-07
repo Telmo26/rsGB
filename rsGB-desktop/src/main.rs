@@ -18,7 +18,10 @@ use iced::{
 
 use rs_gb_core::{ColorMode, ThreadedGameboy};
 
-const FRAME_SIZE: usize = 144 * 160 * 4;
+const XRES: u16 = 160;
+const YRES: u16 = 144;
+
+const FRAME_SIZE: usize = XRES as usize * YRES as usize * 4;
 
 fn main() -> iced::Result {
     let args: Vec<String> = env::args().collect();
@@ -112,11 +115,11 @@ impl MainWindow {
     fn update(&mut self, message: Message) {
         match message {
             Message::FrameUpdate => {
-                if let Some(pixels) = self.gameboy.recv_frame(Duration::from_micros(10_000)) {
+                if let Some(pixels) = self.gameboy.recv_frame(Duration::from_micros(16_600)) {
                     self.counter += 1;
                     self.frame_buffer.clear();
                     self.frame_buffer.extend_from_slice(pixels.as_u8_slice());
-                    self.frame_handle = Some(Handle::from_rgba(160, 144, self.frame_buffer.clone()));
+                    self.frame_handle = Some(Handle::from_rgba(XRES as u32, YRES as u32, self.frame_buffer.clone()));
                 }
 
                 let elapsed = self.instant.elapsed();
@@ -135,8 +138,8 @@ impl MainWindow {
         if let Some(handle) = self.frame_handle.as_ref() {
             column![
                 iced::widget::image(handle)
-                    .width(160 * 3)
-                    .height(144 * 3)
+                    .width(XRES * 3)
+                    .height(YRES * 3)
                     .filter_method(iced::widget::image::FilterMethod::Nearest),
             ]
             .into()
