@@ -33,9 +33,7 @@ impl PPU {
             } else {
                 return;
             }
-        }
-
-        if self.bgw_fifo.is_empty() {
+        } else if self.bgw_fifo.is_empty() {
             self.fetcher.fetch(bus);
             if let Some(pixels) = self.fetcher.push_bgw(bus) {
                 self.bgw_fifo.extend(pixels);
@@ -155,9 +153,6 @@ impl PPU {
                 let sprite_x = sprite.x.saturating_sub(8);
 
                 if !self.fetched_sprites[index] && self.pushed_x >= sprite_x && self.pushed_x < sprite_x + 8 {
-                    // println!("Triggering sprite at X={}, pushed_x={}", sprite.x, self.pushed_x);
-                    // println!("SPRITES: {:#?}", self.visible_sprites);
-                    // println!("ALL SPRITES: {:#?}", bus.oam_ram);
                     self.fetcher.trigger_sprite_fetching(*sprite);
                     self.fetched_sprites[index] = true;
                     break;
