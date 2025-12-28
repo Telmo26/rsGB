@@ -13,8 +13,8 @@ trait CartridgeInternals {
     fn read(&self, address: u16) -> u8;
     fn write(&mut self, address: u16, value: u8);
     fn need_save(&mut self) -> bool;
-    fn save(&self, save_path: &str);
-    fn load_save(&mut self, save_path: &str);
+    fn save(&self, save_path: &PathBuf);
+    fn load_save(&mut self, save_path: &PathBuf);
 }
 
 pub struct Cartridge {
@@ -71,11 +71,11 @@ impl Cartridge {
         self.cart_internals.write(address, value);
     }
 
-    pub fn save(&self, save_path: &str) {
+    pub fn save(&self, save_path: &PathBuf) {
         self.cart_internals.save(save_path);
     }
 
-    pub fn load_save(&mut self, save_path: &str) {
+    pub fn load_save(&mut self, save_path: &PathBuf) {
         self.cart_internals.load_save(save_path);
     }
 

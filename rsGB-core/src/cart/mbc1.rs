@@ -1,4 +1,4 @@
-use std::{fs::File, io::{Read, Write}};
+use std::{fs::File, io::{Read, Write}, path::PathBuf};
 
 use crate::cart::{CartridgeInternals};
 
@@ -111,7 +111,7 @@ impl CartridgeInternals for MBC1 {
         need_save
     }
 
-    fn save(&self, save_path: &str) {
+    fn save(&self, save_path: &PathBuf) {
         // Determine how many banks should be saved
         let bank_count = self.ram_banks.iter()
             .filter(|&bank| bank.is_some())
@@ -132,7 +132,7 @@ impl CartridgeInternals for MBC1 {
         file.write_all(&buffer).expect("Failed to write save file");
     }
 
-    fn load_save(&mut self, save_path: &str) {
+    fn load_save(&mut self, save_path: &PathBuf) {
         // If the save file doesn't exist 
         // it will be created on next frame anyway
         if let Ok(mut file) = File::open(save_path) {

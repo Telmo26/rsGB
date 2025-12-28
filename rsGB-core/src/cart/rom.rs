@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::cart::CartridgeInternals;
 
 pub struct ROM {
@@ -22,7 +24,7 @@ impl CartridgeInternals for ROM {
 
     fn need_save(&mut self) -> bool { false }
 
-    fn save(&self, _save_path: &str) {}
+    fn save(&self, _save_path: &PathBuf) {}
 
-    fn load_save(&mut self, _save_path: &str) {}
+    fn load_save(&mut self, _save_path: &PathBuf) {}
 }

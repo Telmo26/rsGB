@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::{
     cart::Cartridge, Button, ColorMode
 };
@@ -194,11 +196,11 @@ impl Interconnect {
         self.cart.as_mut().unwrap().need_save()
     }
 
-    pub fn save(&self, save_path: &str) {
+    pub fn save(&self, save_path: &PathBuf) {
         self.cart.as_ref().unwrap().save(save_path);
     }
 
-    pub fn load_save(&mut self, save_path: &str) {
+    pub fn load_save(&mut self, save_path: &PathBuf) {
         self.cart.as_mut().unwrap().load_save(save_path);
     }
 

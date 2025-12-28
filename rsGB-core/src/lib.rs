@@ -6,14 +6,10 @@ mod ppu;
 mod utils;
 pub mod settings;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::{
-    cart::Cartridge, 
-    cpu::CPU,  
-    interconnect::Interconnect, 
-    ppu::PPU,
-    utils::TICKS_PER_SAMPLE,
+    cart::Cartridge, cpu::CPU, interconnect::Interconnect, ppu::PPU, settings::SaveLocation, utils::TICKS_PER_SAMPLE
 };
 
 pub use debug::DebugInfo;
@@ -99,13 +95,15 @@ pub struct Gameboy {
     cpu: CPU,
     devices: Devices,
 
-    save_path: String,
+    save_path: PathBuf,
 }
 
 impl Gameboy {
     pub fn new<F>(rom_path: &PathBuf, color_mode: ColorMode, audio_callback: F) -> Gameboy 
     where F: FnMut((f32, f32)) + Send + 'static {
-        let save_path = format!("{}.sav", rom_path.file_stem().unwrap().to_str().unwrap()); // Here unwrap is used because we assume a correct extension is checked before
+        // Here unwrap is used because we assume a correct extension is checked before
+        let mut save_path = rom_path.clone(); 
+        save_path.set_extension(".sav");
 
         let mut bus = Interconnect::new(color_mode);
         let ppu = PPU::new();
@@ -134,7 +132,18 @@ impl Gameboy {
         }
         
         if self.devices.bus.need_save() {
-            self.devices.bus.save(&self.save_path);
+            match settings.get_save_location() {
+                SaveLocation::GameLoc => self.devices.bus.save(&self.save_path),
+                SaveLocation::SaveFolder(path) => {
+                    let file_name = Path::new(self.save_path.file_name().unwrap());
+                    
+                    let mut save_path = path.clone();
+                    save_path.push(file_name);
+
+                    self.devices.bus.save(&save_path);
+                }
+            }
+            ;
         }
         self.devices.frames = 0;
         self.devices.detach_buffer();
