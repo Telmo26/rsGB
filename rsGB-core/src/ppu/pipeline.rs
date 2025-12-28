@@ -3,7 +3,7 @@ use crate::{interconnect::Interconnect, ppu::{XRES, utils::{lcd_read_ly, lcd_rea
 use super::PPU;
 
 impl PPU {
-    pub(super) fn process_fifo(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
+    pub(super) fn process_fifo(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) {
         self.check_window_trigger(bus);
 
         self.check_sprite_displayed(bus);
@@ -65,7 +65,9 @@ impl PPU {
 
             let x = self.pushed_x as usize + lcd_read_ly(bus) as usize * XRES;
             
-            framebuffer[x] = pixel;
+            if render {
+                framebuffer[x] = pixel;
+            }
             self.pushed_x += 1;
         }
     }

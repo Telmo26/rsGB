@@ -54,8 +54,8 @@ impl PPU {
         }
     }
 
-    pub fn xfer(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) {
-        self.process_fifo(bus, framebuffer);
+    pub fn xfer(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) {
+        self.process_fifo(bus, framebuffer, render);
 
         if self.pushed_x >= XRES as u8 {
             change_lcd_mode(bus, LCDMode::HBlank);

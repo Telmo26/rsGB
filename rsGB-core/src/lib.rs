@@ -4,6 +4,7 @@ mod debug;
 mod interconnect;
 mod ppu;
 mod utils;
+pub mod settings;
 
 use std::path::PathBuf;
 
@@ -22,13 +23,19 @@ pub use utils::{
     ColorMode
 };
 
+use settings::{
+    Settings,
+};
+
 struct Devices {
     bus: Interconnect,
     ppu: PPU,
 
     audio_callback: Box<dyn FnMut((f32, f32)) + Send>,
     framebuffer: Option<*mut [u32]>,
-    pending_frame: bool,
+
+    speed: u8,
+    frames: u8,
 
     ticks: u64,
     last_sample_tick: u64,
@@ -42,7 +49,10 @@ impl Devices {
             ppu,
             audio_callback: Box::new(audio_callback),
             framebuffer: None,
-            pending_frame: false,
+
+            speed: 1,
+            frames: 0,
+
             ticks: 0,
             last_sample_tick: 0,
         }
@@ -56,8 +66,8 @@ impl Devices {
                 if let Some(ptr) = self.framebuffer {
                     unsafe {
                         let fb = &mut *ptr;
-                        if self.ppu.tick(&mut self.bus, fb) { // Frame updated
-                            self.pending_frame = true;
+                        if self.ppu.tick(&mut self.bus, fb, self.frames == self.speed - 1) { // Frame updated
+                            self.frames += 1;
                         }
                     } 
                 }
@@ -113,16 +123,20 @@ impl Gameboy {
         }
     }
 
-    pub fn next_frame(&mut self, framebuffer: &mut [u32]) {
+    pub fn next_frame(&mut self, framebuffer: &mut [u32], settings: &Settings) {
         self.devices.attach_buffer(framebuffer);
-        while !self.devices.pending_frame {
+
+        let speed = settings.get_speed();
+        self.devices.speed = speed;
+
+        while self.devices.frames < speed {
             self.cpu.step(&mut self.devices);
         }
-
+        
         if self.devices.bus.need_save() {
             self.devices.bus.save(&self.save_path);
         }
-        self.devices.pending_frame = false;
+        self.devices.frames = 0;
         self.devices.detach_buffer();
     }
 
@@ -137,3 +151,4 @@ impl Gameboy {
         }
     }
 }
+

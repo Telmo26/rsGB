@@ -51,7 +51,7 @@ impl PPU {
         }
     }
 
-    pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32]) -> bool {
+    pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) -> bool {
         self.line_ticks += 1;
 
         let lcd_mode = status_mode(bus);
@@ -60,7 +60,7 @@ impl PPU {
             LCDMode::HBlank => self.hblank(bus),
             LCDMode::VBlank => self.vblank(bus),
             LCDMode::OAM => self.oam(bus),
-            LCDMode::XFer => self.xfer(bus, framebuffer),
+            LCDMode::XFer => self.xfer(bus, framebuffer, render),
         };
 
         if self.new_frame {

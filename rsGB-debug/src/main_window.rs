@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::{Duration, Instant}};
 
 use minifb::{Key, Scale, Window, WindowOptions};
-use rs_gb_core::{Button, Gameboy};
+use rs_gb_core::{Button, Gameboy, settings::Settings};
 
 use crate::CustomWindow;
 
@@ -12,6 +12,7 @@ const SCALE: Scale = Scale::X4;
 pub struct MainWindow {
     window: Window,
     gameboy: Rc<RefCell<Gameboy>>,
+    settings: Settings,
     framebuffer: [u32; WIDTH * HEIGHT],
     previous_frame_time: Instant,
     frame_count: u8,
@@ -33,6 +34,7 @@ impl MainWindow {
         MainWindow { 
             window, 
             gameboy,
+            settings: Settings::default(),
             framebuffer: [0; WIDTH * HEIGHT],
             previous_frame_time: Instant::now(),
             frame_count: 0,
@@ -51,7 +53,7 @@ impl CustomWindow for MainWindow {
 
     fn update(&mut self) {
         let mut gb = self.gameboy.borrow_mut();
-        
+
         gb.update_button(Button::A, self.window.is_key_down(Key::Z));
         gb.update_button(Button::B, self.window.is_key_down(Key::X));
         gb.update_button(Button::UP, self.window.is_key_down(Key::Up));
@@ -60,7 +62,7 @@ impl CustomWindow for MainWindow {
         gb.update_button(Button::RIGHT, self.window.is_key_down(Key::Right));
         gb.update_button(Button::START, self.window.is_key_down(Key::P));
         gb.update_button(Button::SELECT, self.window.is_key_down(Key::M));
-        gb.next_frame(&mut self.framebuffer);
+        gb.next_frame(&mut self.framebuffer, &self.settings);
 
         self.window.update_with_buffer(&self.framebuffer, WIDTH, HEIGHT).unwrap();
         self.frame_count += 1;

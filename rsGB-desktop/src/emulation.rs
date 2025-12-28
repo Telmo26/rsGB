@@ -9,7 +9,7 @@ use ringbuf::traits::{Consumer, Producer, Split};
 // local crate import
 use rs_gb_core::{Gameboy, ColorMode};
 
-use crate::utils::{FRAME_SIZE, XRES, YRES};
+use crate::utils::{AppSettings, FRAME_SIZE, XRES, YRES};
 
 pub struct EmulationState {
     gameboy: Gameboy,
@@ -81,8 +81,8 @@ impl EmulationState {
         }
     }
 
-    pub fn render(&mut self, ui: &mut egui::Ui) {
-        self.gameboy.next_frame(&mut self.framebuffer);
+    pub fn render(&mut self, ui: &mut egui::Ui, settings: &AppSettings) {
+        self.gameboy.next_frame(&mut self.framebuffer, settings.emu_settings());
 
         let image_size = [XRES, YRES];
         let color_image = ColorImage::from_rgba_unmultiplied(image_size, cast_slice(&self.framebuffer));
