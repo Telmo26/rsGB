@@ -2,7 +2,9 @@ use std::env;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use rs_gb_core::ThreadedGameboy;
+use ringbuf::traits::{Consumer, Producer, Split};
+
+use rs_gb_core::Gameboy;
 
 mod main_window;
 // mod debug_window;
@@ -19,11 +21,19 @@ fn main() {
         return;
     }
 
+    let (mut audio_sender, mut audio_receiver) = ringbuf::StaticRb::<(f32, f32), 8192>::default().split();
+
     // Creation of the gameboy
-    let mut gameboy = ThreadedGameboy::new(&args[1], rs_gb_core::ColorMode::ARGB, CORE_DEBUG);
+    let  gameboy = Gameboy::new(
+        &args[1], 
+        rs_gb_core::ColorMode::ARGB, 
+        move |sample| { 
+            let _ = audio_sender.try_push(sample);
+        },
+        CORE_DEBUG
+    );
 
     // Preparation of the audio stream
-    let mut audio_receiver = gameboy.audio_receiver();
     let mut previous_audio = (0.0, 0.0);
 
     let host = cpal::default_host();
@@ -34,7 +44,7 @@ fn main() {
         &config.config(), 
         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
             for sample in data.chunks_mut(2) {
-                match audio_receiver.try_recv() {
+                match audio_receiver.try_pop() {
                     Some((left, right)) => {sample[0] = left ; sample[1] = right ; previous_audio = (left, right)}
                     None => {sample[0] = previous_audio.0 ; sample[1] = previous_audio.1},
                 }

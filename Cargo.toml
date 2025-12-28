@@ -1,3 +1,9 @@
 [workspace]
 resolver = "3"
 members=["rsGB-core", "rsGB-debug", "rsGB-desktop"]
+
+[profile.release]
+lto = true        # Link Time Optimization
+codegen-units = 1
+panic = "abort"
+strip = true

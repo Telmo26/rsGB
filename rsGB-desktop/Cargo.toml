@@ -5,5 +5,7 @@ edition = "2024"
 
 [dependencies]
 cpal = "0.16.0"
-iced = { version = "0.13.1", features = ["image", "smol"] }
+eframe = "0.33"
+bytemuck = "1.24"
+ringbuf = "0.4.8"
 rs_gb_core = { path = "../rsGB-core" }

@@ -16,3 +16,25 @@ pub fn bit_set(a: &mut u8, n: u8, on: bool) {
 }
 
 pub const BIT_IGNORE: u8 = 2;
+
+pub type VRAM = [u8; 0x2000];
+
+pub const TICKS_PER_SAMPLE: u64 = 95;
+
+#[derive(Debug, Clone, Copy)]
+pub enum ColorMode {
+    RGBA,
+    ARGB,
+}
+
+#[derive(Debug)]
+pub enum Button {
+    A,
+    B,
+    START,
+    SELECT,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT,
+}
