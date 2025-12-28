@@ -1,5 +1,5 @@
 [package]
-name = "rsGB-desktop"
+name = "rs_gb_desktop"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,4 +8,5 @@ cpal = "0.16.0"
 eframe = "0.33"
 bytemuck = "1.24"
 ringbuf = "0.4.8"
+rfd = "0.16"
 rs_gb_core = { path = "../rsGB-core" }

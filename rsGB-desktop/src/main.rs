@@ -7,16 +7,9 @@ const YRES: usize = 144;
 
 const SCALE: usize = 5;
 
-mod app;
-use app::MyEguiApp;
+use rs_gb_desktop::MyEguiApp;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Usage: rsgb <rom_file>");
-        exit(1)
-    }
-    
+fn main() {    
     let options = NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([(SCALE * XRES + 16) as f32, (SCALE * YRES + 16) as f32])
@@ -25,5 +18,5 @@ fn main() {
     };
     let _ = eframe::run_native("My egui App", 
         options, 
-        Box::new(|cc| Ok(Box::new(MyEguiApp::new(cc, &args[1])))));
+        Box::new(|cc| Ok(Box::new(MyEguiApp::new(cc)))));
 }

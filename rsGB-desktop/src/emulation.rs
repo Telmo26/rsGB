@@ -1,18 +1,17 @@
-use std::time::{Duration, Instant};
+use std::{path::PathBuf, time::{Duration, Instant}};
 
-use eframe::egui::{self, ColorImage};
 use bytemuck::cast_slice;
+// 3rd party crates
 use cpal::{Stream, traits::{DeviceTrait, HostTrait, StreamTrait}};
+use eframe::egui::{self, ColorImage};
 use ringbuf::traits::{Consumer, Producer, Split};
 
+// local crate import
 use rs_gb_core::{Gameboy, ColorMode};
 
-const XRES: usize = 160;
-const YRES: usize = 144;
+use crate::utils::{FRAME_SIZE, XRES, YRES};
 
-const FRAME_SIZE: usize = XRES as usize * YRES as usize;
-
-pub struct MyEguiApp {
+pub struct EmulationState {
     gameboy: Gameboy,
 
     framebuffer: [u32; FRAME_SIZE],
@@ -24,13 +23,8 @@ pub struct MyEguiApp {
     instant: Instant,
 }
 
-impl MyEguiApp {
-    pub fn new(cc: &eframe::CreationContext<'_>, rom_path: &str) -> Self {
-        // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
-        // Restore app state using cc.storage (requires the "persistence" feature).
-        // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
-        // for e.g. egui::PaintCallback.
-
+impl EmulationState {
+    pub fn new(ctx: &egui::Context, rom_path: &PathBuf) -> EmulationState {
         let (mut audio_sender, mut audio_receiver) = ringbuf::StaticRb::<(f32, f32), 8192>::default().split();
 
         let  gameboy = Gameboy::new(
@@ -45,7 +39,7 @@ impl MyEguiApp {
         let framebuffer = [0; FRAME_SIZE];
         let initial_image = ColorImage::new([XRES, YRES], vec![egui::Color32::BLACK; FRAME_SIZE]);
 
-        let frame_texture = cc.egui_ctx.load_texture(
+        let frame_texture = ctx.load_texture(
             "emulator_frame", 
             initial_image, 
             egui::TextureOptions::NEAREST,
@@ -75,28 +69,26 @@ impl MyEguiApp {
         ).unwrap();
 
         _audio_stream.play().unwrap();
+        EmulationState { 
+            gameboy,
 
-        MyEguiApp { 
-            gameboy, 
-            framebuffer, 
+            framebuffer,
             frame_texture,
+
             _audio_stream,
-            counter: 0, 
-            instant: Instant::now() 
+
+            counter: 0,
+            instant: Instant::now(),
         }
     }
-}
 
-impl eframe::App for MyEguiApp {
-   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    pub fn render(&mut self, ui: &mut egui::Ui) {
         self.gameboy.next_frame(&mut self.framebuffer);
 
         let image_size = [XRES, YRES];
         let color_image = ColorImage::from_rgba_unmultiplied(image_size, cast_slice(&self.framebuffer));
 
         self.frame_texture.set(color_image, egui::TextureOptions::NEAREST);
-        
-        ctx.request_repaint();
 
         self.counter += 1;
         let elasped = self.instant.elapsed();
@@ -106,19 +98,17 @@ impl eframe::App for MyEguiApp {
             self.counter = 0;
         }
 
-       egui::CentralPanel::default().show(ctx, |ui| {
-            // Get the screen size to scale the image
-            let screen_width = ui.available_width();
-            
-            // Calculate scale to fit the window while maintaining aspect ratio
-            let scale = (screen_width / XRES as f32).floor();
+        // Get the screen size to scale the image
+        let screen_width = ui.available_width();
+        
+        // Calculate scale to fit the window while maintaining aspect ratio
+        let scale = (screen_width / XRES as f32).floor();
 
-            // Create the Image widget using the texture handle
-            let image_widget = egui::Image::new(&self.frame_texture)
-                .fit_to_original_size(scale); // Scale to 'display_size'
+        // Create the Image widget using the texture handle
+        let image_widget = egui::Image::new(&self.frame_texture)
+            .fit_to_original_size(scale); // Scale to 'display_size'
 
-            // ui.add_space(10.0);
-            ui.add(image_widget);
-       });
-   }
+        // ui.add_space(10.0);
+        ui.add(image_widget);
+    }
 }

@@ -1,4 +1,4 @@
-use std::{error::Error, fs};
+use std::{error::Error, fs, path::PathBuf};
 
 mod header;
 use header::{CartridgeHeader, ROM_TYPES};
@@ -18,14 +18,13 @@ trait CartridgeInternals {
 }
 
 pub struct Cartridge {
-    _filename: String,
     _rom_size: u32,
     _header: CartridgeHeader,
     cart_internals: Box<dyn CartridgeInternals + Send>,
 }
 
 impl Cartridge {
-    pub fn load(path: &str) -> Result<Cartridge, Box<dyn Error>> {
+    pub fn load(path: &PathBuf) -> Result<Cartridge, Box<dyn Error>> {
         let rom_data = fs::read(path)?;
         let rom_size = (rom_data.len() * 8) as u32;
 
@@ -58,7 +57,6 @@ impl Cartridge {
         // println!("\t ROM Vers : {}", header.version);
 
         Ok(Cartridge {
-            _filename: path.to_string(),
             _rom_size: rom_size,
             _header: header,
             cart_internals,

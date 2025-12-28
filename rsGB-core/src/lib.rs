@@ -5,6 +5,8 @@ mod interconnect;
 mod ppu;
 mod utils;
 
+use std::path::PathBuf;
+
 use crate::{
     cart::Cartridge, 
     cpu::CPU, 
@@ -95,9 +97,9 @@ pub struct Gameboy {
 }
 
 impl Gameboy {
-    pub fn new<F>(rom_path: &str, color_mode: ColorMode, audio_callback: F, debug: bool) -> Gameboy 
+    pub fn new<F>(rom_path: &PathBuf, color_mode: ColorMode, audio_callback: F, debug: bool) -> Gameboy 
     where F: FnMut((f32, f32)) + Send + 'static {
-        let save_path = rom_path.replace(".gb", ".sav");
+        let save_path = format!("{}.sav", rom_path.file_stem().unwrap().to_str().unwrap()); // Here unwrap is used because we assume a correct extension is checked before
 
         let mut bus = Interconnect::new(color_mode);
         let ppu = PPU::new();

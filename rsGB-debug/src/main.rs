@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, path::PathBuf};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -23,9 +23,11 @@ fn main() {
 
     let (mut audio_sender, mut audio_receiver) = ringbuf::StaticRb::<(f32, f32), 8192>::default().split();
 
+    let rom_path = PathBuf::from(&args[1]);
+
     // Creation of the gameboy
     let  gameboy = Gameboy::new(
-        &args[1], 
+        &rom_path, 
         rs_gb_core::ColorMode::ARGB, 
         move |sample| { 
             let _ = audio_sender.try_push(sample);
