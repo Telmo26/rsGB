@@ -1,7 +1,9 @@
-use std::{sync::mpsc::Receiver, time::Duration};
+use std::{cell::RefCell, rc::Rc};
 
 use minifb::{Scale, Window, WindowOptions};
-use rs_gb_core::DebugCommunicator;
+use rs_gb_core::Gameboy;
+
+use crate::CustomWindow;
 
 // Add a pixel between all tiles
 const DEBUG_WIDTH: usize = 16 * 8 + 16 + 1; 
@@ -13,11 +15,11 @@ const COLORS: [u32; 4] = [0x00FFFFFF, 0x00AAAAAA, 0x00555555, 0x00000000];
 pub struct DebugWindow {
     window: Window,
     buffer: [u32; DEBUG_WIDTH * DEBUG_HEIGHT],
-    comm: DebugCommunicator,
+    gameboy: Rc<RefCell<Gameboy>>,
 }
 
 impl DebugWindow {
-    pub fn new(comm: DebugCommunicator) -> DebugWindow {
+    pub fn new(gameboy: Rc<RefCell<Gameboy>>) -> DebugWindow {
         let mut window = Window::new(
                         "Debug Window",
                         DEBUG_WIDTH, 
@@ -26,6 +28,7 @@ impl DebugWindow {
                             scale: SCALE,
                             ..WindowOptions::default()
                         }).unwrap();
+
         window.set_target_fps(60);
         let buffer = [0x00000000; DEBUG_WIDTH * DEBUG_HEIGHT];
 
@@ -34,14 +37,22 @@ impl DebugWindow {
         DebugWindow { 
             window,
             buffer,
-            comm
+            gameboy,
         }
     }
+}
 
-    pub fn update(&mut self) {
-        let vram = &*self.comm.vram_recv();
+impl CustomWindow for DebugWindow {
+    fn is_main(&self) -> bool {
+        false
+    }
+    
+    fn update(&mut self) {
+        let gb = self.gameboy.borrow();
+        let debug_info = gb.debug();
+        let tiles = debug_info.get_tiles();
+
         self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
-        let (tiles, _) = vram.as_chunks::<16>();
 
         for y in 0..24 {
             for x in 0..16 {
@@ -51,7 +62,7 @@ impl DebugWindow {
         }
     }
 
-    pub fn is_open(&self) -> bool {
+    fn is_open(&self) -> bool {
         self.window.is_open()
     }
 }

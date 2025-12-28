@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{cell::RefCell, env, path::PathBuf, rc::Rc};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -7,11 +7,11 @@ use ringbuf::traits::{Consumer, Producer, Split};
 use rs_gb_core::Gameboy;
 
 mod main_window;
-// mod debug_window;
-use main_window::MainWindow;
-// use debug_window::DebugWindow;
+mod debug_window;
 
-const CORE_DEBUG: bool = false;
+use main_window::MainWindow;
+use debug_window::DebugWindow;
+
 
 fn main() {
     // Parsing of the arguments
@@ -31,8 +31,7 @@ fn main() {
         rs_gb_core::ColorMode::ARGB, 
         move |sample| { 
             let _ = audio_sender.try_push(sample);
-        },
-        CORE_DEBUG
+        }
     );
 
     // Preparation of the audio stream
@@ -61,10 +60,12 @@ fn main() {
     stream.play().unwrap();
 
     // Creation of the windows
-    let mut windows = Vec::new();
+    let mut windows: Vec<Box<dyn CustomWindow>> = Vec::new();
 
-    let main_window = MainWindow::new(gameboy);
-    windows.push(CustomWindow::MainWindow(main_window));    
+    let gameboy = Rc::new(RefCell::new(gameboy));
+
+    windows.push(Box::new(MainWindow::new(gameboy.clone())));
+    windows.push(Box::new(DebugWindow::new(gameboy)));  
 
     // Updating the windows
     while windows.iter().any(|w| w.is_main() && w.is_open()) {
@@ -79,27 +80,8 @@ fn main() {
     }
 }
 
-
-enum CustomWindow {
-    MainWindow(MainWindow),
-}
-
-impl CustomWindow {
-    fn is_open(&self) -> bool {
-        match self {
-            CustomWindow::MainWindow(w) => w.is_open(),
-        }
-    }
-
-    fn is_main(&self) -> bool {
-        match self {
-            CustomWindow::MainWindow(_) => true,
-        }
-    }
-
-    fn update(&mut self) {
-        match self {
-            CustomWindow::MainWindow(w) => w.update(),
-        }
-    }
+trait CustomWindow {
+    fn is_open(&self) -> bool;
+    fn is_main(&self) -> bool;
+    fn update(&mut self);
 }

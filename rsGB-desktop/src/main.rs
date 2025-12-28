@@ -1,5 +1,3 @@
-use std::{env, process::exit};
-
 use eframe::{NativeOptions, egui};
 
 const XRES: usize = 160;

@@ -30,7 +30,7 @@ pub use oam::OAMEntry;
 
 pub struct Interconnect {
     cart: Option<Cartridge>,
-    vram: [u8; 0x2000],
+    pub(crate) vram: [u8; 0x2000],
     ram: RAM,
     oam_ram: [OAMEntry; 40],
     io: IO,

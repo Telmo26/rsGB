@@ -49,7 +49,6 @@ impl eframe::App for MyEguiApp {
             })
         });
 
-
         egui::CentralPanel::default().show(ctx, |ui| {
             if let Some(emu_state) = &mut self.emulation_state {
                 emu_state.render(ui);

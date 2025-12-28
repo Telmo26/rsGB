@@ -1,6 +1,6 @@
 mod cart;
 mod cpu;
-mod dbg;
+mod debug;
 mod interconnect;
 mod ppu;
 mod utils;
@@ -9,15 +9,13 @@ use std::path::PathBuf;
 
 use crate::{
     cart::Cartridge, 
-    cpu::CPU, 
-    dbg::Debugger, 
+    cpu::CPU,  
     interconnect::Interconnect, 
-    ppu::PPU
+    ppu::PPU,
+    utils::TICKS_PER_SAMPLE,
 };
 
-use utils::{
-    TICKS_PER_SAMPLE
-};
+pub use debug::DebugInfo;
 
 pub use utils::{
     Button,
@@ -32,13 +30,12 @@ struct Devices {
     framebuffer: Option<*mut [u32]>,
     pending_frame: bool,
 
-    debugger: Option<Debugger>,
     ticks: u64,
     last_sample_tick: u64,
 }
 
 impl Devices {
-    fn new<F>(bus: Interconnect, ppu: PPU, audio_callback: F, debug: bool) -> Devices 
+    fn new<F>(bus: Interconnect, ppu: PPU, audio_callback: F) -> Devices 
     where F: FnMut((f32, f32)) + Send + 'static {
         Devices {
             bus,
@@ -46,7 +43,6 @@ impl Devices {
             audio_callback: Box::new(audio_callback),
             framebuffer: None,
             pending_frame: false,
-            debugger: if debug { Some(Debugger::new()) } else { None },
             ticks: 0,
             last_sample_tick: 0,
         }
@@ -97,7 +93,7 @@ pub struct Gameboy {
 }
 
 impl Gameboy {
-    pub fn new<F>(rom_path: &PathBuf, color_mode: ColorMode, audio_callback: F, debug: bool) -> Gameboy 
+    pub fn new<F>(rom_path: &PathBuf, color_mode: ColorMode, audio_callback: F) -> Gameboy 
     where F: FnMut((f32, f32)) + Send + 'static {
         let save_path = format!("{}.sav", rom_path.file_stem().unwrap().to_str().unwrap()); // Here unwrap is used because we assume a correct extension is checked before
 
@@ -108,7 +104,7 @@ impl Gameboy {
         bus.set_cart(cartridge);
         bus.load_save(&save_path);
 
-        let devices = Devices::new(bus, ppu, audio_callback, debug);
+        let devices = Devices::new(bus, ppu, audio_callback);
         Gameboy {
             cpu: CPU::new(),
             devices,
@@ -132,5 +128,12 @@ impl Gameboy {
 
     pub fn update_button(&mut self, button: Button, value: bool) {
         self.devices.bus.update_button(button, value);
+    }
+
+    pub fn debug(&self) -> DebugInfo {
+        DebugInfo {
+            cpu_registers: &self.cpu.registers,
+            vram: &self.devices.bus.vram
+        }
     }
 }

@@ -32,8 +32,7 @@ impl EmulationState {
             ColorMode::ARGB, 
             move |sample| { 
                 let _ = audio_sender.try_push(sample);
-            },
-            false
+            }
         );
 
         let framebuffer = [0; FRAME_SIZE];

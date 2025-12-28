@@ -1,6 +1,6 @@
 mod proc;
 mod instruction;
-mod registers;
+pub mod registers;
 mod stack;
 pub mod interrupts;
 mod fetch_data;
@@ -54,15 +54,10 @@ impl CPU {
         }
 
         if !self.halted {
-            let previous_pc = self.registers.pc;
 
             self.fetch_instruction(dev);
             dev.incr_cycle(1);
             self.fetch_data(dev);
-
-            if let Some(debugger) = &mut dev.debugger {
-                debugger.debug_info(self, &mut dev.bus, dev.ticks, previous_pc);
-            }
 
             self.execute(dev, self.curr_inst.in_type);
             
