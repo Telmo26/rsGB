@@ -1,17 +1,12 @@
 use eframe::{NativeOptions, egui};
 
-const XRES: usize = 160;
-const YRES: usize = 144;
-
-const SCALE: usize = 5;
-
 use rs_gb_desktop::MyEguiApp;
 
 fn main() {    
     let options = NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([(SCALE * XRES + 16) as f32, (SCALE * YRES + 16) as f32])
-            .with_title("Egui Emulator Display"),
+            .with_title("Egui Emulator Display")
+            .with_inner_size((900.0, 675.0)),
         ..Default::default()
     };
     let _ = eframe::run_native("My egui App", 

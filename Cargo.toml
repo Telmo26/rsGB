@@ -3,7 +3,7 @@ resolver = "3"
 members = ["rsGB-core", "rsGB-debug", "rsGB-desktop"]
 
 [profile.release]
-lto = true        # Link Time Optimization
+lto = true
 codegen-units = 1
 panic = "abort"
 strip = true

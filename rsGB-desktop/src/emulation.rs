@@ -81,8 +81,15 @@ impl EmulationState {
         }
     }
 
-    pub fn render(&mut self, ui: &mut egui::Ui, settings: &AppSettings) {
-        self.gameboy.next_frame(&mut self.framebuffer, settings.emu_settings());
+    pub fn render(&mut self, ctx: &egui::Context, settings: &AppSettings) {
+        ctx.input(|i | {
+            for (key, button) in settings.key_map() {
+                self.gameboy.update_button(button, i.key_down(key));
+            }
+        });
+
+
+        self.gameboy.next_frame(&mut self.framebuffer, &settings.emu_settings());
 
         let image_size = [XRES, YRES];
         let color_image = ColorImage::from_rgba_unmultiplied(image_size, cast_slice(&self.framebuffer));
@@ -97,17 +104,20 @@ impl EmulationState {
             self.counter = 0;
         }
 
-        // Get the screen size to scale the image
-        let screen_width = ui.available_width();
-        
-        // Calculate scale to fit the window while maintaining aspect ratio
-        let scale = (screen_width / XRES as f32).floor();
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.centered_and_justified(|ui| {
+                let available_width = ui.available_width();
+                let x_scale = (available_width / XRES as f32).floor();
 
-        // Create the Image widget using the texture handle
-        let image_widget = egui::Image::new(&self.frame_texture)
-            .fit_to_original_size(scale); // Scale to 'display_size'
+                let available_height = ui.available_height();
+                let y_scale = (available_height / YRES as f32).floor();
 
-        // ui.add_space(10.0);
-        ui.add(image_widget);
+                let scale = x_scale.min(y_scale);
+
+                let image_widget = egui::Image::new(&self.frame_texture)
+                    .fit_to_original_size(scale);
+                ui.add(image_widget);
+            });
+        });
     }
 }

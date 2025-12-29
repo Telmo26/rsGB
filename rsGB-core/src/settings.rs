@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
+#[derive(Debug, Clone)]
 pub struct Settings {
-    speed: SpeedOption,
-    save_location: SaveLocation,
+    pub speed: SpeedOption,
+    pub save_location: SaveLocation,
 }
 
 impl Settings {
@@ -24,10 +25,6 @@ impl Settings {
         self.speed = speed;
     }
 
-    pub fn get_speed(&self) -> u8 {
-        self.speed as u8
-    }
-
     pub fn set_save_location(&mut self, save_location: SaveLocation) {
         self.save_location = save_location;
     }
@@ -37,7 +34,7 @@ impl Settings {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SpeedOption {
     Normal = 1,
     X2 = 2,

@@ -68,7 +68,7 @@ impl Devices {
                     } 
                 }
 
-                if self.ticks - self.last_sample_tick >= TICKS_PER_SAMPLE {
+                if self.ticks - self.last_sample_tick >= TICKS_PER_SAMPLE * self.speed as u64 {
                     if let Some(sample) = self.bus.apu_output() {
                         (self.audio_callback)(sample)
                     }
@@ -124,7 +124,7 @@ impl Gameboy {
     pub fn next_frame(&mut self, framebuffer: &mut [u32], settings: &Settings) {
         self.devices.attach_buffer(framebuffer);
 
-        let speed = settings.get_speed();
+        let speed = settings.speed as u8;
         self.devices.speed = speed;
 
         while self.devices.frames < speed {
