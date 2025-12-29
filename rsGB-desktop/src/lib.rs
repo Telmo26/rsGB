@@ -5,11 +5,11 @@ use eframe::egui;
 use rfd::FileDialog;
 
 // child modules
-mod utils;
+mod settings;
 mod emulation;
 
 use crate::{
-    emulation::EmulationState, utils::AppSettings
+    emulation::EmulationState, settings::AppSettings
 };
 
 
@@ -61,20 +61,18 @@ impl eframe::App for MyEguiApp {
             });
             
             if self.display_settings.load(Ordering::Relaxed) {
-                let show_settings = self.display_settings.clone();
-                let settings = self.app_settings.clone();
-                ctx.show_viewport_deferred(
+                ctx.show_viewport_immediate(
                     egui::ViewportId::from_hash_of("settings"), 
                     egui::ViewportBuilder::default()
                         .with_always_on_top()
                         .with_title("Settings"),
-                    move |ctx, _class| {
-                        settings.render(ctx);
+                    |ctx, _class| {
+                        self.app_settings.render(ctx);
 
                         egui::CentralPanel::default().show(ctx, |ui| {
                             if ui.input(|i| i.viewport().close_requested()) {
                                 // Tell parent to close us.
-                                show_settings.store(false, Ordering::Relaxed);
+                                self.display_settings.store(false, Ordering::Relaxed);
                             }
                         });
                     }

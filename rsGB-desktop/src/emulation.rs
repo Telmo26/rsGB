@@ -9,7 +9,7 @@ use ringbuf::traits::{Consumer, Producer, Split};
 // local crate import
 use rs_gb_core::{Gameboy, ColorMode};
 
-use crate::utils::{AppSettings, FRAME_SIZE, XRES, YRES};
+use crate::settings::{AppSettings, FRAME_SIZE, XRES, YRES};
 
 pub struct EmulationState {
     gameboy: Gameboy,
@@ -84,7 +84,7 @@ impl EmulationState {
     pub fn render(&mut self, ctx: &egui::Context, settings: &AppSettings) {
         ctx.input(|i | {
             for (key, button) in settings.key_map() {
-                self.gameboy.update_button(button, i.key_down(key));
+                self.gameboy.update_button(*button, i.key_down(*key));
             }
         });
 
