@@ -1,10 +1,17 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use eframe::egui::{self, Key};
+
 use rs_gb_core::{
     Button,
-    settings::{SaveLocation, Settings, SpeedOption},
+    settings::{SaveLocation, Settings},
 };
+
+mod bindings;
+mod save_location;
+
+use bindings::bindings_widget;
+use save_location::save_location_widget;
 
 pub const XRES: usize = 160;
 pub const YRES: usize = 144;
@@ -12,7 +19,7 @@ pub const YRES: usize = 144;
 pub const FRAME_SIZE: usize = XRES as usize * YRES as usize;
 
 pub struct AppSettings {
-    emu_settings: Settings,
+    pub(crate) emu_settings: Settings,
     key_map: HashMap<Key, Button>,
 
     awaiting_input: Option<Button>,
@@ -47,104 +54,33 @@ impl AppSettings {
         &self.key_map
     }
 
-    pub fn render(&mut self, ctx: &egui::Context) {
-        let mut is_save_next_to_rom = matches!(self.emu_settings.save_location, SaveLocation::GameLoc);
+    pub fn render(&mut self, ctx: &egui::Context) -> bool {
+        let mut stay_open = true;
 
-        egui::SidePanel::left("emulation_settings").show(ctx, |ui| {
-            ui.heading("Emulation Settings");
-
-            ui.separator();
-
-            ui.label("Emulation speed");
-            ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.emu_settings.speed, SpeedOption::Normal, "1x");
-                ui.selectable_value(&mut self.emu_settings.speed, SpeedOption::X2, "2x");
-                ui.selectable_value(&mut self.emu_settings.speed, SpeedOption::X3, "3x");
-                ui.selectable_value(&mut self.emu_settings.speed, SpeedOption::X4, "4x");
-            });
-
-            ui.add_space(20.0);
-
-            ui.label("Save Folder");
-            if ui.checkbox(&mut is_save_next_to_rom, "Save next to the rom file").changed() {
-                self.emu_settings.save_location = if is_save_next_to_rom {
-                    SaveLocation::GameLoc
-                } else {
-                    SaveLocation::SaveFolder(PathBuf::new())
-                };
-            }
-
-            if let SaveLocation::SaveFolder(ref mut path_buf) = self.emu_settings.save_location {
-                ui.horizontal(|ui| {
-                    let mut path_str = path_buf.to_string_lossy().to_string();
-                    
-                    if ui.text_edit_singleline(&mut path_str).changed() {
-                        *path_buf = PathBuf::from_str(&path_str).expect("Invalid UTF-8 path typed")
-                    }
-
-                    if ui.button("📂").clicked() {
-                        if let Some(folder) = rfd::FileDialog::new().pick_folder() {
-                            *path_buf = folder;
-                        }
-                    }
-                });
-            }
-        });
-
-        egui::SidePanel::right("app_settings").show(ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("App Settings");
 
             ui.separator();
 
-            ui.label("Button binding");
-
-            let buttons = [Button::A, Button::B, Button::DOWN, Button::LEFT, Button::RIGHT, Button::SELECT, Button::START, Button::UP];
-                    
-            egui::Grid::new("bindings")
-                .num_columns(2)
-                .striped(true)
+            egui::Grid::new("settings_grid")
+                .num_columns(3)
+                .spacing([40.0, 10.0]) // [horizontal, vertical] spacing
+                .min_col_width(200.0)
+                .max_col_width(200.0)
                 .show(ui, |ui| {
-                    for button in buttons {
-                            ui.label(format!("{:?}", button));
+                    bindings_widget(self, ui);
 
-                            let bound_key = self.key_map.iter()
-                                .find(|(_, v)| **v == button)
-                                .map(|(&k, _)| k);
+                    save_location_widget(self, ui);
 
-                            if self.awaiting_input == Some(button) {
-                                if ui.button("Wait for key...").clicked() {
-                                    self.awaiting_input = None; // Cancel if clicked again
-                                }
-
-                                ui.input(|i| {
-                                    if let Some(key) = i.keys_down.iter().next() {
-                                        // We keep the other settings
-                                        self.key_map.retain(|&k, _| k != *key);
-                                        self.key_map.retain(|_, &mut v| v != button);
-
-                                        // We update the setting we want
-                                        self.key_map.insert(*key, button);
-
-                                        self.awaiting_input = None;
-                                    }
-                                });
-                            } else {
-                                let btn_text = match bound_key {
-                                    Some(k) => format!("{:?}", k),
-                                    None => "Unbound".to_string(),
-                                };
-
-                                if ui.button(btn_text).clicked() {
-                                    self.awaiting_input = Some(button);
-                                }
-                            }
-                            ui.end_row();
-                    }
+                    ui.end_row();
+                    
                 });
-                 
-            if self.awaiting_input.is_some() {
-                ui.label(egui::RichText::new("Press a key to bind it...").color(egui::Color32::YELLOW));
+
+            if ui.input(|i| i.viewport().close_requested()) {
+                // Tell parent to close us.
+                    stay_open = false;
             }
         });
+        stay_open
     }
 }

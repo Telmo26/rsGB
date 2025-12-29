@@ -1,23 +1,28 @@
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-
 // third party crates imports
 use eframe::egui;
 use rfd::FileDialog;
+use rs_gb_core::settings::SpeedOption;
 
 // child modules
 mod settings;
 mod emulation;
+mod debugger;
 
 use crate::{
-    emulation::EmulationState, settings::AppSettings
+    emulation::EmulationState, 
+    settings::AppSettings,
+    debugger::Debugger,
 };
 
 
 pub struct MyEguiApp {
     emulation_state: Option<EmulationState>,
+    debugger: Option<Debugger>,
+    
     app_settings: AppSettings,
 
-    display_settings: Arc<AtomicBool>,
+    display_debugger: bool,
+    display_settings: bool,
 }
 
 impl MyEguiApp {
@@ -29,9 +34,12 @@ impl MyEguiApp {
 
         MyEguiApp { 
             emulation_state: None,
+            debugger: None,
+
             app_settings: AppSettings::new(),
 
-            display_settings: Arc::new(AtomicBool::new(false)),
+            display_debugger: false,
+            display_settings: false,
         }
     }
 }
@@ -51,32 +59,55 @@ impl eframe::App for MyEguiApp {
 
                         if let Some(file) = file {
                             self.emulation_state = Some(EmulationState::new(ctx, &file));
+                            self.debugger = Some(Debugger::new());
                         }
                     }
                 });
 
+                ui.menu_button("Emulation", |ui| {
+                    ui.add_enabled_ui(self.emulation_state.is_some(), |ui| {
+                        ui.menu_button("Speed", |ui| {
+                            ui.selectable_value(&mut self.app_settings.emu_settings.speed, SpeedOption::Normal, "1x");
+                            ui.selectable_value(&mut self.app_settings.emu_settings.speed, SpeedOption::X2, "2x");
+                            ui.selectable_value(&mut self.app_settings.emu_settings.speed, SpeedOption::X3, "3x");
+                            ui.selectable_value(&mut self.app_settings.emu_settings.speed, SpeedOption::X4, "4x");
+                        });
+
+                        ui.separator();
+
+                        if ui.button("Debugger").clicked() {
+                            self.display_debugger = true;
+                        }
+                    })
+                });
+
                 if ui.button("Settings").clicked() {
-                    self.display_settings.store(true, Ordering::Relaxed);
+                    self.display_settings = true;
                 }
             });
             
-            if self.display_settings.load(Ordering::Relaxed) {
+            if self.display_settings {
                 ctx.show_viewport_immediate(
                     egui::ViewportId::from_hash_of("settings"), 
                     egui::ViewportBuilder::default()
                         .with_always_on_top()
                         .with_title("Settings"),
                     |ctx, _class| {
-                        self.app_settings.render(ctx);
-
-                        egui::CentralPanel::default().show(ctx, |ui| {
-                            if ui.input(|i| i.viewport().close_requested()) {
-                                // Tell parent to close us.
-                                self.display_settings.store(false, Ordering::Relaxed);
-                            }
-                        });
+                        self.display_settings = self.app_settings.render(ctx);
                     }
                 );
+            }
+
+            if self.display_debugger && let Some(ref mut debugger) = self.debugger {
+                ctx.show_viewport_immediate(
+                    egui::ViewportId::from_hash_of("debugger"), 
+                    egui::ViewportBuilder::default()
+                        .with_always_on_top()
+                        .with_title("Debugger"), 
+                    |ctx, _class| {
+                        let debug_info = self.emulation_state.as_ref().unwrap().debug_info();
+                        self.display_debugger = debugger.render(ctx, debug_info);
+                    })
             }
         });
 

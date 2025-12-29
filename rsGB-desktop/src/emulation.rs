@@ -7,7 +7,7 @@ use eframe::egui::{self, ColorImage};
 use ringbuf::traits::{Consumer, Producer, Split};
 
 // local crate import
-use rs_gb_core::{Gameboy, ColorMode};
+use rs_gb_core::{ColorMode, DebugInfo, Gameboy};
 
 use crate::settings::{AppSettings, FRAME_SIZE, XRES, YRES};
 
@@ -118,5 +118,9 @@ impl EmulationState {
                 ui.add(image_widget);
             });
         });
+    }
+
+    pub fn debug_info(&self) -> DebugInfo {
+        self.gameboy.debug()
     }
 }
