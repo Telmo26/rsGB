@@ -4,7 +4,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 use ringbuf::traits::{Consumer, Producer, Split};
 
-use rs_gb_core::Gameboy;
+use rs_gb_core::{Gameboy, settings::Settings};
 
 mod main_window;
 mod debug_window;
@@ -26,13 +26,13 @@ fn main() {
     let rom_path = PathBuf::from(&args[1]);
 
     // Creation of the gameboy
-    let  gameboy = Gameboy::new(
-        &rom_path, 
+    let mut gameboy = Gameboy::new( 
         rs_gb_core::ColorMode::ARGB, 
         move |sample| { 
             let _ = audio_sender.try_push(sample);
         }
     );
+    gameboy.load_cartridge(&rom_path, &Settings::default());
 
     // Preparation of the audio stream
     let mut previous_audio = (0.0, 0.0);

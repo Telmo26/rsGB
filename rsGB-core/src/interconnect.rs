@@ -31,7 +31,7 @@ pub use oam::OAMEntry;
 // 0xFF80 - 0xFFFE : Zero Page
 
 pub struct Interconnect {
-    cart: Option<Cartridge>,
+    pub(crate) cart: Option<Cartridge>,
     pub(crate) vram: [u8; 0x2000],
     ram: RAM,
     oam_ram: [OAMEntry; 40],

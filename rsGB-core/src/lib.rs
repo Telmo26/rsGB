@@ -99,26 +99,44 @@ pub struct Gameboy {
 }
 
 impl Gameboy {
-    pub fn new<F>(rom_path: &PathBuf, color_mode: ColorMode, audio_callback: F) -> Gameboy 
+    pub fn new<F>(color_mode: ColorMode, audio_callback: F) -> Gameboy 
     where F: FnMut((f32, f32)) + Send + 'static {
-        // Here unwrap is used because we assume a correct extension is checked before
-        let mut save_path = rom_path.clone(); 
-        save_path.set_extension(".sav");
-
-        let mut bus = Interconnect::new(color_mode);
+        let bus = Interconnect::new(color_mode);
         let ppu = PPU::new();
-
-        let cartridge = Cartridge::load(rom_path).unwrap();
-        bus.set_cart(cartridge);
-        bus.load_save(&save_path);
 
         let devices = Devices::new(bus, ppu, audio_callback);
         Gameboy {
             cpu: CPU::new(),
             devices,
 
-            save_path,
+            save_path: PathBuf::new(),
         }
+    }
+
+    pub fn load_cartridge(&mut self, rom_path: &PathBuf, settings: &Settings) {
+        // Here unwrap is used because we assume a correct extension is checked before
+        let mut save_path = rom_path.clone(); 
+        save_path.set_extension(".sav");
+
+        let save_path = match settings.get_save_location() {
+            SaveLocation::GameLoc => {
+                let mut clone = rom_path.clone();
+                clone.set_extension(".sav");
+                clone
+            },
+            SaveLocation::SaveFolder(path) => {
+                let file_name = Path::new(self.save_path.file_name().unwrap());
+                
+                let mut clone = path.clone();
+                clone.push(file_name);
+
+                clone
+            }
+        };
+
+        let cartridge = Cartridge::load(rom_path).unwrap();
+        self.devices.bus.set_cart(cartridge);
+        self.devices.bus.load_save(&save_path);
     }
 
     pub fn next_frame(&mut self, framebuffer: &mut [u32], settings: &Settings) {
@@ -132,18 +150,7 @@ impl Gameboy {
         }
         
         if self.devices.bus.need_save() {
-            match settings.get_save_location() {
-                SaveLocation::GameLoc => self.devices.bus.save(&self.save_path),
-                SaveLocation::SaveFolder(path) => {
-                    let file_name = Path::new(self.save_path.file_name().unwrap());
-                    
-                    let mut save_path = path.clone();
-                    save_path.push(file_name);
-
-                    self.devices.bus.save(&save_path);
-                }
-            }
-            ;
+            
         }
         self.devices.frames = 0;
         self.devices.detach_buffer();
@@ -153,8 +160,12 @@ impl Gameboy {
         self.devices.bus.update_button(button, value);
     }
 
+    pub fn cartridge_loaded(&self) -> bool {
+        self.devices.bus.cart.is_some()
+    }
+
     pub fn debug(&self) -> DebugInfo {
-        DebugInfo::new(&self.cpu, &self.devices.bus.vram)
+        DebugInfo::new(&self.cpu, &self.devices.bus.vram, &self.devices.bus.cart.as_ref().unwrap())
     }
 }
 

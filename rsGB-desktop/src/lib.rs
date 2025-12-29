@@ -16,8 +16,8 @@ use crate::{
 
 
 pub struct MyEguiApp {
-    emulation_state: Option<EmulationState>,
-    debugger: Option<Debugger>,
+    emulation_state: EmulationState,
+    debugger: Debugger,
     
     app_settings: AppSettings,
 
@@ -26,15 +26,15 @@ pub struct MyEguiApp {
 }
 
 impl MyEguiApp {
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
         // Restore app state using cc.storage (requires the "persistence" feature).
         // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
         // for e.g. egui::PaintCallback.
 
         MyEguiApp { 
-            emulation_state: None,
-            debugger: None,
+            emulation_state: EmulationState::new(cc),
+            debugger: Debugger::new(),
 
             app_settings: AppSettings::new(),
 
@@ -58,14 +58,13 @@ impl eframe::App for MyEguiApp {
                             .pick_file();
 
                         if let Some(file) = file {
-                            self.emulation_state = Some(EmulationState::new(ctx, &file));
-                            self.debugger = Some(Debugger::new());
+                            self.emulation_state.load_cartridge(&file, &self.app_settings);
                         }
                     }
                 });
 
                 ui.menu_button("Emulation", |ui| {
-                    ui.add_enabled_ui(self.emulation_state.is_some(), |ui| {
+                    ui.add_enabled_ui(self.emulation_state.cartridge_loaded(), |ui| {
                         ui.menu_button("Speed", |ui| {
                             ui.selectable_value(&mut self.app_settings.emu_settings.speed, SpeedOption::Normal, "1x");
                             ui.selectable_value(&mut self.app_settings.emu_settings.speed, SpeedOption::X2, "2x");
@@ -98,21 +97,21 @@ impl eframe::App for MyEguiApp {
                 );
             }
 
-            if self.display_debugger && let Some(ref mut debugger) = self.debugger {
+            if self.display_debugger {
                 ctx.show_viewport_immediate(
                     egui::ViewportId::from_hash_of("debugger"), 
                     egui::ViewportBuilder::default()
                         .with_always_on_top()
                         .with_title("Debugger"), 
                     |ctx, _class| {
-                        let debug_info = self.emulation_state.as_ref().unwrap().debug_info();
-                        self.display_debugger = debugger.render(ctx, debug_info);
+                        let debug_info = self.emulation_state.debug_info();
+                        self.display_debugger = self.debugger.render(ctx, debug_info);
                     })
             }
         });
 
-        if let Some(emu_state) = &mut self.emulation_state {
-            emu_state.render(ctx, &self.app_settings);
+        if self.emulation_state.cartridge_loaded() {
+            self.emulation_state.render(ctx, &self.app_settings);
         }
    }
 }

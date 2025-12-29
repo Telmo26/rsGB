@@ -1,18 +1,20 @@
 use std::collections::HashMap;
 
-use crate::{cpu::{CPU}, utils::VRAM};
+use crate::{cart::Cartridge, cpu::CPU, utils::VRAM};
 
 pub struct DebugInfo<'dbg> {
     pub(crate) cpu: &'dbg CPU,
     pub(crate) vram: &'dbg VRAM,
+    pub(crate) cartridge: &'dbg Cartridge,
     instruction_text: String,
 }
 
 impl<'dbg> DebugInfo<'dbg> {
-    pub fn new(cpu: &'dbg CPU, vram: &'dbg VRAM) -> DebugInfo<'dbg> {
+    pub fn new(cpu: &'dbg CPU, vram: &'dbg VRAM, cartridge: &'dbg Cartridge) -> DebugInfo<'dbg> {
         DebugInfo {
             cpu,
             vram,
+            cartridge,
             instruction_text: String::new(),
         }
     } 
@@ -44,5 +46,46 @@ impl<'dbg> DebugInfo<'dbg> {
         reg.insert("sp", self.cpu.registers.sp);  
 
         reg
+    }
+
+    pub fn game_name(&self) -> &str {
+        &self.cartridge.header.title
+    }
+
+    pub fn game_license(&self) -> &str {
+        self.cartridge.header.get_lic_name()
+    }
+
+    pub fn game_cartridge_type(&self) -> &str {
+        self.cartridge.header.get_cart_type()
+    }
+
+    pub fn game_supports_sgb(&self) -> bool {
+        self.cartridge.header.sgb_flag == 0x03
+    }
+
+    pub fn game_type(&self) -> &str {
+        match self.cartridge.header.cgb_flag {
+            0..128 => "DMG",
+            0x80 => "DMG with CGB enhancements",
+            0xC0 => "CGB only",
+            _ => "Unknown"
+        }
+    }
+
+    // Returns the size of the ROM in KiB
+    pub fn game_rom_size(&self) -> u16 {
+        32 << self.cartridge.header.rom_size
+    }
+
+    // Returns the size of the RAM in KiB
+    pub fn game_ram_size(&self) -> u8 {
+        match self.cartridge.header.ram_size {
+            0x02 => 8,
+            0x03 => 32,
+            0x04 => 128,
+            0x05 => 64,
+            _ => 0,
+        }
     }
 }

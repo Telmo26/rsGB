@@ -19,7 +19,7 @@ trait CartridgeInternals {
 
 pub struct Cartridge {
     _rom_size: u32,
-    _header: CartridgeHeader,
+    pub(crate) header: CartridgeHeader,
     cart_internals: Box<dyn CartridgeInternals + Send>,
 }
 
@@ -58,7 +58,7 @@ impl Cartridge {
 
         Ok(Cartridge {
             _rom_size: rom_size,
-            _header: header,
+            header,
             cart_internals,
         })
     }

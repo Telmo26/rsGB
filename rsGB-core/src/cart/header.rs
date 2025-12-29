@@ -175,19 +175,20 @@ pub fn get_new_license_name(code: &str) -> &'static str {
 }
 
 pub struct CartridgeHeader {
-    entry: [u8; 4],
-    logo: [u8; 0x30],
-    title: String,
-    new_lic_code: [u8; 2],
-    sgb_flag: u8,
-    pub cart_type: u8,
-    rom_size: u8,
-    pub ram_size: u8,
-    dest_code: u8,
-    lic_code: u8,
-    version: u8,
-    checksum: u8,
-    _global_checksum: u16,
+    pub(crate) _entry: [u8; 4],
+    pub(crate) _logo: [u8; 0x30],
+    pub(crate) cgb_flag: u8,
+    pub(crate) title: String,
+    pub(crate) new_lic_code: [u8; 2],
+    pub(crate) sgb_flag: u8,
+    pub(crate) cart_type: u8,
+    pub(crate) rom_size: u8,
+    pub(crate) ram_size: u8,
+    pub(crate) _dest_code: u8,
+    pub(crate) lic_code: u8,
+    pub(crate) _version: u8,
+    pub(crate) _checksum: u8,
+    pub(crate) _global_checksum: u16,
 }
 
 impl CartridgeHeader {
@@ -223,18 +224,19 @@ impl CartridgeHeader {
         }
 
         Ok(Self {
-            entry: data[0x100..0x104].try_into().unwrap(),
-            logo: data[0x104..0x134].try_into().unwrap(),
+            _entry: data[0x100..0x104].try_into().unwrap(),
+            _logo: data[0x104..0x134].try_into().unwrap(),
+            cgb_flag: data[143],
             title, //data[0x134..0x144].try_into().unwrap(),
             new_lic_code: data[0x144..0x146].try_into().unwrap(),
             sgb_flag: data[0x146],
             cart_type: data[0x147],
             rom_size: data[0x148],
             ram_size: data[0x149],
-            dest_code: data[0x14A],
+            _dest_code: data[0x14A],
             lic_code: data[0x14B],
-            version: data[0x14C],
-            checksum,
+            _version: data[0x14C],
+            _checksum: checksum,
             _global_checksum: u16::from_be_bytes(data[0x14E..0x150].try_into().unwrap()),
         })
     }
