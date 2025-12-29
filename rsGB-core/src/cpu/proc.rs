@@ -3,7 +3,7 @@ use super::{instruction::*, CPU};
 use crate::{utils::*, Devices};
 
 impl CPU {
-    pub fn execute(&mut self, dev: &mut Devices, instruction: InType) { // -> impl FnMut(&mut CPU, &mut Interconnect, &mut EmuContext) {
+    pub(super) fn execute(&mut self, dev: &mut Devices, instruction: InType) { // -> impl FnMut(&mut CPU, &mut Interconnect, &mut EmuContext) {
         match instruction {
             InType::NOP => proc_nop(self, dev),
             InType::LD => proc_ld(self, dev),

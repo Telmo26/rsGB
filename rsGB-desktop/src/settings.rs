@@ -1,10 +1,10 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::collections::HashMap;
 
 use eframe::egui::{self, Key};
 
 use rs_gb_core::{
     Button,
-    settings::{SaveLocation, Settings},
+    settings::Settings,
 };
 
 mod bindings;

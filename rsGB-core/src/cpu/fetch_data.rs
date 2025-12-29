@@ -2,7 +2,7 @@ use super::CPU;
 use crate::{cpu::{AddrMode, RegType}, Devices};
 
 impl CPU {
-    pub fn fetch_data(&mut self, dev: &mut Devices) {
+    pub(super) fn fetch_data(&mut self, dev: &mut Devices) {
         self.mem_dest = 0;
         self.dest_is_mem = false;
 

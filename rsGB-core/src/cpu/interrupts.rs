@@ -17,7 +17,7 @@ impl CPU {
         self.registers.pc = address;
     }
 
-    pub fn handle_interrupts(&mut self, dev: &mut Devices) {
+    pub(super) fn handle_interrupts(&mut self, dev: &mut Devices) {
         if self.interrupt_check(dev, 0x40, InterruptType::VBlank) {
 
         } else if self.interrupt_check(dev, 0x48, InterruptType::LcdStat) {

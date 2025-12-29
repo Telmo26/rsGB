@@ -47,7 +47,7 @@ impl CPU {
         }
     }
 
-    pub fn step(&mut self, dev: &mut Devices) -> bool {
+    pub(crate) fn step(&mut self, dev: &mut Devices) -> bool {
         if self.int_master_enabled {
             self.handle_interrupts(dev);
             self.enabling_ime = false;
