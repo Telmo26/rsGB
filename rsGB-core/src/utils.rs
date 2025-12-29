@@ -27,7 +27,7 @@ pub enum ColorMode {
     ARGB,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Button {
     A,
     B,

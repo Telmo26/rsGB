@@ -13,7 +13,9 @@ pub const FRAME_SIZE: usize = XRES as usize * YRES as usize;
 
 pub struct AppSettings {
     emu_settings: Settings,
-    key_map: HashMap<Key, Button>
+    key_map: HashMap<Key, Button>,
+
+    awaiting_input: Option<Button>,
 }
 
 impl AppSettings {
@@ -32,6 +34,8 @@ impl AppSettings {
         AppSettings {
             emu_settings: Settings::default(),
             key_map,
+
+            awaiting_input: None,
         }
     }
 
@@ -91,6 +95,56 @@ impl AppSettings {
             ui.heading("App Settings");
 
             ui.separator();
+
+            ui.label("Button binding");
+
+            let buttons = [Button::A, Button::B, Button::DOWN, Button::LEFT, Button::RIGHT, Button::SELECT, Button::START, Button::UP];
+                    
+            egui::Grid::new("bindings")
+                .num_columns(2)
+                .striped(true)
+                .show(ui, |ui| {
+                    for button in buttons {
+                            ui.label(format!("{:?}", button));
+
+                            let bound_key = self.key_map.iter()
+                                .find(|(_, v)| **v == button)
+                                .map(|(&k, _)| k);
+
+                            if self.awaiting_input == Some(button) {
+                                if ui.button("Wait for key...").clicked() {
+                                    self.awaiting_input = None; // Cancel if clicked again
+                                }
+
+                                ui.input(|i| {
+                                    if let Some(key) = i.keys_down.iter().next() {
+                                        // We keep the other settings
+                                        self.key_map.retain(|&k, _| k != *key);
+                                        self.key_map.retain(|_, &mut v| v != button);
+
+                                        // We update the setting we want
+                                        self.key_map.insert(*key, button);
+
+                                        self.awaiting_input = None;
+                                    }
+                                });
+                            } else {
+                                let btn_text = match bound_key {
+                                    Some(k) => format!("{:?}", k),
+                                    None => "Unbound".to_string(),
+                                };
+
+                                if ui.button(btn_text).clicked() {
+                                    self.awaiting_input = Some(button);
+                                }
+                            }
+                            ui.end_row();
+                    }
+                });
+                 
+            if self.awaiting_input.is_some() {
+                ui.label(egui::RichText::new("Press a key to bind it...").color(egui::Color32::YELLOW));
+            }
         });
     }
 }

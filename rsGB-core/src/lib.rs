@@ -154,10 +154,7 @@ impl Gameboy {
     }
 
     pub fn debug(&self) -> DebugInfo {
-        DebugInfo {
-            cpu_registers: &self.cpu.registers,
-            vram: &self.devices.bus.vram
-        }
+        DebugInfo::new(&self.cpu, &self.devices.bus.vram)
     }
 }
 

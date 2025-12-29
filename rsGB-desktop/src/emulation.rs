@@ -88,7 +88,6 @@ impl EmulationState {
             }
         });
 
-
         self.gameboy.next_frame(&mut self.framebuffer, &settings.emu_settings());
 
         let image_size = [XRES, YRES];
