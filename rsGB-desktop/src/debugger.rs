@@ -43,17 +43,21 @@ impl Debugger {
             }
         }        
 
-        egui::SidePanel::right("tiles").show(ctx, |ui| {
+        egui::SidePanel::right("tiles")
+            .exact_width(450.0)
+            .show(ctx, |ui| {
             ui.heading("VRAM Tiles Visualizer");
 
             ui.checkbox(&mut self.vram_debug, "Enable VRAM vizualization");
 
             if self.vram_debug {
-                let scale = (ui.available_height() / DEBUG_HEIGHT as f32).floor();
-                let image_widget = egui::Image::new(&self.tile_texture)
-                    .fit_to_original_size(scale);
+                ui.vertical_centered(|ui| {
+                    let scale = (ui.available_height() / DEBUG_HEIGHT as f32).floor();
+                    let image_widget = egui::Image::new(&self.tile_texture)
+                        .fit_to_original_size(scale);
 
-                ui.add(image_widget);
+                    ui.add(image_widget);
+                });
             }
         });
 
