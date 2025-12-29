@@ -1,6 +1,6 @@
 use std::{error::Error, fmt};
 
-pub(super) const ROM_TYPES: [&str; 0x23] = [
+static ROM_TYPES: [&str; 0x23] = [
     "ROM ONLY",
     "MBC1",
     "MBC1+RAM",
@@ -175,8 +175,8 @@ pub fn get_new_license_name(code: &str) -> &'static str {
 }
 
 pub struct CartridgeHeader {
-    pub(crate) _entry: [u8; 4],
-    pub(crate) _logo: [u8; 0x30],
+    _entry: [u8; 4],
+    _logo: [u8; 0x30],
     pub(crate) cgb_flag: u8,
     pub(crate) title: String,
     pub(crate) new_lic_code: [u8; 2],
@@ -184,11 +184,11 @@ pub struct CartridgeHeader {
     pub(crate) cart_type: u8,
     pub(crate) rom_size: u8,
     pub(crate) ram_size: u8,
-    pub(crate) _dest_code: u8,
+    _dest_code: u8,
     pub(crate) lic_code: u8,
-    pub(crate) _version: u8,
-    pub(crate) _checksum: u8,
-    pub(crate) _global_checksum: u16,
+    _version: u8,
+    _checksum: u8,
+    _global_checksum: u16,
 }
 
 impl CartridgeHeader {

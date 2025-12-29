@@ -36,26 +36,6 @@ impl Cartridge {
             _ => unreachable!()
         };
 
-        // println!("Cartridge successfully loaded");
-        // println!("\t Title    : {}", header.title);
-        // println!(
-        //     "\t Type     : {0} ({1})",
-        //     header.cart_type,
-        //     header.get_cart_type()
-        // );
-        // println!("\t ROM Size : {} KiB", 32 << header.rom_size);
-        // println!("\t RAM Size : {}", header.ram_size);
-        // println!(
-        //     "\t LIC Code : {0} ({1})",
-        //     if header.lic_code != 0x33 {
-        //         header.lic_code.to_string()
-        //     } else {
-        //         str::from_utf8(&header.new_lic_code).unwrap().to_string()
-        //     },
-        //     header.get_lic_name()
-        // );
-        // println!("\t ROM Vers : {}", header.version);
-
         Ok(Cartridge {
             _rom_size: rom_size,
             header,

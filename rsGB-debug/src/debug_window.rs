@@ -52,14 +52,14 @@ impl CustomWindow for DebugWindow {
         let debug_info = gb.debug();
         let tiles = debug_info.get_tiles();
 
-        self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
-
         for y in 0..24 {
             for x in 0..16 {
                 let tile = &tiles[x + y * 16];
                 display_tile(&mut self.buffer, x * 9 + 1, y * 9 + 1, tile);
             }
         }
+
+        self.window.update_with_buffer(&self.buffer, DEBUG_WIDTH, DEBUG_HEIGHT).unwrap();
     }
 
     fn is_open(&self) -> bool {

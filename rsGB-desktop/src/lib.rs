@@ -33,8 +33,8 @@ impl MyEguiApp {
         // for e.g. egui::PaintCallback.
 
         MyEguiApp { 
-            emulation_state: EmulationState::new(cc),
-            debugger: Debugger::new(),
+            emulation_state: EmulationState::new(&cc.egui_ctx),
+            debugger: Debugger::new(cc),
 
             app_settings: AppSettings::new(),
 
@@ -58,6 +58,10 @@ impl eframe::App for MyEguiApp {
                             .pick_file();
 
                         if let Some(file) = file {
+                            if self.emulation_state.cartridge_loaded() {
+                                // If another game was already loaded
+                                self.emulation_state = EmulationState::new(ctx);
+                            }
                             self.emulation_state.load_cartridge(&file, &self.app_settings);
                         }
                     }
@@ -102,7 +106,8 @@ impl eframe::App for MyEguiApp {
                     egui::ViewportId::from_hash_of("debugger"), 
                     egui::ViewportBuilder::default()
                         .with_always_on_top()
-                        .with_title("Debugger"), 
+                        .with_title("Debugger")
+                        .with_inner_size((1000.0, 750.0)), 
                     |ctx, _class| {
                         let debug_info = self.emulation_state.debug_info();
                         self.display_debugger = self.debugger.render(ctx, debug_info);

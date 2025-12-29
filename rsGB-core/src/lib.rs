@@ -114,14 +114,10 @@ impl Gameboy {
     }
 
     pub fn load_cartridge(&mut self, rom_path: &PathBuf, settings: &Settings) {
-        // Here unwrap is used because we assume a correct extension is checked before
-        let mut save_path = rom_path.clone(); 
-        save_path.set_extension(".sav");
-
         let save_path = match settings.get_save_location() {
             SaveLocation::GameLoc => {
                 let mut clone = rom_path.clone();
-                clone.set_extension(".sav");
+                clone.set_extension("sav");
                 clone
             },
             SaveLocation::SaveFolder(path) => {
@@ -137,6 +133,8 @@ impl Gameboy {
         let cartridge = Cartridge::load(rom_path).unwrap();
         self.devices.bus.set_cart(cartridge);
         self.devices.bus.load_save(&save_path);
+
+        self.save_path = save_path;
     }
 
     pub fn next_frame(&mut self, framebuffer: &mut [u32], settings: &Settings) {
@@ -150,7 +148,7 @@ impl Gameboy {
         }
         
         if self.devices.bus.need_save() {
-            
+            self.devices.bus.save(&self.save_path);
         }
         self.devices.frames = 0;
         self.devices.detach_buffer();
@@ -165,7 +163,15 @@ impl Gameboy {
     }
 
     pub fn debug(&self) -> DebugInfo {
-        DebugInfo::new(&self.cpu, &self.devices.bus.vram, &self.devices.bus.cart.as_ref().unwrap())
+        let vram_updated = self.devices.bus.vram_updated.get();
+        self.devices.bus.vram_updated.replace(false);
+
+        DebugInfo::new(
+            &self.cpu, 
+            vram_updated,
+            &self.devices.bus.vram, 
+            &self.devices.bus.cart.as_ref().unwrap()
+        )
     }
 }
 

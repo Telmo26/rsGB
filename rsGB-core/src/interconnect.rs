@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{cell::Cell, path::PathBuf};
 
 use crate::{
     cart::Cartridge, Button, ColorMode
@@ -32,6 +32,7 @@ pub use oam::OAMEntry;
 
 pub struct Interconnect {
     pub(crate) cart: Option<Cartridge>,
+    pub(crate) vram_updated: Cell<bool>,
     pub(crate) vram: [u8; 0x2000],
     ram: RAM,
     oam_ram: [OAMEntry; 40],
@@ -43,6 +44,7 @@ impl Interconnect {
     pub fn new(color_mode: ColorMode) -> Interconnect {
         Interconnect { 
             cart: None,
+            vram_updated: Cell::new(false),
             vram: [0; 0x2000],
             ram: RAM::new(),
             oam_ram: [OAMEntry::new(); 40],
@@ -104,7 +106,10 @@ impl Interconnect {
             0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),
 
            // Char/Map Data
-            0x8000..0xA000 => self.vram[(address - 0x8000) as usize] = value,
+            0x8000..0xA000 => {
+                self.vram_updated.replace(true);
+                self.vram[(address - 0x8000) as usize] = value;
+            }
 
             // Cartridge RAM
             0xA000..0xC000 => self.cart.as_mut().unwrap().write(address, value),

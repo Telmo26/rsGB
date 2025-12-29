@@ -3,21 +3,29 @@ use std::collections::HashMap;
 use crate::{cart::Cartridge, cpu::CPU, utils::VRAM};
 
 pub struct DebugInfo<'dbg> {
-    pub(crate) cpu: &'dbg CPU,
-    pub(crate) vram: &'dbg VRAM,
-    pub(crate) cartridge: &'dbg Cartridge,
+    cpu: &'dbg CPU,
+
+    vram_updated: bool,
+    vram: &'dbg VRAM,
+
+    cartridge: &'dbg Cartridge,
     instruction_text: String,
 }
 
 impl<'dbg> DebugInfo<'dbg> {
-    pub fn new(cpu: &'dbg CPU, vram: &'dbg VRAM, cartridge: &'dbg Cartridge) -> DebugInfo<'dbg> {
+    pub fn new(cpu: &'dbg CPU, vram_updated: bool, vram: &'dbg VRAM, cartridge: &'dbg Cartridge) -> DebugInfo<'dbg> {
         DebugInfo {
             cpu,
+            vram_updated,
             vram,
             cartridge,
             instruction_text: String::new(),
         }
     } 
+
+    pub fn vram_updated(&self) -> bool {
+        self.vram_updated
+    }
 
     /// This function always returns the 512 tiles from the VRAM
     pub fn get_tiles(&self) -> &[[u8; 16]] {

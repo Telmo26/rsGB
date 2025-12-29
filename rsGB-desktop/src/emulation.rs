@@ -24,7 +24,7 @@ pub struct EmulationState {
 }
 
 impl EmulationState {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> EmulationState {
+    pub fn new(ctx: &egui::Context) -> EmulationState {
         let (mut audio_sender, mut audio_receiver) = ringbuf::StaticRb::<(f32, f32), 8192>::default().split();
 
         let  gameboy = Gameboy::new( 
@@ -37,7 +37,7 @@ impl EmulationState {
         let framebuffer = [0; FRAME_SIZE];
         let initial_image = ColorImage::new([XRES, YRES], vec![egui::Color32::BLACK; FRAME_SIZE]);
 
-        let frame_texture = cc.egui_ctx.load_texture(
+        let frame_texture = ctx.load_texture(
             "emulator_frame", 
             initial_image, 
             egui::TextureOptions::NEAREST,
@@ -97,8 +97,7 @@ impl EmulationState {
 
         self.gameboy.next_frame(&mut self.framebuffer, &settings.emu_settings());
 
-        let image_size = [XRES, YRES];
-        let color_image = ColorImage::from_rgba_unmultiplied(image_size, cast_slice(&self.framebuffer));
+        let color_image = ColorImage::from_rgba_unmultiplied([XRES, YRES], cast_slice(&self.framebuffer));
 
         self.frame_texture.set(color_image, egui::TextureOptions::NEAREST);
 
