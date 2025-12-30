@@ -8,6 +8,7 @@ const RAM_BANK_SIZE: usize = 0x2000;
 
 pub struct MBC1 {
     rom_data: Vec<u8>,
+    rom_bank_nb: u8,
 
     // MBC1-related data
     ram_enabled: bool,
@@ -30,7 +31,7 @@ impl MBC1 {
         let battery = header.cart_type == 3;
         let need_save = false;
 
-        println!("ROM Data: {:X}", rom_data.len());
+        let rom_bank_nb = (rom_data.len() / 0x4000) as u8; // A ROM bank is 16 KiB
        
         let ram_bank_nb: u8 = match header.ram_size {
             0x00 => 0,
@@ -41,9 +42,6 @@ impl MBC1 {
             _ => unreachable!(),
         };
 
-
-        println!("{} RAM banks in the cartridge", ram_bank_nb);
-
         let mut ram_banks = Vec::with_capacity(ram_bank_nb as usize);
         for _ in 0..ram_bank_nb {
             ram_banks.push([0; 0x2000]);
@@ -51,6 +49,8 @@ impl MBC1 {
 
         MBC1 {
             rom_data,
+            rom_bank_nb,
+
             ram_enabled: false,
 
             bank1: 1, // This is the ROM bank register: it cannot be 0
@@ -71,12 +71,23 @@ impl MBC1 {
 impl CartridgeInternals for MBC1 {
     fn read(&self, address: u16) -> u8 {
         match address {
-            0x0000..=0x3FFF => self.rom_data[address as usize],
+            0x0000..=0x3FFF => {
+                let mut bank = if self.banking_mode == 0 {
+                    0
+                } else {
+                    self.bank2 << 5
+                };
+                bank %= self.rom_bank_nb as usize;
+
+                self.rom_data[bank << 14 | address as usize & 0x3FFF]
+            }
 
             0x4000..=0x7FFF => {
-                let offset = self.bank1 << 14;
+                let mut bank = (self.bank2 << 5) | self.bank1;
+                bank = bank.max(1);
+                bank %= self.rom_bank_nb as usize;
 
-                self.rom_data[offset + (address as usize - 0x4000)]
+                self.rom_data[bank << 14 | address as usize & 0x3FFF]
             }
 
             0xA000..=0xBFFF => {
@@ -99,17 +110,13 @@ impl CartridgeInternals for MBC1 {
         match address {
             ..0x2000 => self.ram_enabled = (value & 0xF) == 0xA,
             0x2000..0x4000 => self.bank1 = (value as usize & 0x1F).max(1),
-            0x4000..0x6000 => {
-                if self.ram_bank_nb > 0 {
-                    self.bank2 = (value as usize & 0b11).min(self.ram_bank_nb as usize - 1);
-                }
-            } 
+            0x4000..0x6000 => self.bank2 = value as usize & 0b11,
             0x6000..0x8000 => self.banking_mode = value & 1,
             0xA000..0xC000 if self.ram_enabled => {
                 let ram_bank = if self.banking_mode == 0 {
                     0
                 } else {
-                    self.bank2
+                    self.bank2.min(self.ram_bank_nb as usize - 1)
                 };
                 self.ram_banks[ram_bank][address as usize % (1 << 12)] = value;
 
