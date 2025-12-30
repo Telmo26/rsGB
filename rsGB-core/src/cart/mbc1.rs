@@ -12,11 +12,13 @@ pub struct MBC1 {
     // MBC1-related data
     ram_enabled: bool,
 
-    active_rom_bank: usize, // Offset of the ROM bank
+    bank1: usize, // BANK 1 register
+    bank2: usize, // BANK 2 register
+
     banking_mode: u8,
 
-    active_ram_bank: usize, // Currently selected RAM bank
-    ram_banks: [Option<Box<[u8; RAM_BANK_SIZE]>>; 16], // All RAM banks
+    ram_bank_nb: u8,
+    ram_banks: Vec<[u8; RAM_BANK_SIZE]>, // All RAM banks
 
     // for battery
     battery: bool,
@@ -28,33 +30,35 @@ impl MBC1 {
         let battery = header.cart_type == 3;
         let need_save = false;
 
-        let ram_enabled = header.ram_size != 0;
+        println!("ROM Data: {:X}", rom_data.len());
+       
+        let ram_bank_nb: u8 = match header.ram_size {
+            0x00 => 0,
+            0x02 => 1,
+            0x03 => 4,
+            0x04 => 16,
+            0x05 => 8,
+            _ => unreachable!(),
+        };
 
-        let mut ram_banks: [Option<Box<[u8; RAM_BANK_SIZE]>>; 16] = [const { None }; 16];
-        if ram_enabled {
-            // RAM Banks initialization
-            for i in 0..16 {
-                ram_banks[i] = match header.ram_size {
-                    2 if i == 0 => Some(Box::new([0; 0x2000])),
-                    3 if i < 4 => Some(Box::new([0; 0x2000])),
-                    4 if i < 16 => Some(Box::new([0; 0x2000])),
-                    5 if i < 8 => Some(Box::new([0; 0x2000])),
-                    _ => None,
-                }
-            }
+
+        println!("{} RAM banks in the cartridge", ram_bank_nb);
+
+        let mut ram_banks = Vec::with_capacity(ram_bank_nb as usize);
+        for _ in 0..ram_bank_nb {
+            ram_banks.push([0; 0x2000]);
         }
-
-        let active_ram_bank = 0;
-        let active_rom_bank = 1; // ROM bank 1
 
         MBC1 {
             rom_data,
-            ram_enabled,
+            ram_enabled: false,
 
-            active_rom_bank,
+            bank1: 1, // This is the ROM bank register: it cannot be 0
+            bank2: 0,
+
             banking_mode: 0,
 
-            active_ram_bank,
+            ram_bank_nb,
             ram_banks,
 
             battery,
@@ -70,7 +74,8 @@ impl CartridgeInternals for MBC1 {
             0x0000..=0x3FFF => self.rom_data[address as usize],
 
             0x4000..=0x7FFF => {
-                let offset = self.active_rom_bank * 0x4000;
+                let offset = self.bank1 << 14;
+
                 self.rom_data[offset + (address as usize - 0x4000)]
             }
 
@@ -79,9 +84,12 @@ impl CartridgeInternals for MBC1 {
                     return 0xFF;
                 }
 
-                self.ram_banks[self.active_ram_bank]
-                    .as_ref()
-                    .unwrap()[address as usize - 0xA000]
+                let ram_bank = if self.banking_mode == 0 {
+                    0
+                } else {
+                    self.bank2
+                };
+                self.ram_banks[ram_bank][address as usize % (1 << 12)]
             }
             _ => 0xFF,
         }
@@ -90,13 +98,21 @@ impl CartridgeInternals for MBC1 {
     fn write(&mut self, address: u16, value: u8) {
         match address {
             ..0x2000 => self.ram_enabled = (value & 0xF) == 0xA,
-            0x2000..0x4000 => self.active_rom_bank = (value as usize & 0x1F).max(1),
-            0x4000..0x6000 => self.active_ram_bank = value as usize & 0b11,
+            0x2000..0x4000 => self.bank1 = (value as usize & 0x1F).max(1),
+            0x4000..0x6000 => {
+                if self.ram_bank_nb > 0 {
+                    self.bank2 = (value as usize & 0b11).min(self.ram_bank_nb as usize - 1);
+                }
+            } 
             0x6000..0x8000 => self.banking_mode = value & 1,
             0xA000..0xC000 if self.ram_enabled => {
-                self.ram_banks[self.active_ram_bank]
-                    .as_mut()                                
-                    .unwrap()[address as usize - 0xA000] = value;
+                let ram_bank = if self.banking_mode == 0 {
+                    0
+                } else {
+                    self.bank2
+                };
+                self.ram_banks[ram_bank][address as usize % (1 << 12)] = value;
+
                 if self.battery {
                     self.need_save = true;
                 }
@@ -112,21 +128,11 @@ impl CartridgeInternals for MBC1 {
     }
 
     fn save(&self, save_path: &PathBuf) {
-        // Determine how many banks should be saved
-        let bank_count = self.ram_banks.iter()
-            .filter(|&bank| bank.is_some())
-            .count();
-
-        let mut buffer = Vec::with_capacity(bank_count * 0x2000);
-
-        for i in 0..bank_count {
-            if let Some(bank) = &self.ram_banks[i] {
-                buffer.extend_from_slice(&**bank);
-            } else {
-                // If a bank is missing, pad with zeros
-                buffer.extend_from_slice(&[0u8; 0x2000]);
-            }
-        }
+        return;
+        // This way we only do one allocation
+        let buffer: Vec<u8> = self.ram_banks.clone().into_iter()
+            .flatten()
+            .collect();
 
         let mut file = File::create(save_path).expect("Failed to create save file");
         file.write_all(&buffer).expect("Failed to write save file");
@@ -136,24 +142,19 @@ impl CartridgeInternals for MBC1 {
         // If the save file doesn't exist 
         // it will be created on next frame anyway
         if let Ok(mut file) = File::open(save_path) {
-            let mut buffer = Vec::new();
+            let expected_len = self.ram_bank_nb as usize * 0x2000;
+
+            let mut buffer = Vec::with_capacity(expected_len);
             file.read_to_end(&mut buffer).unwrap();
             
-            let bank_count = self.ram_banks.iter()
-                .filter(|&bank| bank.is_some())
-                .count();
-            let expected_len = bank_count * 0x2000;
-
             if buffer.len() == expected_len {
-                for i in 0..bank_count {
+                for i in 0..self.ram_bank_nb as usize {
                     let start = i * 0x2000;
                     let end = start + 0x2000;
                     let slice = &buffer[start..end];
 
                     // Copy the slice into a boxed array
-                    let mut arr = Box::new([0u8; 0x2000]);
-                    arr.copy_from_slice(slice);
-                    self.ram_banks[i] = Some(arr);
+                    self.ram_banks[i].copy_from_slice(slice);
                 }
             } else {
                 panic!("Failed to load the save data: incorrect size")
