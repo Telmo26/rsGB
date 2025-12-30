@@ -54,7 +54,6 @@ impl eframe::App for MyEguiApp {
                     if ui.button("Open").clicked() {
                         let file = FileDialog::new()
                             .add_filter("GameBoy / GameBoy Color games", &["gb", "gbc"])
-                            .set_directory(".")
                             .pick_file();
 
                         if let Some(file) = file {

@@ -62,6 +62,9 @@ impl Debugger {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            ui.label("Cartridge Type");
+            ui.label(debug_info.game_cartridge_type());
+
             if ui.input(|i| i.viewport().close_requested()) {
                 // Tell parent to close us.
                 stay_open = false;

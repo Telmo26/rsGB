@@ -1,13 +1,18 @@
+#![allow(non_contiguous_range_endpoints)]
+
 use std::{error::Error, fs, path::PathBuf};
 
 mod header;
 use header::CartridgeHeader;
 
 mod rom;
-use rom::ROM;
-
 mod mbc1;
-use mbc1::MBC1;
+mod mbc2;
+
+use self::{
+    rom::ROM, mbc1::MBC1, mbc2::MBC2,
+};
+
 
 trait CartridgeInternals {
     fn read(&self, address: u16) -> u8;
@@ -32,7 +37,8 @@ impl Cartridge {
 
         let cart_internals: Box<dyn CartridgeInternals + Send> = match header.cart_type {
             0 => Box::new(ROM::new(rom_data)),
-            1..4 => Box::new(MBC1::new(&header, rom_data)),
+            0x1..0x4 => Box::new(MBC1::new(&header, rom_data)),
+            0x5..0x7 => Box::new(MBC2::new(&header, rom_data)),
             _ => unreachable!()
         };
 
