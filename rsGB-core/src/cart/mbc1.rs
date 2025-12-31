@@ -140,7 +140,7 @@ impl CartridgeInternals for MBC1 {
             0x2000..0x4000 => self.bank1 = (value as usize & 0x1F).max(1),
             0x4000..0x6000 => self.bank2 = value as usize & 0b11,
             0x6000..0x8000 => self.banking_mode = value & 1,
-            0xA000..0xC000 if self.ram_enabled => {
+            0xA000..0xC000 if self.ram_enabled && self.ram_bank_nb > 0 => {
                 let ram_bank = if self.banking_mode == 0 {
                     0
                 } else {

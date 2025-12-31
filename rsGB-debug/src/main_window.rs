@@ -19,9 +19,9 @@ pub struct MainWindow {
 }
 
 impl MainWindow {
-    pub fn new(gameboy: Rc<RefCell<Gameboy>>) -> MainWindow {
+    pub fn new(gameboy: Rc<RefCell<Gameboy>>, title: &str) -> MainWindow {
         let mut window = Window::new(
-            "rsGB - A GameBoy Emulator in Rust",
+            &format!("rsGB - {}", title),
             WIDTH, 
             HEIGHT, 
             WindowOptions {

@@ -38,17 +38,17 @@ impl APU {
         APU {
             div_apu: 0,
             
-            ch1: PulseChannel::default(),
+            ch1: PulseChannel::new(true),
 
-            ch2: PulseChannel::default(),
+            ch2: PulseChannel::new(false),
 
             ch3: WaveChannel::default(),
 
             ch4: NoiseChannel::default(),
 
-            master_vol: 0,
-            sound_panning: 0,
-            audio_master_ctrl: 0,
+            master_vol: 0x77,
+            sound_panning: 0xF3,
+            audio_master_ctrl: 0xF1,
         }
     }
 
@@ -238,16 +238,6 @@ impl APU {
             self.div_apu = 7; // Next step is 0
         }
     }
-
-    // fn filter_audio(&mut self) -> (f32, f32) {
-    //     let n = self.output_buffer.len() as f32;
-    //     let (mut left, mut right) = self.output_buffer.iter()
-    //         .fold((0f32, 0f32), |acc, &(l, r)| (acc.0 + l, acc.1 + r));
-    //     left /= n;
-    //     right /= n;
-
-    //     (left, right)                
-    // }
 
     fn audio_enabled(&self) -> bool {
         self.audio_master_ctrl & 0b10000000 != 0

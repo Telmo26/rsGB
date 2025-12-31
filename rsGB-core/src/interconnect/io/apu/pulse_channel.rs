@@ -36,6 +36,29 @@ pub struct PulseChannel {
 }
 
 impl PulseChannel {
+    pub fn new(ch1: bool) -> PulseChannel {
+        if ch1 {
+            PulseChannel {
+                sweep: 0x80,
+                length_timer_duty_cycle: 0xBF,
+                volume_envelope: 0xF3,
+                period_low: 0xFF,
+                period_high_ctrl: 0xBF,
+                enabled: true,
+                ..Self::default()
+            }
+        } else {
+            PulseChannel {
+                sweep: 0x80,
+                length_timer_duty_cycle: 0x3F,
+                volume_envelope: 0x00,
+                period_low: 0xFF,
+                period_high_ctrl: 0xBF,
+                ..Self::default()
+            }
+        }
+    }
+
     pub fn read(&self, address: u16) -> u8 {
         match address {
             0 => self.sweep | 0x80,

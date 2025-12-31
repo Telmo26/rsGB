@@ -68,6 +68,10 @@ impl eframe::App for MyEguiApp {
 
                 ui.menu_button("Emulation", |ui| {
                     ui.add_enabled_ui(self.emulation_state.cartridge_loaded(), |ui| {
+                        if ui.button("Stop").clicked() {
+                            self.emulation_state = EmulationState::new(ctx);
+                        }
+
                         ui.menu_button("Speed", |ui| {
                             ui.selectable_value(&mut self.app_settings.emu_settings.speed, SpeedOption::Normal, "1x");
                             ui.selectable_value(&mut self.app_settings.emu_settings.speed, SpeedOption::X2, "2x");

@@ -64,7 +64,7 @@ fn main() {
 
     let gameboy = Rc::new(RefCell::new(gameboy));
 
-    windows.push(Box::new(MainWindow::new(gameboy.clone())));
+    windows.push(Box::new(MainWindow::new(gameboy.clone(), &rom_path.file_stem().unwrap().to_string_lossy())));
     windows.push(Box::new(DebugWindow::new(gameboy)));  
 
     // Updating the windows

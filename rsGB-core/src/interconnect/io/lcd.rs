@@ -54,7 +54,7 @@ impl LCD {
     pub fn read(&self, address: u16) -> u8 {
         match address {
             0xFF40 => self.lcdc,
-            0xFF41 => self.status,
+            0xFF41 => self.status | 0x80,
             0xFF42 => self.scroll_y,
             0xFF43 => self.scroll_x,
             0xFF44 => self.ly,
@@ -72,7 +72,7 @@ impl LCD {
     pub fn write(&mut self, address: u16, value: u8) {
         match address {
             0xFF40 => self.lcdc = value,
-            0xFF41 => self.status = value,
+            0xFF41 => self.status = value | 0x80,
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
             0xFF44 => self.ly = value,

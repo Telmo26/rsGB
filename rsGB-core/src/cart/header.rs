@@ -174,6 +174,7 @@ pub fn get_new_license_name(code: &str) -> &'static str {
     }
 }
 
+#[derive(Debug)]
 pub struct CartridgeHeader {
     _entry: [u8; 4],
     _logo: [u8; 0x30],

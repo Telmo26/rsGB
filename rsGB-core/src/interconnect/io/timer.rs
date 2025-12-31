@@ -15,7 +15,7 @@ pub struct Timer {
 impl Timer {
     pub fn new() -> Timer {
         Timer {
-            div: 0xAC00,
+            div: 0xABCF,
             ..Timer::default()
         }
     }
@@ -83,7 +83,7 @@ impl Timer {
             0xFF06 => self.tma = value,
             0xFF07 => {
                 // Changing TAC can immediately generate a tick (falling edge) — emulate by checking old/new
-                self.tac = value;
+                self.tac = value | 0b11111000;
 
                 let new_timer_enable = (self.tac & (1 << 2)) != 0;
                 let new_result = new_timer_enable && self.selected_bit();
@@ -108,7 +108,7 @@ impl Timer {
             0xFF04 => (self.div >> 8) as u8,
             0xFF05 => self.tima,
             0xFF06 => self.tma,
-            0xFF07 => self.tac,
+            0xFF07 => self.tac | 0b11111000,
             _ => panic!()
         }
     }
