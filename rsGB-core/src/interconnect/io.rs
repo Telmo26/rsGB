@@ -70,13 +70,13 @@ impl IO {
             0xFF01 => self.serial[0],
             0xFF02 => self.serial[1] | 0b01111100,
             0xFF04..=0xFF07 => self.timer.read(address),
-            0xFF0F => self.if_register,
+            0xFF0F => self.if_register | 0xE0,
             0xFF10..0xFF40 => self.apu.read(address),
             0xFF40..=0xFF4B => self.lcd.read(address),
             0xFF50 => 0x01,
             _ => {
-                // eprintln!("Read at address {address:X} not implemented!");
-                0
+                eprintln!("Read at address {address:X} not implemented!");
+                0xFF
             }
         }
     }
@@ -93,7 +93,7 @@ impl IO {
                 if address == 0xFF46 { self.dma.start(value) }
                 self.lcd.write(address, value);
             }
-            _ => (), // eprintln!("Write at address {address:X} not implemented!"),
+            _ => eprintln!("Write at address {address:X} not implemented!"),
         }
     }
 

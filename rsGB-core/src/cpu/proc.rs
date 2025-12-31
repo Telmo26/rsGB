@@ -510,8 +510,25 @@ fn proc_ccf(cpu: &mut CPU, _dev: &mut Devices) {
     cpu.set_flags(BIT_IGNORE, 0, 0, cflag);
 }
 
-fn proc_halt(cpu: &mut CPU, _dev: &mut Devices) {
-    cpu.halted = true;
+fn proc_halt(cpu: &mut CPU, dev: &mut Devices) {
+    let ie = dev.bus.get_ie_register();
+    let if_reg = cpu.get_int_flags(dev);
+
+    if cpu.int_master_enabled {
+        // Normal Halt: Wait for interrupt
+        cpu.halted = true;
+    } else {
+        if (ie & if_reg & 0x1F) != 0 {
+            // THE HALT BUG:
+            // IME is 0, but an interrupt is pending. 
+            // Do NOT halt, and trigger the PC increment glitch.
+            cpu.halt_bug_triggered = true; 
+        } else {
+            // IME is 0, no interrupt pending: 
+            // Halt until an interrupt flag is set (even if IME remains 0)
+            cpu.halted = true;
+        }
+    }
 }
 
 fn proc_ei(cpu: &mut CPU, _dev: &mut Devices) {

@@ -8,9 +8,10 @@ use header::CartridgeHeader;
 mod rom;
 mod mbc1;
 mod mbc2;
+mod mbc3;
 
 use self::{
-    rom::ROM, mbc1::MBC1, mbc2::MBC2,
+    rom::ROM, mbc1::MBC1, mbc2::MBC2, mbc3::MBC3
 };
 
 
@@ -39,7 +40,8 @@ impl Cartridge {
             0 => Box::new(ROM::new(rom_data)),
             0x1..0x4 => Box::new(MBC1::new(&header, rom_data)),
             0x5..0x7 => Box::new(MBC2::new(&header, rom_data)),
-            _ => unreachable!()
+            0x0F..=0x13 => Box::new(MBC3::new(&header, rom_data)),
+            _ => panic!("Incompatible MBC detected: {:X}", header.cart_type)
         };
 
         Ok(Cartridge {

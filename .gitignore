@@ -2,6 +2,8 @@
 doctor.txt
 debug.txt
 /test_roms/*.gb
+/test_roms/*.gbc
+/test_roms/*.rtc
 /test_roms/*.sav
 /test_roms/*/*.sav
 /test_roms/*/*/*.sav

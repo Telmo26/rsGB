@@ -23,6 +23,7 @@ pub struct CPU {
     pub curr_inst: Instruction,
 
     halted: bool,
+    halt_bug_triggered: bool,
 
     int_master_enabled: bool,
     enabling_ime: bool,
@@ -41,6 +42,7 @@ impl CPU {
             curr_inst: INSTRUCTIONS[0x00].unwrap(),
 
             halted: false,
+            halt_bug_triggered: false,
 
             int_master_enabled: false,
             enabling_ime: false,
@@ -54,7 +56,6 @@ impl CPU {
         }
 
         if !self.halted {
-
             self.fetch_instruction(dev);
             dev.incr_cycle(1);
             self.fetch_data(dev);
@@ -63,7 +64,7 @@ impl CPU {
             
         } else {
             dev.incr_cycle(1);
-            if self.get_int_flags(&dev) != 0 {
+            if dev.bus.get_ie_register() & self.get_int_flags(&dev) & 0x1F != 0 {
                 self.halted = false;
             }
         }
@@ -78,7 +79,12 @@ impl CPU {
         self.curr_opcode = dev.bus.read(self.registers.pc);
         self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
-        self.registers.pc += 1;
+        if self.halt_bug_triggered {
+        // Do NOT increment PC this time.
+            self.halt_bug_triggered = false;
+        } else {
+            self.registers.pc = self.registers.pc.wrapping_add(1);
+        }
     }
 
     fn z_flag(&self) -> bool {

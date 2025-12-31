@@ -73,7 +73,7 @@ impl Interconnect {
             0xC000..0xE000 => self.ram.wram_read(address),
 
             // Reserved echo RAM
-            0xE000..0xFE00 => 0,
+            0xE000..0xFE00 => self.ram.wram_read(address - 0x2000),
 
             // OAM
             0xFE00..0xFEA0 => {
@@ -118,7 +118,7 @@ impl Interconnect {
             0xC000..0xE000 => self.ram.wram_write(address, value),
 
             // Reserved echo RAM
-            0xE000..0xFE00 => (),
+            0xE000..0xFE00 => self.ram.wram_write(address - 0x2000, value),
 
             // OAM
             0xFE00..0xFEA0 => {
