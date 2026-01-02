@@ -96,7 +96,7 @@ impl eframe::App for MyEguiApp {
                 ctx.show_viewport_immediate(
                     egui::ViewportId::from_hash_of("settings"), 
                     egui::ViewportBuilder::default()
-                        .with_always_on_top()
+                        .with_always_on_top()                       
                         .with_title("Settings"),
                     |ctx, _class| {
                         self.display_settings = self.app_settings.render(ctx);
@@ -109,8 +109,9 @@ impl eframe::App for MyEguiApp {
                     egui::ViewportId::from_hash_of("debugger"), 
                     egui::ViewportBuilder::default()
                         .with_always_on_top()
+                        .with_resizable(false)
                         .with_title("Debugger")
-                        .with_inner_size((1000.0, 750.0)), 
+                        .with_inner_size((1000.0, 740.0)), 
                     |ctx, _class| {
                         let debug_info = self.emulation_state.debug_info();
                         self.display_debugger = self.debugger.render(ctx, debug_info);

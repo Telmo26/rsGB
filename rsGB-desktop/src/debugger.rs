@@ -33,22 +33,16 @@ impl Debugger {
     pub fn render(&mut self, ctx: &egui::Context, debug_info: DebugInfo) -> bool {
         let mut stay_open = true;
 
-        if self.vram_debug {
-            if debug_info.vram_updated() {
-                self.draw_vram(&debug_info);
-                self.tile_texture.set(
-                    egui::ColorImage::from_rgba_unmultiplied([DEBUG_WIDTH, DEBUG_HEIGHT], &self.tilemap),
-                    egui::TextureOptions::NEAREST
-                );
-            }
-        }        
+        if self.vram_debug && debug_info.vram_updated() { self.draw_vram(&debug_info); }
 
         egui::SidePanel::right("tiles")
             .exact_width(450.0)
             .show(ctx, |ui| {
             ui.heading("VRAM Tiles Visualizer");
 
-            ui.checkbox(&mut self.vram_debug, "Enable VRAM vizualization");
+            if ui.checkbox(&mut self.vram_debug, "Enable VRAM vizualization").changed() {
+                if self.vram_debug { self.draw_vram(&debug_info); }
+            }
 
             if self.vram_debug {
                 ui.vertical_centered(|ui| {
@@ -84,6 +78,11 @@ impl Debugger {
                 display_tile(&mut self.tilemap, x * 9 + 1, y * 9 + 1, tile);
             }
         }
+
+        self.tile_texture.set(
+            egui::ColorImage::from_rgba_unmultiplied([DEBUG_WIDTH, DEBUG_HEIGHT], &self.tilemap),
+            egui::TextureOptions::NEAREST
+        );
     }
 }
 
