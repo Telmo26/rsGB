@@ -7,7 +7,7 @@ use eframe::egui::{self, ColorImage};
 use ringbuf::traits::{Consumer, Producer, Split};
 
 // local crate import
-use rs_gb_core::{ColorMode, DebugInfo, Gameboy};
+use rs_gb_core::{ColorMode, DebugInfo, Gameboy, InputState};
 
 use crate::settings::{AppSettings, FRAME_SIZE, XRES, YRES};
 
@@ -89,12 +89,15 @@ impl EmulationState {
     }
 
     pub fn render(&mut self, ctx: &egui::Context, settings: &AppSettings) {
+        let mut input = InputState::default();
+
         ctx.input(|i | {
             for (key, button) in settings.key_map() {
-                self.gameboy.update_button(*button, i.key_down(*key));
+                input.update(*button, i.key_down(*key));
             }
         });
 
+        self.gameboy.apply_input(input);
         self.gameboy.next_frame(&mut self.framebuffer, &settings.emu_settings());
 
         let color_image = ColorImage::from_rgba_unmultiplied([XRES, YRES], cast_slice(&self.framebuffer));

@@ -1,7 +1,7 @@
 use std::{cell::Cell, path::PathBuf};
 
 use crate::{
-    cart::Cartridge, Button, ColorMode
+    ColorMode, InputState, cart::Cartridge
 };
 
 pub use crate::{
@@ -209,8 +209,8 @@ impl Interconnect {
         self.cart.as_mut().unwrap().load_save(save_path);
     }
 
-    pub fn update_button(&mut self, button: Button, value: bool) {
-        self.io.update_button(button, value);
+    pub fn update_input(&mut self, input: InputState) {
+        self.io.update_input(input);
     }
 
     pub fn apu_output(&self) -> Option<(f32, f32)> {

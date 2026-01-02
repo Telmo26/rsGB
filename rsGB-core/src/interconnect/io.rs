@@ -10,7 +10,7 @@ use lcd::LCD;
 use gamepad::Gamepad;
 use apu::APU;
 
-use crate::{Button, ColorMode};
+use crate::{ColorMode, InputState};
 
 use super::InterruptType;
 
@@ -133,8 +133,8 @@ impl IO {
         self.dma.transferring()
     }
 
-    pub fn update_button(&mut self, button: Button, value: bool) {
-        self.gamepad.update_button(button, value);
+    pub fn update_input(&mut self, input: InputState) {
+        self.gamepad.gamepad_state = input;
     }
 
     pub fn apu_output(&self) -> Option<(f32, f32)> {

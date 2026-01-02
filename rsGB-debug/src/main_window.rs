@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::{Duration, Instant}};
 
 use minifb::{Key, Scale, Window, WindowOptions};
-use rs_gb_core::{Button, Gameboy, settings::Settings};
+use rs_gb_core::{Button, Gameboy, InputState, settings::Settings};
 
 use crate::CustomWindow;
 
@@ -54,14 +54,18 @@ impl CustomWindow for MainWindow {
     fn update(&mut self) {
         let mut gb = self.gameboy.borrow_mut();
 
-        gb.update_button(Button::A, self.window.is_key_down(Key::Z));
-        gb.update_button(Button::B, self.window.is_key_down(Key::X));
-        gb.update_button(Button::UP, self.window.is_key_down(Key::Up));
-        gb.update_button(Button::DOWN, self.window.is_key_down(Key::Down));
-        gb.update_button(Button::LEFT, self.window.is_key_down(Key::Left));
-        gb.update_button(Button::RIGHT, self.window.is_key_down(Key::Right));
-        gb.update_button(Button::START, self.window.is_key_down(Key::P));
-        gb.update_button(Button::SELECT, self.window.is_key_down(Key::M));
+        let mut input = InputState::default();
+
+        input.update(Button::A, self.window.is_key_down(Key::Z));
+        input.update(Button::B, self.window.is_key_down(Key::X));
+        input.update(Button::UP, self.window.is_key_down(Key::Up));
+        input.update(Button::DOWN, self.window.is_key_down(Key::Down));
+        input.update(Button::LEFT, self.window.is_key_down(Key::Left));
+        input.update(Button::RIGHT, self.window.is_key_down(Key::Right));
+        input.update(Button::START, self.window.is_key_down(Key::P));
+        input.update(Button::SELECT, self.window.is_key_down(Key::M));
+
+        gb.apply_input(input);
         gb.next_frame(&mut self.framebuffer, &self.settings);
 
         self.window.update_with_buffer(&self.framebuffer, WIDTH, HEIGHT).unwrap();

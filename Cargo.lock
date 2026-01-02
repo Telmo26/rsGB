@@ -2762,6 +2762,10 @@ dependencies = [
 [[package]]
 name = "rs_gb_core"
 version = "0.1.0"
+dependencies = [
+ "bitflags 2.10.0",
+ "ringbuf",
+]
 
 [[package]]
 name = "rs_gb_debug"

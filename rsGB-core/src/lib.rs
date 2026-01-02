@@ -15,7 +15,7 @@ use crate::{
 pub use debug::DebugInfo;
 
 pub use utils::{
-    Button,
+    Button, InputState,
     ColorMode
 };
 
@@ -154,8 +154,8 @@ impl Gameboy {
         self.devices.detach_buffer();
     }
 
-    pub fn update_button(&mut self, button: Button, value: bool) {
-        self.devices.bus.update_button(button, value);
+    pub fn apply_input(&mut self, input: InputState) {
+        self.devices.bus.update_input(input);
     }
 
     pub fn cartridge_loaded(&self) -> bool {
