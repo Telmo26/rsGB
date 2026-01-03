@@ -103,13 +103,10 @@ impl IO {
         let div_bit = (self.timer.div >> 12) & 1;
         let prev_bit = (self.prev_div >> 12) & 1;
 
-        if div_bit == 0 && prev_bit == 1 {
-            // We read the 12th bit of DIV because it reprensents the full 16-bit internal counter,
-            // instead of the 8-bit register
-            self.falling_edge = true;
-        } else {
-            self.falling_edge = false;
-        }
+        // We read the 12th bit of DIV because it represents the full 16-bit internal counter,
+        // instead of the 8-bit register
+        self.falling_edge = div_bit == 0 && prev_bit == 1;
+
         self.prev_div = self.timer.div;
 
         if let Some(interrupt) = interrupt {

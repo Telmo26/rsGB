@@ -29,7 +29,7 @@ impl Debugger {
         }
     }
 
-    /// Renders the entirety of the debugger window and
+    /// Renders the entirety of the debugger window
     pub fn render(&mut self, ctx: &egui::Context, debug_info: DebugInfo) -> bool {
         let mut stay_open = true;
 

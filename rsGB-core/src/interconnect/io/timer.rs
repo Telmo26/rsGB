@@ -8,8 +8,10 @@ pub struct Timer {
     tac: u8,
 
     previous_result: bool,
+    latched_tma: u8,
     tima_overflow: bool,
     tima_overflow_counter: u8,
+    tima_reload_cycle: bool,
 }
 
 impl Timer {
@@ -21,35 +23,46 @@ impl Timer {
     }
 
     pub fn tick(&mut self) -> Option<InterruptType> {
+        let mut interrupt = None;
+
         self.div = self.div.wrapping_add(1);
 
         if self.tima_overflow {
             self.tima_overflow_counter += 1;
+
             if self.tima_overflow_counter == 4 {
+                self.tima_reload_cycle = true;
                 self.tima = self.tma;
                 self.tima_overflow = false;
                 self.tima_overflow_counter = 0;
-                return Some(InterruptType::Timer);
+                interrupt = Some(InterruptType::Timer);
             }
         }
 
+        if self.tima_reload_cycle && interrupt.is_none() {
+            // If we passed the reload cycle where an interrupt is fired
+            self.tima_reload_cycle = false;
+        }
+        
         let timer_enable = (self.tac & (1 << 2)) != 0;
-
         let result = timer_enable & self.selected_bit();
+        let falling_edge = self.previous_result && !result;
 
-        if !self.tima_overflow && self.previous_result && !result { 
-            // Falling edge and no overflow in the last 4 cycles
-            let (new_tima, did_overflow) = self.tima.overflowing_add(1);
-            self.tima = new_tima;
+        if falling_edge { 
+            if !self.tima_overflow && !self.tima_reload_cycle {
+                // Falling edge and no overflow in the last 4 cycles
+                let (new_tima, did_overflow) = self.tima.overflowing_add(1);
+                self.tima = new_tima;
 
-            if did_overflow {
-                self.tima_overflow = did_overflow;
-                self.tima_overflow_counter = 0;
+                if did_overflow {
+                    self.tima_overflow = did_overflow;
+                    self.tima_overflow_counter = 0;
+                }
             }
         }
 
         self.previous_result = result;
-        None
+        interrupt
     }
 
     pub fn write(&mut self, address: u16, value: u8) {
@@ -73,14 +86,22 @@ impl Timer {
                 self.previous_result = new_result;
             },
             0xFF05 => {
-                self.tima = value;
-                if self.tima_overflow {
-                    // Bypass the overflow trigger
-                    self.tima_overflow = false;
-                    self.tima_overflow_counter = 0;
+                if !self.tima_reload_cycle {
+                    self.tima = value;
+                    if self.tima_overflow {
+                        // Bypass the overflow trigger
+                        self.tima_overflow = false;
+                        self.tima_overflow_counter = 0;
+                    }
                 }
             } 
-            0xFF06 => self.tma = value,
+            0xFF06 =>  {
+                self.tma = value;
+                if self.tima_reload_cycle {
+                    // If TMA is written while TIMA is reloading, overwrite the old value
+                    self.tima = value;
+                }
+            }
             0xFF07 => {
                 // Changing TAC can immediately generate a tick (falling edge) — emulate by checking old/new
                 self.tac = value | 0b11111000;
