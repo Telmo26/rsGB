@@ -9,7 +9,6 @@ pub struct DebugInfo<'dbg> {
     vram: &'dbg VRAM,
 
     cartridge: &'dbg Cartridge,
-    instruction_text: String,
 }
 
 impl<'dbg> DebugInfo<'dbg> {
@@ -19,7 +18,6 @@ impl<'dbg> DebugInfo<'dbg> {
             vram_updated,
             vram,
             cartridge,
-            instruction_text: String::new(),
         }
     } 
 
@@ -32,10 +30,9 @@ impl<'dbg> DebugInfo<'dbg> {
         self.vram.as_chunks::<16>().0
     }
     
-    pub fn current_instruction(&mut self) -> &str {
+    pub fn current_instruction(&self) -> String {
         let cpu = self.cpu;
-        self.instruction_text = cpu.curr_inst.to_str(&cpu);
-        &self.instruction_text
+        cpu.curr_inst.to_str(&cpu).clone()
     }
 
     /// This function returns a HashMap with each register value accessible by name

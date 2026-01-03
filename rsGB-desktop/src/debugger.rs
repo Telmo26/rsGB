@@ -59,6 +59,11 @@ impl Debugger {
             ui.label("Cartridge Type");
             ui.label(debug_info.game_cartridge_type());
 
+            ui.add_space(20.0);
+
+            ui.label("Instruction");
+            ui.label(debug_info.current_instruction());
+
             if ui.input(|i| i.viewport().close_requested()) {
                 // Tell parent to close us.
                 stay_open = false;
