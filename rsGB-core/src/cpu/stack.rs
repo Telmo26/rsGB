@@ -4,7 +4,7 @@ use crate::Interconnect;
 
 impl CPU {
     pub fn push(&mut self, bus: &mut Interconnect, value: u8) {
-        self.registers.sp -= 1;
+        self.registers.sp = self.registers.sp.wrapping_sub(1);
         bus.write(self.registers.sp, value);
     }
 

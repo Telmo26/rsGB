@@ -1,6 +1,6 @@
 use super::{instruction::*, CPU};
 
-use crate::{utils::*, Devices};
+use crate::{Devices, cpu::EnableInterrupt, utils::*};
 
 impl CPU {
     pub(super) fn execute(&mut self, dev: &mut Devices, instruction: InType) { // -> impl FnMut(&mut CPU, &mut Interconnect, &mut EmuContext) {
@@ -160,6 +160,7 @@ fn proc_reti(cpu: &mut CPU, dev: &mut Devices) {
 
 fn proc_di(cpu: &mut CPU, _dev: &mut Devices) {
     cpu.int_master_enabled = false;
+    cpu.enabling_ime = EnableInterrupt::None;
 }
 
 fn proc_pop(cpu: &mut CPU, dev: &mut Devices) {
@@ -534,5 +535,7 @@ fn proc_halt(cpu: &mut CPU, dev: &mut Devices) {
 }
 
 fn proc_ei(cpu: &mut CPU, _dev: &mut Devices) {
-    cpu.enabling_ime = true;
+    if cpu.enabling_ime == EnableInterrupt::None {
+        cpu.enabling_ime = EnableInterrupt::Activated;
+    }
 }

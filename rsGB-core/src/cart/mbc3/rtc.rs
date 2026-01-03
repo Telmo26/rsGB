@@ -130,22 +130,17 @@ impl RTC {
 
                 if live.h == 24 {
                     live.h = 0;
-                    self.advance_day();
+
+                    let mut day = live.day() + 1;
+                    if day == 512 {
+                        day = 0;
+                        live.set_carry();
+                    }
+
+                    live.set_day(day);
                 }
             }
         }
-    }
-
-    fn advance_day(&self) {
-        let mut live = self.live.borrow_mut();
-        let mut day = live.day() + 1;
-
-        if day == 512 {
-            day = 0;
-            live.set_carry();
-        }
-
-        live.set_day(day);
     }
 }
 

@@ -26,7 +26,7 @@ pub struct CPU {
     halt_bug_triggered: bool,
 
     int_master_enabled: bool,
-    enabling_ime: bool,
+    enabling_ime: EnableInterrupt,
 }
 
 impl CPU {
@@ -45,14 +45,13 @@ impl CPU {
             halt_bug_triggered: false,
 
             int_master_enabled: false,
-            enabling_ime: false,
+            enabling_ime: EnableInterrupt::None,
         }
     }
 
     pub(crate) fn step(&mut self, dev: &mut Devices) -> bool {
         if self.int_master_enabled {
             self.handle_interrupts(dev);
-            self.enabling_ime = false;
         }
 
         if !self.halted {
@@ -69,9 +68,18 @@ impl CPU {
             }
         }
 
-        if self.enabling_ime {
-            self.int_master_enabled = true;
+        match self.enabling_ime {
+            // EI was just triggered
+            EnableInterrupt::Activated => self.enabling_ime = EnableInterrupt::Pending,
+            
+            // We skipped the required instruction
+            EnableInterrupt::Pending => {
+                self.int_master_enabled = true;
+                self.enabling_ime = EnableInterrupt::None;
+            }
+            EnableInterrupt::None => {},
         }
+        
         true
     }
 
@@ -141,4 +149,11 @@ impl CPU {
     fn set_int_flags(&mut self, dev: &mut Devices, value: u8) {
         dev.bus.write(0xFF0F, value);
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum EnableInterrupt {
+    None,
+    Pending,
+    Activated,
 }
