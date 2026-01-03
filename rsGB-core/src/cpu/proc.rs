@@ -103,15 +103,17 @@ fn proc_ldh(cpu: &mut CPU, dev: &mut Devices) {
 
 fn goto_addr(cpu: &mut CPU, dev: &mut Devices, address: u16, push_pc: bool) {
     if cpu.check_cond() {
-        if push_pc {
-            dev.incr_cycle(2);
-            cpu.push16(&mut dev.bus, cpu.registers.pc);
-        }
-        cpu.registers.pc = address;
         if cpu.curr_inst.mode != AddrMode::R {
             // We want to avoid increasing cycles for 0xE9 : JP HL
             dev.incr_cycle(1);
         }
+        if push_pc {
+            cpu.push(&mut dev.bus, (cpu.registers.pc >> 8) as u8);
+            dev.incr_cycle(1);
+            cpu.push(&mut dev.bus, cpu.registers.pc as u8);
+            dev.incr_cycle(1);
+        }
+        cpu.registers.pc = address;
     }
 }
 

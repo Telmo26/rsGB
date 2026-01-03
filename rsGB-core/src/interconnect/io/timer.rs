@@ -8,7 +8,6 @@ pub struct Timer {
     tac: u8,
 
     previous_result: bool,
-    latched_tma: u8,
     tima_overflow: bool,
     tima_overflow_counter: u8,
     tima_reload_cycle: bool,
