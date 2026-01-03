@@ -126,7 +126,7 @@ impl CartridgeInternals for MBC1 {
                 let ram_bank = if self.banking_mode == 0 {
                     0
                 } else {
-                    self.bank2
+                    self.bank2.min(self.ram_bank_nb as usize - 1)
                 };
                 self.ram_banks[ram_bank][address as usize % (1 << 12)]
             }

@@ -5,6 +5,7 @@ use crate::cart::{CartridgeInternals, header::CartridgeHeader};
 pub struct MBC2 {
     rom_data: Vec<u8>,
     rom_bank_nb: u8,
+    total_rom_banks: u8,
 
     internal_ram: [u8; 512],
     ram_enabled: bool,
@@ -15,9 +16,11 @@ pub struct MBC2 {
 
 impl MBC2 {
     pub fn new(header: &CartridgeHeader, rom_data: Vec<u8>) -> MBC2 {
+        let total_rom_banks = (rom_data.len() / 0x4000) as u8; // A ROM bank is 16KiB
         MBC2 {
             rom_data,
             rom_bank_nb: 1,
+            total_rom_banks,
 
             internal_ram: [0; 512],
             ram_enabled: false,
@@ -32,9 +35,12 @@ impl CartridgeInternals for MBC2 {
     fn read(&self, address: u16) -> u8 {
         match address {
             0x0000..=0x3FFF => self.rom_data[address as usize],
-            0x4000..=0x7FFF => self.rom_data[(self.rom_bank_nb as usize) << 14 | (address as usize & 0x3FFF)],
+            0x4000..=0x7FFF => {
+                let bank = self.rom_bank_nb % self.total_rom_banks;
+                self.rom_data[(bank as usize) << 14 | (address as usize & 0x3FFF)]
+            },
             0xA000..=0xBFFF => if self.ram_enabled { 
-                self.internal_ram[(address as usize) & 0x1FF] & 0xF 
+                self.internal_ram[(address as usize) & 0x1FF] | 0xF0 
             } else { 0xFF },
             _ => unreachable!(),
         }

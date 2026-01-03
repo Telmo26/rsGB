@@ -111,27 +111,27 @@ impl RTC {
     fn advance_seconds(&self, mut secs: u64) {
         while secs > 0 {
             let step = secs.min(60);
-            self.tick(step as u32);
+            self.tick(step as u8);
             secs -= step;
         }
     }
 
-    fn tick(&self, secs: u32) {
+    fn tick(&self, secs: u8) {
         let mut live = self.live.borrow_mut();
         live.s += secs as u8;
 
         if live.s >= 60 {
             live.s %= 60;
-            live.m += 1;
+            live.m += live.s / 60;
 
-            if live.m == 60 {
-                live.m = 0;
-                live.h += 1;
+            if live.m >= 60 {
+                live.m %= 60;
+                live.h += live.m / 60;
 
-                if live.h == 24 {
-                    live.h = 0;
+                if live.h >= 24 {
+                    live.h %= 24;
 
-                    let mut day = live.day() + 1;
+                    let mut day = live.day() + (live.h / 24) as u16;
                     if day == 512 {
                         day = 0;
                         live.set_carry();
