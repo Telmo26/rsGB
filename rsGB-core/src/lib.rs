@@ -162,7 +162,7 @@ impl Gameboy {
         self.devices.bus.cart.is_some()
     }
 
-    pub fn debug(&self) -> DebugInfo {
+    pub fn debug<'a>(&'a self) -> DebugInfo<'a> {
         let vram_updated = self.devices.bus.vram_updated.get();
         self.devices.bus.vram_updated.replace(false);
 

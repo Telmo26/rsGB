@@ -1,3 +1,6 @@
+use core::panic;
+use std::ops::{Index, IndexMut};
+
 use bitflags::bitflags;
 
 #[macro_export]
@@ -7,7 +10,7 @@ macro_rules! NO_IMPL {
     }};
 }
 
-/// This function sets the n-th bit of 'a' 
+/// This function sets the n-th bit of 'a'
 /// to the value given in 'on'
 pub fn bit_set(a: &mut u8, n: u8, on: bool) {
     if on {
@@ -44,14 +47,14 @@ pub enum Button {
 impl Button {
     fn flag(&self) -> ButtonFlag {
         match self {
-            Button::A       => ButtonFlag::A,
-            Button::B       => ButtonFlag::B,
-            Button::START   => ButtonFlag::START,
-            Button::SELECT  => ButtonFlag::SELECT,
-            Button::UP      => ButtonFlag::UP,
-            Button::DOWN    => ButtonFlag::DOWN,
-            Button::LEFT    => ButtonFlag::LEFT,
-            Button::RIGHT   => ButtonFlag::RIGHT
+            Button::A => ButtonFlag::A,
+            Button::B => ButtonFlag::B,
+            Button::START => ButtonFlag::START,
+            Button::SELECT => ButtonFlag::SELECT,
+            Button::UP => ButtonFlag::UP,
+            Button::DOWN => ButtonFlag::DOWN,
+            Button::LEFT => ButtonFlag::LEFT,
+            Button::RIGHT => ButtonFlag::RIGHT,
         }
     }
 }
@@ -90,10 +93,94 @@ impl InputState {
     }
 
     pub fn from_bits(bits: u8) -> InputState {
-        InputState { buttons: ButtonFlag::from_bits_truncate(bits) }
+        InputState {
+            buttons: ButtonFlag::from_bits_truncate(bits),
+        }
     }
 
     pub fn bits(&self) -> u8 {
         self.buttons.bits()
+    }
+}
+
+#[derive(Debug)]
+pub enum BoundedError {
+    Full
+}
+
+#[derive(Debug)]
+pub struct BoundedQueue<T, const N: usize> {
+    inner: [T; N],
+    head: usize,
+    tail: usize,
+    len: usize,
+}
+
+impl<T: Copy + Default, const N: usize> BoundedQueue<T, N> {
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn push_back(&mut self, element: T) -> Result<(), BoundedError> {
+        if self.len >= self.inner.len() {
+            return Err(BoundedError::Full)
+        }
+
+        self.inner[self.tail] = element;
+        self.tail = (self.tail + 1) % N;
+        self.len += 1;
+        Ok(())
+    }
+
+    pub fn pop_front(&mut self) -> Option<T> {
+        if self.len == 0 {
+            return None
+        }
+
+        let out = self.inner[self.head];
+        self.head = (self.head + 1) % N;
+        self.len -= 1;
+
+        Some(out)
+    }
+
+    pub fn clear(&mut self) {
+        self.inner = [T::default(); N];
+        self.head = 0;
+        self.tail = 0;
+        self.len = 0;
+    }
+}
+
+impl<T: Copy + Default, const N: usize> Default for BoundedQueue<T, N> {
+    fn default() -> BoundedQueue<T, N> {
+        BoundedQueue {
+            inner: [T::default(); N],
+            head: 0,
+            tail: 0,
+            len: 0,
+        }
+    }
+}
+
+impl<T: Copy + Default, const N: usize> Index<usize> for BoundedQueue<T, N> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index < self.len {
+            &self.inner[(self.head + index) % N]
+        } else {
+            panic!("Incorrect")
+        }
+    }
+}
+
+impl<T: Copy + Default, const N: usize> IndexMut<usize> for BoundedQueue<T, N> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if index < self.len {
+            &mut self.inner[(self.head + index) % N]
+        } else {
+            panic!("Incorrect")
+        }
     }
 }

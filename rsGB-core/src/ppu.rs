@@ -1,6 +1,4 @@
-use std::collections::VecDeque;
-
-use crate::interconnect::{Interconnect, OAMEntry};
+use crate::{interconnect::{Interconnect, OAMEntry}, utils::BoundedQueue};
 
 mod state_machine;
 mod pipeline;
@@ -18,8 +16,8 @@ const XRES: usize = 160;
 #[derive(Debug)]
 pub struct PPU {
     fetcher: Fetcher,
-    bgw_fifo: VecDeque<(u32, u8)>,
-    obj_fifo: VecDeque<(u32, u8, bool)>,
+    bgw_fifo: BoundedQueue<(u32, u8), 8>,
+    obj_fifo: BoundedQueue<(u32, u8, bool), 8>,
 
     visible_sprites: Vec<OAMEntry>,
     fetched_sprites: [bool; 10],
@@ -36,8 +34,8 @@ impl PPU {
     pub fn new() -> PPU {
         PPU {
             fetcher: Fetcher::new(),
-            bgw_fifo: VecDeque::with_capacity(8),
-            obj_fifo: VecDeque::with_capacity(8),
+            bgw_fifo: BoundedQueue::default(),
+            obj_fifo: BoundedQueue::default(),
 
             visible_sprites: Vec::with_capacity(10),
             fetched_sprites: [false; 10],

@@ -5,5 +5,5 @@ members = ["rsGB-core", "rsGB-debug", "rsGB-desktop"]
 [profile.release]
 lto = true
 codegen-units = 1
-panic = "abort"
-strip = true
+# panic = "abort"
+# strip = true

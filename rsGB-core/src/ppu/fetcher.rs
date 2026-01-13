@@ -221,9 +221,9 @@ impl Fetcher {
 
     // This function returns the color value for the background
     // and the index, to handle transparency
-    pub fn push_bgw(&mut self, bus: &mut Interconnect) -> Option<Vec<(u32, u8)>> {
+    pub fn push_bgw(&mut self, bus: &mut Interconnect) -> Option<[(u32, u8); 8]> {
         if let FetchState::Push = self.state {
-            let mut pixels = Vec::new();
+            let mut pixels = [(0, 0); 8];
             for i in 0..8 {
                 let bit: u8 = 7 - i;
                 let low = ((self.bgw_fetched_data[1] & (1 << bit)) != 0) as u8;
@@ -236,7 +236,7 @@ impl Fetcher {
 
                 let color = bus.lcd_bg_colors()[index as usize];
 
-                pixels.push((color, index));
+                pixels[i as usize] = (color, index);
             }
             self.pushed_x += 8;
             self.state = FetchState::TileID(Step::First);

@@ -81,7 +81,7 @@ impl EmulationState {
     }
 
     pub fn load_cartridge(&mut self, rom_path: &PathBuf, settings: &AppSettings) {
-        self.gameboy.load_cartridge(rom_path, &settings.emu_settings);
+        self.gameboy.load_cartridge(rom_path, settings.emu_settings());
     }
 
     pub fn cartridge_loaded(&self) -> bool {
@@ -98,7 +98,7 @@ impl EmulationState {
         });
 
         self.gameboy.apply_input(input);
-        self.gameboy.next_frame(&mut self.framebuffer, &settings.emu_settings());
+        self.gameboy.next_frame(&mut self.framebuffer, settings.emu_settings());
 
         let color_image = ColorImage::from_rgba_unmultiplied([XRES, YRES], cast_slice(&self.framebuffer));
 
@@ -129,7 +129,7 @@ impl EmulationState {
         });
     }
 
-    pub fn debug_info(&self) -> DebugInfo {
+    pub fn debug_info<'a>(&'a self) -> DebugInfo<'a> {
         self.gameboy.debug()
     }
 }

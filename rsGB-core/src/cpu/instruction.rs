@@ -413,7 +413,8 @@ pub struct Instruction {
 impl Instruction {
     pub fn from_opcode(opcode: u8) -> Instruction {
         INSTRUCTIONS[opcode as usize]
-            .expect(&format!("Opcode {opcode:X} not implemented!"))
+            .unwrap()
+            // .expect(&format!("Opcode {opcode:X} not implemented!"))
     }
 
     pub fn to_str(&self, cpu: &CPU) -> String {

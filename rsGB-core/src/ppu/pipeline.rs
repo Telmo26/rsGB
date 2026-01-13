@@ -12,7 +12,7 @@ impl PPU {
             self.fetcher.fetch(bus);
             if let Some(data) = self.fetcher.push_obj(bus) {
                 while self.obj_fifo.len() < 8 {
-                    self.obj_fifo.push_back((u32::MAX, 0, true));
+                    self.obj_fifo.push_back((u32::MAX, 0, true)).unwrap();
                 }
                 for i in 0..8 {
                     let (new_pixel, new_index, new_bg_priority) = data[i];
@@ -33,14 +33,16 @@ impl PPU {
             } else {
                 return;
             }
-        } else if self.bgw_fifo.is_empty() {
+        } else if self.bgw_fifo.len() == 0 {
             self.fetcher.fetch(bus);
             if let Some(pixels) = self.fetcher.push_bgw(bus) {
-                self.bgw_fifo.extend(pixels);
+                for pixel in pixels {
+                    self.bgw_fifo.push_back(pixel).unwrap();
+                }
             }
         }
 
-        if !self.bgw_fifo.is_empty() {
+        if !(self.bgw_fifo.len() == 0) {
             let (bgw_pixel, bgw_index) = self.bgw_fifo.pop_front().unwrap();
 
             if !self.fetcher.is_window_mode() {
