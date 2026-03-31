@@ -4,7 +4,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 use ringbuf::traits::{Consumer, Producer, Split};
 
-use rs_gb_core::{Gameboy, settings::Settings};
+use rsgb_core::{Gameboy, settings::Settings};
 
 mod main_window;
 mod debug_window;
@@ -27,7 +27,7 @@ fn main() {
 
     // Creation of the gameboy
     let mut gameboy = Gameboy::new( 
-        rs_gb_core::ColorMode::ARGB, 
+        rsgb_core::ColorMode::ARGB, 
         move |sample| { 
             let _ = audio_sender.try_push(sample);
         }

@@ -1,5 +1,5 @@
 use eframe::egui::{self, TextureHandle};
-use rs_gb_core::DebugInfo;
+use rsgb_core::DebugInfo;
 
 const DEBUG_WIDTH: usize = 16 * 8 + 16 + 1; 
 const DEBUG_HEIGHT: usize = 24 * 8 + 24 + 1;

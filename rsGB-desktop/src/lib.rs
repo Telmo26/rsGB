@@ -1,7 +1,7 @@
 // third party crates imports
 use eframe::egui;
 use rfd::FileDialog;
-use rs_gb_core::settings::SpeedOption;
+use rsgb_core::settings::SpeedOption;
 
 // child modules
 mod settings;

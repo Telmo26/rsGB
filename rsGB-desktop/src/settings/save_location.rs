@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use eframe::egui;
-use rs_gb_core::settings::SaveLocation;
+use rsgb_core::settings::SaveLocation;
 
 use crate::settings::AppSettings;
 

@@ -4,7 +4,7 @@ mod mooneye_tests {
     mod acceptance {
         use std::{path::{Path, PathBuf}, time::{Duration, Instant}};
 
-        use rs_gb_core::{Gameboy, settings::Settings};
+        use rsgb_core::{Gameboy, settings::Settings};
 
         const SKIP_LIST: [&str; 9] = [
             "boot_div2-S",
@@ -20,7 +20,7 @@ mod mooneye_tests {
 
         #[test_each::blob(glob = "test_roms/mooneye/acceptance/**/*.gb", name(segments = 1))]
         fn run_test(_content: &[u8], path: &Path) {
-            let mut gb = Gameboy::new(rs_gb_core::ColorMode::ARGB, |_| {});
+            let mut gb = Gameboy::new(rsgb_core::ColorMode::ARGB, |_| {});
 
             let settings = Settings::default();
             let rom_path = PathBuf::from(path);

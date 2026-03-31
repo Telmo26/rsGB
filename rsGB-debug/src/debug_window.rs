@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use minifb::{Scale, Window, WindowOptions};
-use rs_gb_core::Gameboy;
+use rsgb_core::Gameboy;
 
 use crate::CustomWindow;
 

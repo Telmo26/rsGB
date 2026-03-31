@@ -7,7 +7,7 @@ use eframe::egui::{self, ColorImage};
 use ringbuf::traits::{Consumer, Producer, Split};
 
 // local crate import
-use rs_gb_core::{ColorMode, DebugInfo, Gameboy, InputState};
+use rsgb_core::{ColorMode, DebugInfo, Gameboy, InputState};
 
 use crate::settings::{AppSettings, FRAME_SIZE, XRES, YRES};
 

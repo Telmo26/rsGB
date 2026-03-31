@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use eframe::egui::{self, Key};
 
-use rs_gb_core::{
+use rsgb_core::{
     Button,
     settings::Settings,
 };

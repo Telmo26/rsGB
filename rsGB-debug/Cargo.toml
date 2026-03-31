@@ -1,5 +1,5 @@
 [package]
-name = "rs_gb_debug"
+name = "rsgb_debug"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,4 +7,4 @@ edition = "2024"
 cpal = "0.16.0"
 minifb = '0.28.0'
 ringbuf = "0.4.8"
-rs_gb_core = { path = "../rsGB-core" }
+rsgb_core = { path = "../rsGB-core" }

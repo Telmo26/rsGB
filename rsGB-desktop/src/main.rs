@@ -2,7 +2,7 @@
 
 use eframe::{NativeOptions, egui};
 
-use rs_gb_desktop::MyEguiApp;
+use rsgb_desktop::MyEguiApp;
 
 fn main() {    
     let options = NativeOptions {

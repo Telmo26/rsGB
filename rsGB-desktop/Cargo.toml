@@ -1,5 +1,5 @@
 [package]
-name = "rs_gb_desktop"
+name = "rsgb_desktop"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,4 +9,4 @@ eframe = { version = "0.33", features = ["wgpu"] }
 bytemuck = "1.24"
 ringbuf = "0.4.8"
 rfd = "0.16"
-rs_gb_core = { path = "../rsGB-core" }
+rsgb_core = { path = "../rsGB-core" }

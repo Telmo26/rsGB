@@ -2766,7 +2766,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rs_gb_core"
+name = "rsgb_core"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.10.0",
@@ -2774,17 +2774,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "rs_gb_debug"
+name = "rsgb_debug"
 version = "0.1.0"
 dependencies = [
  "cpal",
  "minifb",
  "ringbuf",
- "rs_gb_core",
+ "rsgb_core",
 ]
 
 [[package]]
-name = "rs_gb_desktop"
+name = "rsgb_desktop"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
@@ -2792,7 +2792,7 @@ dependencies = [
  "eframe",
  "rfd",
  "ringbuf",
- "rs_gb_core",
+ "rsgb_core",
 ]
 
 [[package]]

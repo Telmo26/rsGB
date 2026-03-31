@@ -1,5 +1,5 @@
 use eframe::egui;
-use rs_gb_core::Button;
+use rsgb_core::Button;
 
 pub fn bindings_widget(settings: &mut super::AppSettings, ui: &mut egui::Ui) {
     ui.vertical(|ui| {

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::{Duration, Instant}};
 
 use minifb::{Key, Scale, Window, WindowOptions};
-use rs_gb_core::{Button, Gameboy, InputState, settings::Settings};
+use rsgb_core::{Button, Gameboy, InputState, settings::Settings};
 
 use crate::CustomWindow;
 
