@@ -1,4 +1,4 @@
-use crate::Devices;
+use crate::Peripherals;
 
 use super::CPU;
 
@@ -12,16 +12,16 @@ pub enum InterruptType {
 }
 
 impl CPU {
-    fn interrupt_handle(&mut self, dev: &mut Devices, address: u16, interrupt_type: InterruptType) -> bool {
+    fn interrupt_handle(&mut self, dev: &mut impl Peripherals, address: u16, interrupt_type: InterruptType) -> bool {
         // Two internal NOPs
-        dev.incr_cycle(1);
-        dev.incr_cycle(1);
+        dev.incr_cycle();
+        dev.incr_cycle();
 
         // The two push operations
-        self.push(&mut dev.bus, (self.registers.pc >> 8) as u8);
-        dev.incr_cycle(1);
+        self.push(dev, (self.registers.pc >> 8) as u8);
+        dev.incr_cycle();
 
-        let ie_register = dev.bus.get_ie_register();
+        let ie_register = dev.ie_register();
         let it = interrupt_type as u8;
 
         if (ie_register & it) == 0 { // The interrupt was cancelled
@@ -29,8 +29,8 @@ impl CPU {
             return true
         }
 
-        self.push(&mut dev.bus, self.registers.pc as u8);
-        dev.incr_cycle(1);
+        self.push(dev, self.registers.pc as u8);
+        dev.incr_cycle();
 
         if (ie_register & it) == 0 { // The interrupt was cancelled
             self.registers.pc = 0;
@@ -39,11 +39,11 @@ impl CPU {
 
         // Final jump
         self.registers.pc = address;
-        dev.incr_cycle(1);
+        dev.incr_cycle();
         return false
     }
 
-    pub(super) fn handle_interrupts(&mut self, dev: &mut Devices) {
+    pub(super) fn handle_interrupts(&mut self, dev: &mut impl Peripherals) {
         if self.interrupt_check(dev, 0x40, InterruptType::VBlank) {
 
         } else if self.interrupt_check(dev, 0x48, InterruptType::LcdStat) {
@@ -57,9 +57,9 @@ impl CPU {
         }
     }
 
-    fn interrupt_check(&mut self, dev: &mut Devices, address: u16, interrupt_type: InterruptType) -> bool {
+    fn interrupt_check(&mut self, dev: &mut impl Peripherals, address: u16, interrupt_type: InterruptType) -> bool {
         let if_register = self.get_int_flags(dev);
-        let ie_register = dev.bus.get_ie_register();
+        let ie_register = dev.ie_register();
         let it = interrupt_type as u8;
 
         if (if_register & it) != 0 && 

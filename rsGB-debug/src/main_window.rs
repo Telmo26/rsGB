@@ -54,6 +54,8 @@ impl CustomWindow for MainWindow {
     fn update(&mut self) {
         let mut gb = self.gameboy.borrow_mut();
 
+        self.settings.speed = rsgb_core::settings::SpeedOption::X2;
+
         let mut input = InputState::default();
 
         input.update(Button::A, self.window.is_key_down(Key::Z));

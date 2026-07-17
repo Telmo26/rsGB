@@ -1,20 +1,20 @@
 use super::CPU;
 
-use crate::Interconnect;
+use crate::Peripherals;
 
 impl CPU {
-    pub fn push(&mut self, bus: &mut Interconnect, value: u8) {
+    pub(crate) fn push(&mut self, dev: &mut impl Peripherals, value: u8) {
         self.registers.sp = self.registers.sp.wrapping_sub(1);
-        bus.write(self.registers.sp, value);
+        dev.write8(self.registers.sp, value);
     }
 
-    pub fn push16(&mut self, bus: &mut Interconnect, value: u16) {
-        self.push(bus, (value >> 8) as u8);
-        self.push(bus, value as u8);
+    pub(crate) fn push16(&mut self, dev: &mut impl Peripherals, value: u16) {
+        self.push(dev, (value >> 8) as u8);
+        self.push(dev, value as u8);
     }
 
-    pub fn pop(&mut self, bus: &mut Interconnect) -> u8 {
-        let val = bus.read(self.registers.sp);
+    pub(crate) fn pop(&mut self, dev: &mut impl Peripherals) -> u8 {
+        let val = dev.read8(self.registers.sp);
         self.registers.sp = self.registers.sp.wrapping_add(1);
         val
     }

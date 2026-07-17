@@ -130,7 +130,7 @@ impl CartridgeInternals for MBC3 {
         need_save
     }
 
-    fn load_save(&mut self, save_path: &std::path::PathBuf) {
+    fn load_save(&mut self, save_path: &std::path::Path) {
         // If the save file doesn't exist 
         // it will be created on next frame anyway
         if let Ok(mut file) = File::open(save_path) {
@@ -156,7 +156,7 @@ impl CartridgeInternals for MBC3 {
         if self.timer_present { self.rtc.load(save_path); }
     }
 
-    fn save(&self, save_path: &std::path::PathBuf) {
+    fn save(&self, save_path: &std::path::Path) {
         // This way we only do one allocation
         let buffer: Vec<u8> = self.ram_banks.clone().into_iter()
             .flatten()

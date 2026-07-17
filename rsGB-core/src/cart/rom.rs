@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::cart::CartridgeInternals;
 
@@ -24,7 +24,7 @@ impl CartridgeInternals for ROM {
 
     fn need_save(&mut self) -> bool { false }
 
-    fn save(&self, _save_path: &PathBuf) {}
+    fn save(&self, _save_path: &Path) {}
 
-    fn load_save(&mut self, _save_path: &PathBuf) {}
+    fn load_save(&mut self, _save_path: &Path) {}
 }

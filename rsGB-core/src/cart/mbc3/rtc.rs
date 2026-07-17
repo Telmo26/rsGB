@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fs::File, io::{Read, Write}, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+use std::{cell::RefCell, fs::File, io::{Read, Write}, path::Path, time::{SystemTime, UNIX_EPOCH}};
 
 pub struct RTC {
     live: RefCell<RtcState>,
@@ -61,9 +61,9 @@ impl RTC {
         self.latched_valid = true;
     }
 
-    pub fn save(&self, save_path: &PathBuf) {
+    pub fn save(&self, save_path: &Path) {
         self.update();
-        let mut rtc_path = save_path.clone();
+        let mut rtc_path = save_path.to_path_buf();
         rtc_path.set_extension("rtc");
 
         let rtc_values = self.live.borrow().values();
@@ -75,8 +75,8 @@ impl RTC {
 
     }
 
-    pub fn load(&mut self, save_path: &PathBuf) {
-        let mut rtc_path = save_path.clone();
+    pub fn load(&mut self, save_path: &Path) {
+        let mut rtc_path = save_path.to_path_buf();
         rtc_path.set_extension("rtc");
         
         if let Ok(mut file) = File::open(&rtc_path) {

@@ -6,7 +6,7 @@ pub mod interrupts;
 mod fetch_data;
 
 use crate::{
-    utils::{bit_set, BIT_IGNORE}, Devices
+    utils::{bit_set, BIT_IGNORE}, Peripherals
 };
 
 pub use instruction::*;
@@ -49,21 +49,21 @@ impl CPU {
         }
     }
 
-    pub(crate) fn step(&mut self, dev: &mut Devices) -> bool {
+    pub(crate) fn step(&mut self, dev: &mut impl Peripherals) -> bool {
         if self.int_master_enabled {
             self.handle_interrupts(dev);
         }
 
         if !self.halted {
             self.fetch_instruction(dev);
-            dev.incr_cycle(1);
+            dev.incr_cycle();
             self.fetch_data(dev);
 
             self.execute(dev, self.curr_inst.in_type);
             
         } else {
-            dev.incr_cycle(1);
-            if dev.bus.get_ie_register() & self.get_int_flags(&dev) & 0x1F != 0 {
+            dev.incr_cycle();
+            if dev.ie_register() & self.get_int_flags(dev) & 0x1F != 0 {
                 self.halted = false;
             }
         }
@@ -83,8 +83,8 @@ impl CPU {
         true
     }
 
-    fn fetch_instruction(&mut self, dev: &mut Devices) {
-        self.curr_opcode = dev.bus.read(self.registers.pc);
+    fn fetch_instruction(&mut self, dev: &mut impl Peripherals) {
+        self.curr_opcode = dev.read8(self.registers.pc);
         self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
         if self.halt_bug_triggered {
@@ -142,12 +142,12 @@ impl CPU {
         }
     }
 
-    fn get_int_flags(&self, dev: &Devices) -> u8 {
-        dev.bus.read(0xFF0F)
+    fn get_int_flags(&self, dev: &impl Peripherals) -> u8 {
+        dev.read8(0xFF0F)
     }
 
-    fn set_int_flags(&mut self, dev: &mut Devices, value: u8) {
-        dev.bus.write(0xFF0F, value);
+    fn set_int_flags(&mut self, dev: &mut impl Peripherals, value: u8) {
+        dev.write8(0xFF0F, value);
     }
 }
 

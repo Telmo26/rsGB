@@ -1,5 +1,5 @@
 use super::instruction::RegType;
-use crate::Interconnect;
+use crate::Peripherals;
 
 pub struct CpuRegisters {
     pub a: u8,
@@ -87,18 +87,18 @@ impl CpuRegisters {
         }
     }
 
-    pub fn read_reg8(&self, bus: &Interconnect, register: RegType) -> u8 {
+    pub(crate) fn read_reg8(&self, dev: &impl Peripherals, register: RegType) -> u8 {
         match register {
             x if x < RegType::AF => self.read(register) as u8,
-            RegType::HL => bus.read(self.read(register)),
+            RegType::HL => dev.read8(self.read(register)),
             _ => panic!("INVALID REG8: {register:?}"),
         }
     }
 
-    pub fn set_reg8(&mut self, bus: &mut Interconnect, register: RegType, value: u8) {
+    pub(crate) fn set_reg8(&mut self, dev: &mut impl Peripherals, register: RegType, value: u8) {
         match register {
             x if x < RegType::AF => self.set(register, value as u16),
-            RegType::HL => bus.write(self.read(register), value),
+            RegType::HL => dev.write8(self.read(register), value),
             _ => panic!("INVALID REG8: {register:?}"),
         }
     }

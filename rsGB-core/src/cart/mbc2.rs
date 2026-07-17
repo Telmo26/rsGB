@@ -72,12 +72,12 @@ impl CartridgeInternals for MBC2 {
         need_save
     }
 
-    fn save(&self, save_path: &std::path::PathBuf) {
+    fn save(&self, save_path: &std::path::Path) {
         let mut file = File::create(save_path).expect("Failed to create save file");
         file.write_all(&self.internal_ram).expect("Failed to write save file");
     }
 
-    fn load_save(&mut self, save_path: &std::path::PathBuf) {
+    fn load_save(&mut self, save_path: &std::path::Path) {
         if let Ok(mut file) = File::open(save_path) {
             let expected_len = self.internal_ram.len();
 

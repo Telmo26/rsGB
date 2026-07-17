@@ -9,7 +9,7 @@ pub mod settings;
 use std::path::{Path, PathBuf};
 
 use crate::{
-    cart::Cartridge, cpu::CPU, interconnect::Interconnect, ppu::PPU, settings::SaveLocation, utils::TICKS_PER_SAMPLE
+    cart::Cartridge, cpu::CPU, interconnect::Interconnect, ppu::PPU, settings::SaveLocation, utils::{AUDIO_FREQUENCY, CPU_FREQUENCY}
 };
 
 pub use debug::DebugInfo;
@@ -23,88 +23,137 @@ use settings::{
     Settings,
 };
 
-struct Devices {
+pub trait VideoSink {
+    /// Gives mutable access to the framebuffer currently being rendered into
+    fn get_mut(&mut self) -> &mut [u32];
+
+    /// Called once when the frame rendering is done
+    fn present(&mut self);
+}
+
+pub trait AudioSink {
+    /// Used to send a sample to the playing thread
+    fn push_sample(&mut self, left: f32, right: f32);
+}
+
+/// This trait is used to abstract away the various peripherals and only expose
+/// the required reading and writing functions
+trait Peripherals {
+    fn incr_cycle(&mut self);
+    
+    fn read8(&self, address: u16) -> u8;
+    fn write8(&mut self, address: u16, value: u8);
+    fn write16(&mut self, address: u16, value: u16);
+    fn ie_register(&self) -> u8;
+}
+
+struct Devices<A: AudioSink, V: VideoSink> {
     bus: Interconnect,
     ppu: PPU,
 
-    audio_callback: Box<dyn FnMut((f32, f32)) + Send>,
-    framebuffer: Option<*mut [u32]>,
+    audio_sink: A,
+    video_sink: V,
 
     speed: u8,
     frames: u8,
 
     ticks: u64,
-    last_sample_tick: u64,
+    audio_accumulator: u32,
 }
 
-impl Devices {
-    fn new<F>(bus: Interconnect, ppu: PPU, audio_callback: F) -> Devices 
-    where F: FnMut((f32, f32)) + Send + 'static {
+impl<A, V> Devices<A, V>
+where 
+    A: AudioSink,
+    V: VideoSink
+{
+    fn new(
+        bus: Interconnect, 
+        ppu: PPU, 
+        audio_sink: A,
+        video_sink: V
+    ) -> Devices<A, V>
+    {
         Devices {
             bus,
             ppu,
-            audio_callback: Box::new(audio_callback),
-            framebuffer: None,
+            audio_sink,
+            video_sink,
 
             speed: 1,
             frames: 0,
 
             ticks: 0,
-            last_sample_tick: 0,
+            audio_accumulator: 0,
         }
-    }
-
-    fn incr_cycle(&mut self, cpu_cycles: u16) {
-        for _ in 0..cpu_cycles {
-            for _ in 0..4 {
-                self.ticks += 1;
-                self.bus.tick_t();
-                if let Some(ptr) = self.framebuffer {
-                    unsafe {
-                        let fb = &mut *ptr;
-                        if self.ppu.tick(&mut self.bus, fb, self.frames == self.speed - 1) { // Frame updated
-                            self.frames += 1;
-                        }
-                    } 
-                }
-
-                if self.ticks - self.last_sample_tick >= TICKS_PER_SAMPLE * self.speed as u64 {
-                    if let Some(sample) = self.bus.apu_output() {
-                        (self.audio_callback)(sample)
-                    }
-                    self.last_sample_tick = self.ticks;
-                }
-            }
-            self.bus.tick_m();
-        }
-    }
-
-    fn attach_buffer(&mut self, framebuffer: &mut [u32]) {
-        if framebuffer.len() < 0x5A00 {
-            panic!("Trying to attach framebuffer that is too small!");
-        }
-        self.framebuffer = Some(framebuffer as *mut [u32])
-    }
-
-    fn detach_buffer(&mut self) {
-        self.framebuffer = None;
     }
 }
 
-pub struct Gameboy {
+impl<A, V> Peripherals for Devices<A, V>
+where 
+    A: AudioSink,
+    V: VideoSink,
+{
+    fn incr_cycle(&mut self) {
+        for _ in 0..4 {
+            self.ticks += 1;
+            self.bus.tick_t();
+
+            let framebuffer = self.video_sink.get_mut();
+
+            if self.ppu.tick(&mut self.bus, framebuffer, self.frames == self.speed - 1) { // Frame updated
+                self.frames += 1;
+            }
+
+            self.audio_accumulator += AUDIO_FREQUENCY;
+            if self.audio_accumulator >= CPU_FREQUENCY * self.speed as u32 {
+                self.audio_accumulator -= CPU_FREQUENCY * self.speed as u32;
+                if let Some((left, right)) = self.bus.apu_output() {
+                    self.audio_sink.push_sample(left, right);
+                }
+            }
+        }
+        self.bus.tick_m();
+    }
+
+    fn read8(&self, address: u16) -> u8 {
+        self.bus.read(address)
+    }
+
+    fn write8(&mut self, address: u16, value: u8) {
+        self.bus.write(address, value);
+    }
+
+    fn write16(&mut self, address: u16, value: u16) {
+        self.bus.write16(address, value);
+    }
+
+    fn ie_register(&self) -> u8 {
+        self.bus.get_ie_register()
+    }
+}
+
+pub struct Gameboy<A: AudioSink, V: VideoSink> {
     cpu: CPU,
-    devices: Devices,
+    devices: Devices<A, V>,
 
     save_path: PathBuf,
 }
 
-impl Gameboy {
-    pub fn new<F>(color_mode: ColorMode, audio_callback: F) -> Gameboy 
-    where F: FnMut((f32, f32)) + Send + 'static {
+impl<A, V> Gameboy<A, V> 
+where 
+    A: AudioSink,
+    V: VideoSink    
+{
+    pub fn new(
+        color_mode: ColorMode, 
+        audio_sink: A,
+        video_sink: V
+    ) -> Gameboy<A, V> 
+    {
         let bus = Interconnect::new(color_mode);
         let ppu = PPU::new();
 
-        let devices = Devices::new(bus, ppu, audio_callback);
+        let devices = Devices::new(bus, ppu, audio_sink, video_sink);
         Gameboy {
             cpu: CPU::new(),
             devices,
@@ -113,10 +162,10 @@ impl Gameboy {
         }
     }
 
-    pub fn load_cartridge(&mut self, rom_path: &PathBuf, settings: &Settings) {
+    pub fn load_cartridge(&mut self, rom_path: &Path, settings: &Settings) {
         let save_path = match settings.get_save_location() {
             SaveLocation::GameLoc => {
-                let mut clone = rom_path.clone();
+                let mut clone = rom_path.to_path_buf();
                 clone.set_extension("sav");
                 clone
             },
@@ -137,9 +186,7 @@ impl Gameboy {
         self.save_path = save_path;
     }
 
-    pub fn next_frame(&mut self, framebuffer: &mut [u32], settings: &Settings) {
-        self.devices.attach_buffer(framebuffer);
-
+    pub fn next_frame(&mut self, settings: &Settings) {
         let speed = settings.speed as u8;
         self.devices.speed = speed;
 
@@ -151,7 +198,6 @@ impl Gameboy {
             self.devices.bus.save(&self.save_path);
         }
         self.devices.frames = 0;
-        self.devices.detach_buffer();
     }
 
     pub fn apply_input(&mut self, input: InputState) {
@@ -174,4 +220,3 @@ impl Gameboy {
         )
     }
 }
-

@@ -24,7 +24,8 @@ pub const BIT_IGNORE: u8 = 2;
 
 pub type VRAM = [u8; 0x2000];
 
-pub const TICKS_PER_SAMPLE: u64 = 95;
+pub const CPU_FREQUENCY: u32 = 4_194_304;
+pub const AUDIO_FREQUENCY: u32 = 44_100;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ColorMode {

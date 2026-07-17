@@ -1,6 +1,6 @@
 #![allow(non_contiguous_range_endpoints)]
 
-use std::{error::Error, fs, path::PathBuf};
+use std::{error::Error, fs, path::{Path, PathBuf}};
 
 mod header;
 use header::CartridgeHeader;
@@ -19,8 +19,8 @@ trait CartridgeInternals {
     fn read(&self, address: u16) -> u8;
     fn write(&mut self, address: u16, value: u8);
     fn need_save(&mut self) -> bool;
-    fn save(&self, save_path: &PathBuf);
-    fn load_save(&mut self, save_path: &PathBuf);
+    fn save(&self, save_path: &Path);
+    fn load_save(&mut self, save_path: &Path);
 }
 
 pub struct Cartridge {
@@ -30,7 +30,7 @@ pub struct Cartridge {
 }
 
 impl Cartridge {
-    pub fn load(path: &PathBuf) -> Result<Cartridge, Box<dyn Error>> {
+    pub fn load(path: &Path) -> Result<Cartridge, Box<dyn Error>> {
         let rom_data = fs::read(path)?;
         let rom_size = (rom_data.len() * 8) as u32;
 
