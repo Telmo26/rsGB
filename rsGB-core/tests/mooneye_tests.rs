@@ -62,7 +62,7 @@ use crate::mooneye_tests::{TestAudioSink, TestVideoSink};
 
             gb.load_cartridge(&rom_path, &settings);
 
-            let timeout = Duration::from_secs(20);
+            let timeout = Duration::from_secs(5);
             let start_time = Instant::now();
 
             while start_time.elapsed() < timeout && !gb.debug().current_instruction().contains("JR FE") { // Infinite loop of jumping in place
