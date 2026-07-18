@@ -13,7 +13,7 @@ pub struct Debugger {
 }
 
 impl Debugger {
-    pub fn new(cc: &eframe::CreationContext) -> Debugger {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Debugger {
         let tilemap = [0; DEBUG_WIDTH * DEBUG_HEIGHT * 4];
 
         let tile_texture = cc.egui_ctx.load_texture(
@@ -30,32 +30,33 @@ impl Debugger {
     }
 
     /// Renders the entirety of the debugger window
-    pub fn render(&mut self, ctx: &egui::Context, debug_info: DebugInfo) -> bool {
+    pub fn render(&mut self, ui: &mut egui::Ui, debug_info: DebugInfo) -> bool {
         let mut stay_open = true;
 
         if self.vram_debug && debug_info.vram_updated() { self.draw_vram(&debug_info); }
 
-        egui::SidePanel::right("tiles")
-            .exact_width(450.0)
-            .show(ctx, |ui| {
-            ui.heading("VRAM Tiles Visualizer");
+        egui::Panel::right("tiles")
+            .exact_size(450.0)
+            .show(ui, |ui| {
+                ui.heading("VRAM Tiles Visualizer");
 
-            if ui.checkbox(&mut self.vram_debug, "Enable VRAM vizualization").changed() {
-                if self.vram_debug { self.draw_vram(&debug_info); }
+                if ui.checkbox(&mut self.vram_debug, "Enable VRAM vizualization").changed() {
+                    if self.vram_debug { self.draw_vram(&debug_info); }
+                }
+
+                if self.vram_debug {
+                    ui.vertical_centered(|ui| {
+                        let scale = (ui.available_height() / DEBUG_HEIGHT as f32).floor();
+                        let image_widget = egui::Image::new(&self.tile_texture)
+                            .fit_to_original_size(scale);
+
+                        ui.add(image_widget);
+                    });
+                }
             }
+        );
 
-            if self.vram_debug {
-                ui.vertical_centered(|ui| {
-                    let scale = (ui.available_height() / DEBUG_HEIGHT as f32).floor();
-                    let image_widget = egui::Image::new(&self.tile_texture)
-                        .fit_to_original_size(scale);
-
-                    ui.add(image_widget);
-                });
-            }
-        });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.label("Cartridge Type");
             ui.label(debug_info.game_cartridge_type());
 

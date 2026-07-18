@@ -73,7 +73,7 @@ fn main() {
         .unwrap();
 
     let stream = device.build_output_stream(
-        &config.config(), 
+        config.config(), 
         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
             for sample in data.chunks_mut(2) {
                 match audio_receiver.try_pop() {

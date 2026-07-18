@@ -33,7 +33,7 @@ impl MyEguiApp {
         // for e.g. egui::PaintCallback.
 
         MyEguiApp { 
-            emulation_state: EmulationState::new(&cc.egui_ctx),
+            emulation_state: EmulationState::new(cc),
             debugger: Debugger::new(cc),
 
             app_settings: AppSettings::new(),
@@ -45,10 +45,10 @@ impl MyEguiApp {
 }
 
 impl eframe::App for MyEguiApp {
-   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {        
-        ctx.request_repaint();
+   fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {        
+        ui.request_repaint();
 
-        egui::TopBottomPanel::top("Buttons").show(ctx, |ui| {
+        egui::Panel::top("Buttons").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("Open").clicked() {
@@ -93,35 +93,35 @@ impl eframe::App for MyEguiApp {
             });
             
             if self.display_settings {
-                ctx.show_viewport_immediate(
+                ui.show_viewport_immediate(
                     egui::ViewportId::from_hash_of("settings"), 
                     egui::ViewportBuilder::default()
                         .with_always_on_top()                       
                         .with_title("Settings"),
-                    |ctx, _class| {
-                        self.display_settings = self.app_settings.render(ctx);
+                    |ui, _class| {
+                        self.display_settings = self.app_settings.render(ui);
                     }
                 );
             }
 
             if self.display_debugger {
-                ctx.show_viewport_immediate(
+                ui.show_viewport_immediate(
                     egui::ViewportId::from_hash_of("debugger"), 
                     egui::ViewportBuilder::default()
                         .with_always_on_top()
                         .with_resizable(false)
                         .with_title("Debugger")
                         .with_inner_size((1000.0, 740.0)), 
-                    |ctx, _class| {
+                    |ui, _class| {
                         let debug_info = self.emulation_state.debug_info();
-                        self.display_debugger = self.debugger.render(ctx, debug_info);
+                        self.display_debugger = self.debugger.render(ui, debug_info);
                     }
                 )
             }
         });
 
         if self.emulation_state.cartridge_loaded() {
-            self.emulation_state.render(ctx, &self.app_settings);
+            self.emulation_state.render(ui, &self.app_settings);
         }
    }
 }

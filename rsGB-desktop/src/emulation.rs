@@ -52,7 +52,7 @@ pub struct EmulationState {
 }
 
 impl EmulationState {
-    pub fn new(ctx: &egui::Context) -> EmulationState {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> EmulationState {
         let (audio_sender, mut audio_receiver) = ringbuf::StaticRb::<(f32, f32), AUDIO_SAMPLES>::default().split();
         let (video_input, video_output) = triple_buffer::triple_buffer(&[0u32; FRAME_SIZE]);
 
@@ -67,7 +67,7 @@ impl EmulationState {
 
         let initial_image = ColorImage::new([XRES, YRES], vec![egui::Color32::BLACK; FRAME_SIZE]);
 
-        let frame_texture = ctx.load_texture(
+        let frame_texture = cc.egui_ctx.load_texture(
             "emulator_frame", 
             initial_image, 
             egui::TextureOptions::NEAREST,
@@ -81,7 +81,7 @@ impl EmulationState {
         let config = device.default_output_config().unwrap();
 
         let _audio_stream = device.build_output_stream(
-            &config.config(), 
+            config.config(), 
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 for sample in data.chunks_mut(2) {
                     match audio_receiver.try_pop() {
@@ -118,10 +118,10 @@ impl EmulationState {
         self.gameboy.cartridge_loaded()
     }
 
-    pub fn render(&mut self, ctx: &egui::Context, settings: &AppSettings) {
+    pub fn render(&mut self, ui: &mut egui::Ui, settings: &AppSettings) {
         let mut input = InputState::default();
 
-        ctx.input(|i | {
+        ui.input(|i | {
             for (key, button) in settings.key_map() {
                 input.update(*button, i.key_down(*key));
             }
@@ -137,7 +137,6 @@ impl EmulationState {
 
             self.counter += 1;
         }
-
         
         let elasped = self.instant.elapsed();
         if elasped >= Duration::from_secs(1) {
@@ -146,7 +145,7 @@ impl EmulationState {
             self.counter = 0;
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.centered_and_justified(|ui| {
                 let available_width = ui.available_width();
                 let x_scale = (available_width / XRES as f32).floor();

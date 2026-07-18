@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cpal = "0.16.0"
-eframe = { version = "0.33", features = ["wgpu"] }
+cpal = "0.18"
+eframe = { version = "0.35", features = ["wgpu"] }
 bytemuck = "1.24"
-ringbuf = "0.4.8"
-rfd = "0.16"
+ringbuf = "0.5"
+rfd = "0.17"
 rsgb_core = { path = "../rsGB-core" }
 triple_buffer = "9.0"

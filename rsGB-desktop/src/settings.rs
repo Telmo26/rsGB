@@ -54,10 +54,10 @@ impl AppSettings {
         &self.key_map
     }
 
-    pub fn render(&mut self, ctx: &egui::Context) -> bool {
+    pub fn render(&mut self, ui: &mut egui::Ui) -> bool {
         let mut stay_open = true;
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.heading("App Settings");
 
             ui.separator();
