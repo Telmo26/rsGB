@@ -1,20 +1,48 @@
-use std::{path::PathBuf, time::{Duration, Instant}};
+use std::{path::PathBuf, sync::Arc, time::{Duration, Instant}};
 
 use bytemuck::cast_slice;
 // 3rd party crates
 use cpal::{Stream, traits::{DeviceTrait, HostTrait, StreamTrait}};
 use eframe::egui::{self, ColorImage};
-use ringbuf::traits::{Consumer, Producer, Split};
+use ringbuf::{CachingProd, StaticRb, traits::{Consumer, Producer, Split}};
 
 // local crate import
-use rsgb_core::{ColorMode, DebugInfo, Gameboy, InputState};
+use rsgb_core::{AudioSink, ColorMode, DebugInfo, Gameboy, InputState, VideoSink};
 
 use crate::settings::{AppSettings, FRAME_SIZE, XRES, YRES};
 
-pub struct EmulationState {
-    gameboy: Gameboy,
+const AUDIO_SAMPLES: usize = 4096;
 
-    framebuffer: [u32; FRAME_SIZE],
+struct DesktopAS {
+    audio_sender: CachingProd<Arc<StaticRb<(f32, f32), AUDIO_SAMPLES>>>
+}
+
+impl AudioSink for DesktopAS {
+    fn push_sample(&mut self, left: f32, right: f32) {
+        while let Err(_) = self.audio_sender.try_push((left, right)) {
+            continue;
+        }
+    }
+}
+
+struct DesktopVS {
+    video_input: triple_buffer::Input<[u32; FRAME_SIZE]>,
+}
+
+impl VideoSink for DesktopVS {
+    fn get_mut(&mut self) -> &mut [u32] {
+        self.video_input.input_buffer_mut().as_mut_slice()
+    }
+
+    fn present(&mut self) {
+        self.video_input.publish();
+    }
+}
+
+pub struct EmulationState {
+    gameboy: Gameboy<DesktopAS, DesktopVS>,
+
+    video_output: triple_buffer::Output<[u32; FRAME_SIZE]>,
     frame_texture: egui::TextureHandle,
 
     _audio_stream: Stream,
@@ -25,16 +53,18 @@ pub struct EmulationState {
 
 impl EmulationState {
     pub fn new(ctx: &egui::Context) -> EmulationState {
-        let (mut audio_sender, mut audio_receiver) = ringbuf::StaticRb::<(f32, f32), 8192>::default().split();
+        let (audio_sender, mut audio_receiver) = ringbuf::StaticRb::<(f32, f32), AUDIO_SAMPLES>::default().split();
+        let (video_input, video_output) = triple_buffer::triple_buffer(&[0u32; FRAME_SIZE]);
 
-        let  gameboy = Gameboy::new( 
+        let audio_sink = DesktopAS { audio_sender };
+        let video_sink = DesktopVS { video_input };
+
+        let gameboy = Gameboy::new( 
             ColorMode::ARGB, 
-            move |sample| { 
-                let _ = audio_sender.try_push(sample);
-            }
+            audio_sink,
+            video_sink
         );
 
-        let framebuffer = [0; FRAME_SIZE];
         let initial_image = ColorImage::new([XRES, YRES], vec![egui::Color32::BLACK; FRAME_SIZE]);
 
         let frame_texture = ctx.load_texture(
@@ -70,7 +100,7 @@ impl EmulationState {
         EmulationState { 
             gameboy,
 
-            framebuffer,
+            video_output,
             frame_texture,
 
             _audio_stream,
@@ -98,13 +128,17 @@ impl EmulationState {
         });
 
         self.gameboy.apply_input(input);
-        self.gameboy.next_frame(&mut self.framebuffer, settings.emu_settings());
+        self.gameboy.next_frame(settings.emu_settings());
 
-        let color_image = ColorImage::from_rgba_unmultiplied([XRES, YRES], cast_slice(&self.framebuffer));
+        if self.video_output.update() {
+            let color_image = ColorImage::from_rgba_unmultiplied([XRES, YRES], cast_slice(self.video_output.read()));
 
-        self.frame_texture.set(color_image, egui::TextureOptions::NEAREST);
+            self.frame_texture.set(color_image, egui::TextureOptions::NEAREST);
 
-        self.counter += 1;
+            self.counter += 1;
+        }
+
+        
         let elasped = self.instant.elapsed();
         if elasped >= Duration::from_secs(1) {
             println!("{} FPS", self.counter);
@@ -131,5 +165,14 @@ impl EmulationState {
 
     pub fn debug_info<'a>(&'a self) -> DebugInfo<'a> {
         self.gameboy.debug()
+    }
+
+    pub fn reset(&mut self) {
+        self.gameboy.reset();
+        let color_image = ColorImage::new([XRES, YRES], vec![egui::Color32::BLACK; FRAME_SIZE]);
+        self.frame_texture.set(color_image, egui::TextureOptions::NEAREST);
+
+        self.counter = 0;
+        self.instant = Instant::now();
     }
 }

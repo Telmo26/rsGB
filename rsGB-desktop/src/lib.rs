@@ -59,7 +59,7 @@ impl eframe::App for MyEguiApp {
                         if let Some(file) = file {
                             if self.emulation_state.cartridge_loaded() {
                                 // If another game was already loaded
-                                self.emulation_state = EmulationState::new(ctx);
+                                self.emulation_state.reset();
                             }
                             self.emulation_state.load_cartridge(&file, &self.app_settings);
                         }
@@ -69,7 +69,7 @@ impl eframe::App for MyEguiApp {
                 ui.menu_button("Emulation", |ui| {
                     ui.add_enabled_ui(self.emulation_state.cartridge_loaded(), |ui| {
                         if ui.button("Stop").clicked() {
-                            self.emulation_state = EmulationState::new(ctx);
+                            self.emulation_state.reset();
                         }
 
                         ui.menu_button("Speed", |ui| {
@@ -115,7 +115,8 @@ impl eframe::App for MyEguiApp {
                     |ctx, _class| {
                         let debug_info = self.emulation_state.debug_info();
                         self.display_debugger = self.debugger.render(ctx, debug_info);
-                    })
+                    }
+                )
             }
         });
 

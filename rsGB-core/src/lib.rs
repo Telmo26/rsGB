@@ -86,6 +86,16 @@ where
             audio_accumulator: 0,
         }
     }
+
+    fn reset(&mut self, bus: Interconnect, ppu: PPU) {
+        self.bus = bus;
+        self.ppu = ppu;
+
+        self.speed = 1;
+        self.frames = 0;
+        self.ticks = 0;
+        self.audio_accumulator = 0;
+    }
 }
 
 impl<A, V> Peripherals for Devices<A, V>
@@ -102,6 +112,7 @@ where
 
             if self.ppu.tick(&mut self.bus, framebuffer, self.frames == self.speed - 1) { // Frame updated
                 self.frames += 1;
+                self.video_sink.present();
             }
 
             self.audio_accumulator += AUDIO_FREQUENCY;
@@ -136,6 +147,7 @@ pub struct Gameboy<A: AudioSink, V: VideoSink> {
     cpu: CPU,
     devices: Devices<A, V>,
 
+    color_mode: ColorMode,
     save_path: PathBuf,
 }
 
@@ -158,6 +170,7 @@ where
             cpu: CPU::new(),
             devices,
 
+            color_mode,
             save_path: PathBuf::new(),
         }
     }
@@ -206,6 +219,16 @@ where
 
     pub fn cartridge_loaded(&self) -> bool {
         self.devices.bus.cart.is_some()
+    }
+
+    pub fn reset(&mut self) {
+        self.cpu = CPU::new();
+        self.save_path = PathBuf::new();
+        
+        let bus = Interconnect::new(self.color_mode);
+        let ppu = PPU::new();
+
+        self.devices.reset(bus, ppu);
     }
 
     pub fn debug<'a>(&'a self) -> DebugInfo<'a> {

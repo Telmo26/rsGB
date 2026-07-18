@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Settings {
     pub speed: SpeedOption,
     pub save_location: SaveLocation,
@@ -34,16 +34,18 @@ impl Settings {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum SpeedOption {
+    #[default]
     Normal = 1,
     X2 = 2,
     X3 = 3,
     X4 = 4,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum SaveLocation {
+    #[default]
     GameLoc,
     SaveFolder(PathBuf)
 }

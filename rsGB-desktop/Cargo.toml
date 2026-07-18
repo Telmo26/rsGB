@@ -10,3 +10,4 @@ bytemuck = "1.24"
 ringbuf = "0.4.8"
 rfd = "0.16"
 rsgb_core = { path = "../rsGB-core" }
+triple_buffer = "9.0"

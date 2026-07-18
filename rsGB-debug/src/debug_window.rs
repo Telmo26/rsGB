@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use minifb::{Scale, Window, WindowOptions};
 use rsgb_core::Gameboy;
 
-use crate::CustomWindow;
+use crate::{CustomWindow, DebugAS, DebugVS};
 
 // Add a pixel between all tiles
 const DEBUG_WIDTH: usize = 16 * 8 + 16 + 1; 
@@ -15,11 +15,11 @@ const COLORS: [u32; 4] = [0x00FFFFFF, 0x00AAAAAA, 0x00555555, 0x00000000];
 pub struct DebugWindow {
     window: Window,
     buffer: [u32; DEBUG_WIDTH * DEBUG_HEIGHT],
-    gameboy: Rc<RefCell<Gameboy>>,
+    gameboy: Rc<RefCell<Gameboy<DebugAS, DebugVS>>>,
 }
 
 impl DebugWindow {
-    pub fn new(gameboy: Rc<RefCell<Gameboy>>) -> DebugWindow {
+    pub fn new(gameboy: Rc<RefCell<Gameboy<DebugAS, DebugVS>>>) -> DebugWindow {
         let mut window = Window::new(
                         "Debug Window",
                         DEBUG_WIDTH, 

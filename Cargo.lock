@@ -2781,6 +2781,7 @@ dependencies = [
  "minifb",
  "ringbuf",
  "rsgb_core",
+ "triple_buffer",
 ]
 
 [[package]]
@@ -2793,6 +2794,7 @@ dependencies = [
  "rfd",
  "ringbuf",
  "rsgb_core",
+ "triple_buffer",
 ]
 
 [[package]]
@@ -3297,6 +3299,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a04e24fab5c89c6a36eb8558c9656f30d81de51dfa4d3b45f26b21d61fa0a6c"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "triple_buffer"
+version = "9.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e875ab7068a75b74f419da453927e05527c36f0001b3c7aad3ce443640683487"
+dependencies = [
+ "crossbeam-utils",
 ]
 
 [[package]]

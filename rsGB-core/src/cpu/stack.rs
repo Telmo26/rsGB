@@ -8,10 +8,10 @@ impl CPU {
         dev.write8(self.registers.sp, value);
     }
 
-    pub(crate) fn push16(&mut self, dev: &mut impl Peripherals, value: u16) {
-        self.push(dev, (value >> 8) as u8);
-        self.push(dev, value as u8);
-    }
+    // pub(crate) fn push16(&mut self, dev: &mut impl Peripherals, value: u16) {
+    //     self.push(dev, (value >> 8) as u8);
+    //     self.push(dev, value as u8);
+    // }
 
     pub(crate) fn pop(&mut self, dev: &mut impl Peripherals) -> u8 {
         let val = dev.read8(self.registers.sp);
