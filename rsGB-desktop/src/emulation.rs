@@ -6,7 +6,7 @@ use eframe::egui;
 use ringbuf::{CachingProd, StaticRb, traits::{Consumer, Producer, Split}};
 
 // local crate import
-use rsgb_core::{AudioSink, ColorMode, DebugInfo, Gameboy, InputState, VideoSink, settings::Settings};
+use rsgb_core::{AudioSink, ColorMode, DebugInfo, GameInfo, Gameboy, InputState, VideoSink, settings::Settings};
 
 use crate::settings::{AppSettings, FRAME_SIZE, XRES, YRES};
 
@@ -48,18 +48,22 @@ enum EmulationMessage {
     Continue,
     Reset,
     LoadRom(PathBuf),
-    CartridgeLoaded,
     Input(InputState),
     Settings(Settings),
+    GetDebugInfo,
+    GetGameInfo,
 }
 
+#[derive(Debug)]
 enum EmulationResponse {
-    CartridgeLoaded(bool),
+    DebugInfo((DebugInfo, Option<Vec<[u8; 16]>>)),
+    GameInfo(GameInfo)
 }
 
 pub struct EmulationState {
     _gameboy_thread: JoinHandle<()>,
     last_settings: Settings,
+    cartridge_loaded: bool,
 
     video_output: triple_buffer::Output<[u32; FRAME_SIZE]>,
     wgpu_state: WgpuState,
@@ -116,14 +120,33 @@ impl EmulationState {
                             gameboy.load_cartridge(&rom_path, &settings);
                             running = true;
                         },
-                        EmulationMessage::CartridgeLoaded => {
-                            response_tx.send(EmulationResponse::CartridgeLoaded(gameboy.cartridge_loaded()))
-                                .expect("Unable to send cartridge state to the UI thread");
-                        },
                         EmulationMessage::Input(is) => if running {
                             gameboy.apply_input(is);
                         }
                         EmulationMessage::Settings(s) => settings = s,
+                        EmulationMessage::GetDebugInfo => {
+                            let dbg = gameboy.debug();
+                            let tiles = if dbg.vram_updated() {
+                                Some(dbg.get_owned_tiles())
+                            } else {
+                                None
+                            };
+
+                            response_tx
+                                .send(EmulationResponse::DebugInfo(
+                                    (dbg.get_debug_info(), tiles)
+                                ))
+                                .expect("Unable to send debug information back to the UI thread")
+                        }
+                        EmulationMessage::GetGameInfo => {
+                            let dbg = gameboy.debug();
+
+                            response_tx
+                                .send(EmulationResponse::GameInfo(
+                                    dbg.get_game_info()
+                                ))
+                                .expect("Unable to send debug information back to the UI thread")
+                        }
                     }
                 }
 
@@ -188,6 +211,7 @@ impl EmulationState {
         EmulationState { 
             _gameboy_thread,
             last_settings: Settings::default(),
+            cartridge_loaded: false,
 
             video_output,
             wgpu_state,
@@ -206,18 +230,15 @@ impl EmulationState {
 
     pub fn load_cartridge(&mut self, rom_path: &PathBuf, app_settings: &AppSettings) {
         self.update_settings(app_settings.emu_settings());
-        self.message_tx.send(EmulationMessage::LoadRom(rom_path.clone()))
+        self.message_tx.send(EmulationMessage::LoadRom(
+                rom_path.clone()
+            ))
             .expect("Unable to send rom to the emulation thread");
+        self.cartridge_loaded = true;
     }
 
     pub fn cartridge_loaded(&self) -> bool {
-        self.message_tx.send(EmulationMessage::CartridgeLoaded)
-            .expect("Unable to query cartridge state");
-        if let Ok(EmulationResponse::CartridgeLoaded(b)) = self.response_rx.recv_timeout(Duration::from_millis(10)) {
-            b
-        } else {
-            false
-        }
+        self.cartridge_loaded
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui, frame: &eframe::Frame, app_settings: &AppSettings) {
@@ -270,10 +291,6 @@ impl EmulationState {
         });
     }
 
-    // pub fn debug_info<'a>(&'a self) -> DebugInfo<'a> {
-    //     self.gameboy.debug()
-    // }
-
     pub fn update_pause_status(&self) {
         let res = if self.paused {
             self.message_tx.send(EmulationMessage::Pause)
@@ -288,9 +305,36 @@ impl EmulationState {
             .expect("Unable to send reset signal to the emulation thread");
 
         self.wgpu_state.update(frame, &[0u32; FRAME_SIZE]);
+        self.cartridge_loaded = false;
 
         self.frame_count = 0;
         self.previous_frame_time = Instant::now();
+    }
+
+    pub fn get_game_info(&self) -> GameInfo {
+        self.message_tx.send(EmulationMessage::GetGameInfo)
+            .expect("Unable to send game info request to emulation thread");
+
+        let response = self.response_rx.recv()
+            .expect("Failure while waiting for game info response");
+
+        match response {
+            EmulationResponse::GameInfo(data) => data,
+            _ => unreachable!()
+        }
+    }
+
+    pub fn get_debug_info(&self) -> (DebugInfo, Option<Vec<[u8 ; 16]>>) {
+        self.message_tx.send(EmulationMessage::GetDebugInfo)
+            .expect("Unable to send debug request to emulation thread");
+
+        let response = self.response_rx.recv()
+            .expect("Failure while waiting for debug info response");
+
+        match response {
+            EmulationResponse::DebugInfo(data) => data,
+            _ => unreachable!()
+        }
     }
 
     fn update_settings(&mut self, new_settings: &Settings) {

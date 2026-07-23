@@ -1,5 +1,5 @@
 use eframe::egui::{self, TextureHandle};
-use rsgb_core::DebugInfo;
+use rsgb_core::{DebugInfo, GameInfo};
 
 const DEBUG_WIDTH: usize = 16 * 8 + 16 + 1; 
 const DEBUG_HEIGHT: usize = 24 * 8 + 24 + 1;
@@ -10,6 +10,7 @@ pub struct Debugger {
     vram_debug: bool,
     tilemap: [u8; DEBUG_WIDTH * DEBUG_HEIGHT * 4],
     tile_texture: TextureHandle,
+    game_info: Option<GameInfo>,
 }
 
 impl Debugger {
@@ -26,14 +27,25 @@ impl Debugger {
             vram_debug: false,
             tilemap,
             tile_texture,
+            game_info: None
         }
     }
 
+    pub fn has_game_info(&self) -> bool {
+        self.game_info.is_some()
+    }
+
+    pub fn load_game_info(&mut self, game_info: GameInfo) {
+        self.game_info.replace(game_info);
+    }
+
     /// Renders the entirety of the debugger window
-    pub fn render(&mut self, ui: &mut egui::Ui, debug_info: DebugInfo) -> bool {
+    pub fn render(&mut self, ui: &mut egui::Ui, debug_info: DebugInfo, tiles: Option<Vec<[u8 ; 16]>>) -> bool {
         let mut stay_open = true;
 
-        if self.vram_debug && debug_info.vram_updated() { self.draw_vram(&debug_info); }
+        if self.vram_debug && let Some(ref t) = tiles { 
+            self.draw_vram(t); 
+        }
 
         egui::Panel::right("tiles")
             .exact_size(450.0)
@@ -41,7 +53,9 @@ impl Debugger {
                 ui.heading("VRAM Tiles Visualizer");
 
                 if ui.checkbox(&mut self.vram_debug, "Enable VRAM vizualization").changed() {
-                    if self.vram_debug { self.draw_vram(&debug_info); }
+                    if self.vram_debug && let Some(ref t) = tiles { 
+                        self.draw_vram(t); 
+                    }
                 }
 
                 if self.vram_debug {
@@ -57,13 +71,13 @@ impl Debugger {
         );
 
         egui::CentralPanel::default().show(ui, |ui| {
-            ui.label("Cartridge Type");
-            ui.label(debug_info.game_cartridge_type());
+            // ui.label("Cartridge Type");
+            // ui.label(debug_info.game_cartridge_type());
 
             ui.add_space(20.0);
 
             ui.label("Instruction");
-            ui.label(debug_info.current_instruction());
+            ui.label(debug_info.current_instruction);
 
             if ui.input(|i| i.viewport().close_requested()) {
                 // Tell parent to close us.
@@ -73,9 +87,7 @@ impl Debugger {
         stay_open
     }
 
-    fn draw_vram(&mut self, debug_info: &DebugInfo) {
-        let tiles = debug_info.get_tiles();
-
+    fn draw_vram(&mut self, tiles: &Vec<[u8 ; 16]>) {
         assert!(tiles.len() == 512);
         
         for y in 0..24 {

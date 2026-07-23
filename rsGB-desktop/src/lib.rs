@@ -107,20 +107,25 @@ impl eframe::App for MyEguiApp {
                 );
             }
 
-            // if self.display_debugger {
-            //     ui.show_viewport_immediate(
-            //         egui::ViewportId::from_hash_of("debugger"), 
-            //         egui::ViewportBuilder::default()
-            //             .with_always_on_top()
-            //             .with_resizable(false)
-            //             .with_title("Debugger")
-            //             .with_inner_size((1000.0, 740.0)), 
-            //         |ui, _class| {
-            //             let debug_info = self.emulation_state.debug_info();
-            //             self.display_debugger = self.debugger.render(ui, debug_info);
-            //         }
-            //     )
-            // }
+            if self.display_debugger {
+                if !self.debugger.has_game_info() && self.emulation_state.cartridge_loaded() {
+                    let game_info = self.emulation_state.get_game_info();
+                    self.debugger.load_game_info(game_info);
+                }
+
+                ui.show_viewport_immediate(
+                    egui::ViewportId::from_hash_of("debugger"), 
+                    egui::ViewportBuilder::default()
+                        .with_always_on_top()
+                        .with_resizable(false)
+                        .with_title("Debugger")
+                        .with_inner_size((1000.0, 740.0)), 
+                    |ui, _class| {
+                        let (debug_info, tiles) = self.emulation_state.get_debug_info();
+                        self.display_debugger = self.debugger.render(ui, debug_info, tiles);
+                    }
+                )
+            }
         });
 
         if self.emulation_state.cartridge_loaded() {

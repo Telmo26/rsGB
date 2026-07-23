@@ -12,7 +12,9 @@ use crate::{
     cart::Cartridge, cpu::CPU, interconnect::Interconnect, ppu::PPU, settings::SaveLocation, utils::{AUDIO_FREQUENCY, CPU_FREQUENCY}
 };
 
-pub use debug::DebugInfo;
+pub use debug::{ 
+    Debugger, DebugInfo, GameInfo
+};
 
 pub use utils::{
     Button, InputState,
@@ -234,11 +236,11 @@ where
         self.devices.reset(bus, ppu);
     }
 
-    pub fn debug<'a>(&'a self) -> DebugInfo<'a> {
+    pub fn debug<'a>(&'a self) -> Debugger<'a> {
         let vram_updated = self.devices.bus.vram_updated.get();
         self.devices.bus.vram_updated.replace(false);
 
-        DebugInfo::new(
+        Debugger::new(
             &self.cpu, 
             vram_updated,
             &self.devices.bus.vram, 
