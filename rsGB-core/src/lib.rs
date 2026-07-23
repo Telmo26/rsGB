@@ -108,11 +108,14 @@ where
             self.ticks += 1;
             self.bus.tick_t();
 
+            let is_real_frame = self.frames == self.speed - 1;
             let framebuffer = self.video_sink.get_mut();
 
-            if self.ppu.tick(&mut self.bus, framebuffer, self.frames == self.speed - 1) { // Frame updated
+            if self.ppu.tick(&mut self.bus, framebuffer, is_real_frame) { // Frame updated
                 self.frames += 1;
-                self.video_sink.present();
+                if is_real_frame {
+                    self.video_sink.present();
+                }
             }
 
             self.audio_accumulator += AUDIO_FREQUENCY;

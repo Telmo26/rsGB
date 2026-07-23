@@ -45,9 +45,7 @@ impl MyEguiApp {
 }
 
 impl eframe::App for MyEguiApp {
-   fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {        
-        ui.request_repaint();
-
+   fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {        
         egui::Panel::top("Buttons").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("File", |ui| {
@@ -59,7 +57,7 @@ impl eframe::App for MyEguiApp {
                         if let Some(file) = file {
                             if self.emulation_state.cartridge_loaded() {
                                 // If another game was already loaded
-                                self.emulation_state.reset();
+                                self.emulation_state.reset(frame);
                             }
                             self.emulation_state.load_cartridge(&file, &self.app_settings);
                         }
@@ -68,8 +66,13 @@ impl eframe::App for MyEguiApp {
 
                 ui.menu_button("Emulation", |ui| {
                     ui.add_enabled_ui(self.emulation_state.cartridge_loaded(), |ui| {
+                        let pause_button = ui.toggle_value(&mut self.emulation_state.paused, "Pause");
+                        if pause_button.changed() {
+                            self.emulation_state.update_pause_status();
+                        } 
+
                         if ui.button("Stop").clicked() {
-                            self.emulation_state.reset();
+                            self.emulation_state.reset(frame);
                         }
 
                         ui.menu_button("Speed", |ui| {
@@ -104,24 +107,24 @@ impl eframe::App for MyEguiApp {
                 );
             }
 
-            if self.display_debugger {
-                ui.show_viewport_immediate(
-                    egui::ViewportId::from_hash_of("debugger"), 
-                    egui::ViewportBuilder::default()
-                        .with_always_on_top()
-                        .with_resizable(false)
-                        .with_title("Debugger")
-                        .with_inner_size((1000.0, 740.0)), 
-                    |ui, _class| {
-                        let debug_info = self.emulation_state.debug_info();
-                        self.display_debugger = self.debugger.render(ui, debug_info);
-                    }
-                )
-            }
+            // if self.display_debugger {
+            //     ui.show_viewport_immediate(
+            //         egui::ViewportId::from_hash_of("debugger"), 
+            //         egui::ViewportBuilder::default()
+            //             .with_always_on_top()
+            //             .with_resizable(false)
+            //             .with_title("Debugger")
+            //             .with_inner_size((1000.0, 740.0)), 
+            //         |ui, _class| {
+            //             let debug_info = self.emulation_state.debug_info();
+            //             self.display_debugger = self.debugger.render(ui, debug_info);
+            //         }
+            //     )
+            // }
         });
 
         if self.emulation_state.cartridge_loaded() {
-            self.emulation_state.render(ui, &self.app_settings);
+            self.emulation_state.render(ui, frame, &self.app_settings);
         }
    }
 }

@@ -1,26 +1,30 @@
-use std::{path::PathBuf, sync::Arc, time::{Duration, Instant}};
+use std::{path::PathBuf, sync::{self, Arc, Condvar, Mutex, mpsc::{Receiver, Sender}}, thread::{self, JoinHandle}, time::{Duration, Instant}};
 
-use bytemuck::cast_slice;
 // 3rd party crates
 use cpal::{Stream, traits::{DeviceTrait, HostTrait, StreamTrait}};
-use eframe::egui::{self, ColorImage};
+use eframe::egui;
 use ringbuf::{CachingProd, StaticRb, traits::{Consumer, Producer, Split}};
 
 // local crate import
-use rsgb_core::{AudioSink, ColorMode, DebugInfo, Gameboy, InputState, VideoSink};
+use rsgb_core::{AudioSink, ColorMode, DebugInfo, Gameboy, InputState, VideoSink, settings::Settings};
 
 use crate::settings::{AppSettings, FRAME_SIZE, XRES, YRES};
 
-const AUDIO_SAMPLES: usize = 4096;
+mod wgpu_state;
+use wgpu_state::WgpuState;
+
+const AUDIO_SAMPLES: usize = 1024;
 
 struct DesktopAS {
-    audio_sender: CachingProd<Arc<StaticRb<(f32, f32), AUDIO_SAMPLES>>>
+    audio_input: CachingProd<Arc<StaticRb<(f32, f32), AUDIO_SAMPLES>>>,
+    sync: Arc<(Mutex<()>, Condvar)> 
 }
 
 impl AudioSink for DesktopAS {
     fn push_sample(&mut self, left: f32, right: f32) {
-        while let Err(_) = self.audio_sender.try_push((left, right)) {
-            continue;
+        while let Err(_) = self.audio_input.try_push((left, right)) {
+            let guard = self.sync.0.lock().unwrap();
+            let _ = self.sync.1.wait_timeout(guard, Duration::from_millis(5));
         }
     }
 }
@@ -39,55 +43,139 @@ impl VideoSink for DesktopVS {
     }
 }
 
+enum EmulationMessage {
+    Pause,
+    Continue,
+    Reset,
+    LoadRom(PathBuf),
+    CartridgeLoaded,
+    Input(InputState),
+    Settings(Settings),
+}
+
+enum EmulationResponse {
+    CartridgeLoaded(bool),
+}
+
 pub struct EmulationState {
-    gameboy: Gameboy<DesktopAS, DesktopVS>,
+    _gameboy_thread: JoinHandle<()>,
+    last_settings: Settings,
 
     video_output: triple_buffer::Output<[u32; FRAME_SIZE]>,
-    frame_texture: egui::TextureHandle,
+    wgpu_state: WgpuState,
+
+    message_tx: Sender<EmulationMessage>,
+    response_rx: Receiver<EmulationResponse>,
 
     _audio_stream: Stream,
     
-    counter: u32,
-    instant: Instant,
+    frame_count: u32,
+    previous_frame_time: Instant,
+
+    pub paused: bool,
 }
 
 impl EmulationState {
     pub fn new(cc: &eframe::CreationContext<'_>) -> EmulationState {
-        let (audio_sender, mut audio_receiver) = ringbuf::StaticRb::<(f32, f32), AUDIO_SAMPLES>::default().split();
+        // We create the audio and video communication channels
+        let (audio_input, mut audio_output) = ringbuf::StaticRb::<(f32, f32), AUDIO_SAMPLES>::default().split();
         let (video_input, video_output) = triple_buffer::triple_buffer(&[0u32; FRAME_SIZE]);
 
-        let audio_sink = DesktopAS { audio_sender };
+        // We then create the emulation configuration channels
+        let (message_tx, message_rx) = sync::mpsc::channel();
+        let (response_tx, response_rx) = sync::mpsc::channel();
+
+        let audio_sync = Arc::new((Mutex::new(()), Condvar::new()));
+
+        // These implement the required traits for the gameboy
+        let audio_sink = DesktopAS { audio_input, sync: audio_sync.clone() };
         let video_sink = DesktopVS { video_input };
 
-        let gameboy = Gameboy::new( 
+        let mut gameboy = Gameboy::new( 
             ColorMode::ARGB, 
             audio_sink,
             video_sink
         );
 
-        let initial_image = ColorImage::new([XRES, YRES], vec![egui::Color32::BLACK; FRAME_SIZE]);
+        let ctx = cc.egui_ctx.clone();
 
-        let frame_texture = cc.egui_ctx.load_texture(
-            "emulator_frame", 
-            initial_image, 
-            egui::TextureOptions::NEAREST,
-        );
+        let _gameboy_thread = thread::spawn(move || {
+            let mut running = false;
+            let mut paused = false;
+            let mut settings = rsgb_core::settings::Settings::default();
+            loop {
+                while let Ok(m) = message_rx.try_recv() {
+                    match m {
+                        EmulationMessage::Continue => paused = false,
+                        EmulationMessage::Pause => paused = true,
+                        EmulationMessage::Reset => {
+                            gameboy.reset();
+                            running = false;
+                        }
+                        EmulationMessage::LoadRom(rom_path) => {
+                            gameboy.load_cartridge(&rom_path, &settings);
+                            running = true;
+                        },
+                        EmulationMessage::CartridgeLoaded => {
+                            response_tx.send(EmulationResponse::CartridgeLoaded(gameboy.cartridge_loaded()))
+                                .expect("Unable to send cartridge state to the UI thread");
+                        },
+                        EmulationMessage::Input(is) => if running {
+                            gameboy.apply_input(is);
+                        }
+                        EmulationMessage::Settings(s) => settings = s,
+                    }
+                }
+
+                if running && !paused {
+                    gameboy.next_frame(&settings);
+                    ctx.request_repaint_after(Duration::from_micros(16_600));
+                }
+            }
+        });
+
+        // We create the WGPU state for our framebuffer texture
+        let wgpu_state = WgpuState::new(cc);
 
         // Preparation of the audio stream
         let mut previous_audio = (0.0, 0.0);
 
         let host = cpal::default_host();
         let device = host.default_output_device().expect("No output device detected");
-        let config = device.default_output_config().unwrap();
+        let supported_range = device
+            .supported_output_configs()
+            .unwrap()
+            .find(|c| {
+                c.channels() == 2
+                    && c.sample_format() == cpal::SampleFormat::F32
+                    && c.min_sample_rate() <= 44_100
+                    && c.max_sample_rate() >= 44_100
+            })
+            .expect("Device does not support stereo float32 44.1kHz output");
+
+        let config = supported_range.with_sample_rate(44_100).config();
 
         let _audio_stream = device.build_output_stream(
-            config.config(), 
+            config, 
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                let mut popped = false;
                 for sample in data.chunks_mut(2) {
-                    match audio_receiver.try_pop() {
-                        Some((left, right)) => {sample[0] = left ; sample[1] = right ; previous_audio = (left, right)}
-                        None => {sample[0] = previous_audio.0 ; sample[1] = previous_audio.1},
+                    match audio_output.try_pop() {
+                        Some((left, right)) => {
+                            sample[0] = left; 
+                            sample[1] = right; 
+                            previous_audio = (left, right);
+                            popped = true;
+                        }
+                        None => {
+                            sample[0] = previous_audio.0; 
+                            sample[1] = previous_audio.1
+                        },
                     }
+                }
+
+                if popped {
+                    audio_sync.1.notify_one();
                 }
             }, 
             move |err| {
@@ -98,51 +186,68 @@ impl EmulationState {
 
         _audio_stream.play().unwrap();
         EmulationState { 
-            gameboy,
+            _gameboy_thread,
+            last_settings: Settings::default(),
 
             video_output,
-            frame_texture,
+            wgpu_state,
+
+            message_tx,
+            response_rx,
 
             _audio_stream,
 
-            counter: 0,
-            instant: Instant::now(),
+            frame_count: 0,
+            previous_frame_time: Instant::now(),
+
+            paused: false,
         }
     }
 
-    pub fn load_cartridge(&mut self, rom_path: &PathBuf, settings: &AppSettings) {
-        self.gameboy.load_cartridge(rom_path, settings.emu_settings());
+    pub fn load_cartridge(&mut self, rom_path: &PathBuf, app_settings: &AppSettings) {
+        self.update_settings(app_settings.emu_settings());
+        self.message_tx.send(EmulationMessage::LoadRom(rom_path.clone()))
+            .expect("Unable to send rom to the emulation thread");
     }
 
     pub fn cartridge_loaded(&self) -> bool {
-        self.gameboy.cartridge_loaded()
+        self.message_tx.send(EmulationMessage::CartridgeLoaded)
+            .expect("Unable to query cartridge state");
+        if let Ok(EmulationResponse::CartridgeLoaded(b)) = self.response_rx.recv_timeout(Duration::from_millis(10)) {
+            b
+        } else {
+            false
+        }
     }
 
-    pub fn render(&mut self, ui: &mut egui::Ui, settings: &AppSettings) {
+    pub fn render(&mut self, ui: &mut egui::Ui, frame: &eframe::Frame, app_settings: &AppSettings) {
+        self.update_settings(app_settings.emu_settings());
+
         let mut input = InputState::default();
 
         ui.input(|i | {
-            for (key, button) in settings.key_map() {
+            for (key, button) in app_settings.key_map() {
                 input.update(*button, i.key_down(*key));
             }
         });
 
-        self.gameboy.apply_input(input);
-        self.gameboy.next_frame(settings.emu_settings());
+        self.message_tx.send(EmulationMessage::Input(input))
+            .expect("Unable to send input state to the emulation thread");
 
         if self.video_output.update() {
-            let color_image = ColorImage::from_rgba_unmultiplied([XRES, YRES], cast_slice(self.video_output.read()));
+            let pixels = self.video_output.read();
 
-            self.frame_texture.set(color_image, egui::TextureOptions::NEAREST);
+            self.wgpu_state.update(frame, pixels);
 
-            self.counter += 1;
+            self.frame_count += 1;
         }
         
-        let elasped = self.instant.elapsed();
-        if elasped >= Duration::from_secs(1) {
-            println!("{} FPS", self.counter);
-            self.instant = Instant::now();
-            self.counter = 0;
+        let elapsed = self.previous_frame_time.elapsed();
+        if elapsed >= Duration::from_secs(1) {
+            let fps = self.frame_count as f64 / elapsed.as_secs_f64();
+            println!("{:.2} FPS", fps);
+            self.previous_frame_time = Instant::now();
+            self.frame_count = 0;
         }
 
         egui::CentralPanel::default().show(ui, |ui| {
@@ -155,23 +260,46 @@ impl EmulationState {
 
                 let scale = x_scale.min(y_scale);
 
-                let image_widget = egui::Image::new(&self.frame_texture)
-                    .fit_to_original_size(scale);
-                ui.add(image_widget);
+                let size = egui::vec2(XRES as f32 * scale, YRES as f32 * scale);
+
+                ui.add(
+                    egui::Image::new((*self.wgpu_state.texture_id(), size))
+                        .texture_options(egui::TextureOptions::NEAREST)
+                );
             });
         });
     }
 
-    pub fn debug_info<'a>(&'a self) -> DebugInfo<'a> {
-        self.gameboy.debug()
+    // pub fn debug_info<'a>(&'a self) -> DebugInfo<'a> {
+    //     self.gameboy.debug()
+    // }
+
+    pub fn update_pause_status(&self) {
+        let res = if self.paused {
+            self.message_tx.send(EmulationMessage::Pause)
+        } else {
+            self.message_tx.send(EmulationMessage::Continue)
+        };
+        res.expect("Unable to send pause status to the emulation thread");        
     }
 
-    pub fn reset(&mut self) {
-        self.gameboy.reset();
-        let color_image = ColorImage::new([XRES, YRES], vec![egui::Color32::BLACK; FRAME_SIZE]);
-        self.frame_texture.set(color_image, egui::TextureOptions::NEAREST);
+    pub fn reset(&mut self, frame: &eframe::Frame) {
+        self.message_tx.send(EmulationMessage::Reset)
+            .expect("Unable to send reset signal to the emulation thread");
 
-        self.counter = 0;
-        self.instant = Instant::now();
+        self.wgpu_state.update(frame, &[0u32; FRAME_SIZE]);
+
+        self.frame_count = 0;
+        self.previous_frame_time = Instant::now();
+    }
+
+    fn update_settings(&mut self, new_settings: &Settings) {
+        if self.last_settings != *new_settings {
+            self.last_settings = new_settings.clone();
+            self.message_tx.send(EmulationMessage::Settings(
+                self.last_settings.clone()
+            ))
+            .expect("Unable to send updated settings to the emulator thread");
+        }
     }
 }
