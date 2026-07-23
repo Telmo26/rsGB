@@ -58,6 +58,8 @@ impl eframe::App for MyEguiApp {
                             if self.emulation_state.cartridge_loaded() {
                                 // If another game was already loaded
                                 self.emulation_state.reset(frame);
+                                self.debugger.reset();
+                                self.display_debugger = false;
                             }
                             self.emulation_state.load_cartridge(&file, &self.app_settings);
                         }
@@ -73,6 +75,8 @@ impl eframe::App for MyEguiApp {
 
                         if ui.button("Stop").clicked() {
                             self.emulation_state.reset(frame);
+                            self.debugger.reset();
+                            self.display_debugger = false;
                         }
 
                         ui.menu_button("Speed", |ui| {
@@ -108,7 +112,7 @@ impl eframe::App for MyEguiApp {
             }
 
             if self.display_debugger {
-                if !self.debugger.has_game_info() && self.emulation_state.cartridge_loaded() {
+                if !self.debugger.has_game_info() {
                     let game_info = self.emulation_state.get_game_info();
                     self.debugger.load_game_info(game_info);
                 }

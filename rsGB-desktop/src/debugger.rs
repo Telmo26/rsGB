@@ -1,8 +1,10 @@
-use eframe::egui::{self, TextureHandle};
+use eframe::egui::{self, RichText, TextureHandle};
 use rsgb_core::{DebugInfo, GameInfo};
 
-const DEBUG_WIDTH: usize = 16 * 8 + 16 + 1; 
-const DEBUG_HEIGHT: usize = 24 * 8 + 24 + 1;
+/// I want a 16 by 24 grid for displaying tiles, that are 8 pixels square.
+/// There is also a one pixel margin between the tiles
+const DEBUG_WIDTH: usize = 16 * (8 + 1) + 1; 
+const DEBUG_HEIGHT: usize = 24 * (8 + 1) + 1;
 
 const COLORS: [u32; 4] = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000];
 
@@ -39,6 +41,10 @@ impl Debugger {
         self.game_info.replace(game_info);
     }
 
+    pub fn reset(&mut self) {
+        self.game_info = None;
+    }
+
     /// Renders the entirety of the debugger window
     pub fn render(&mut self, ui: &mut egui::Ui, debug_info: DebugInfo, tiles: Option<Vec<[u8 ; 16]>>) -> bool {
         let mut stay_open = true;
@@ -70,14 +76,65 @@ impl Debugger {
             }
         );
 
-        egui::CentralPanel::default().show(ui, |ui| {
-            // ui.label("Cartridge Type");
-            // ui.label(debug_info.game_cartridge_type());
-
+        egui::Panel::bottom("game_info").show(ui, |ui| {
+            ui.heading("Game Information");
             ui.add_space(20.0);
 
-            ui.label("Instruction");
+            let game_info = self.game_info.as_ref().unwrap(); // This is safe because the debugger is ever only shown when a game is loaded
+
+            egui::Grid::new("game_data")
+                .num_columns(2)
+                .min_col_width(ui.available_width() / 2.0)
+                .spacing([0.0, 10.0])
+                .show(ui, |ui| {
+                    ui.vertical(|ui| {
+                        ui.label(underlined_text("Name"));
+                        ui.label(&game_info.name);
+                    });
+
+                    let mut sgb_support = game_info.sgb_support;
+                    
+                    ui.vertical(|ui| {
+                        ui.label(underlined_text("Game Type"));
+                        ui.horizontal(|ui| {
+                            ui.label(game_info.game_type);
+                            ui.add_enabled(false, egui::Checkbox::new(&mut sgb_support, "SGB Support"));
+                        })
+                    });
+
+                    ui.end_row();
+
+                    ui.vertical(|ui| {
+                        ui.label(underlined_text("Cartridge Type"));
+                        ui.label(&game_info.cartridge_type);
+                    });
+
+                    ui.vertical(|ui| {
+                        ui.label(underlined_text("ROM Size"));
+                        ui.label(format!("{} KiB", game_info.rom_size));
+                    });
+
+                    ui.end_row();
+
+                    ui.vertical(|ui| {
+                        ui.label(underlined_text("License"));
+                        ui.label(&game_info.license);
+                    });
+
+                    ui.vertical(|ui| {
+                        ui.label(underlined_text("RAM Size"));
+                        ui.label(format!("{} KiB", game_info.ram_size));
+                    });
+                })
+        });
+
+        egui::CentralPanel::default().show(ui, |ui| {
+            ui.heading("GameBoy emulator state");
+
+            ui.label("Current Instruction");
             ui.label(debug_info.current_instruction);
+
+            ui.separator();
 
             if ui.input(|i| i.viewport().close_requested()) {
                 // Tell parent to close us.
@@ -132,4 +189,10 @@ fn display_tile(buffer: &mut [u8], start_x: usize, start_y: usize, tile: &[u8; 1
             buffer[base_idx + 3] = a;
         }
     }
+}
+
+fn underlined_text(text: impl Into<String>) -> RichText {
+    egui::RichText::new(text)
+        .underline()
+        .weak()
 }
