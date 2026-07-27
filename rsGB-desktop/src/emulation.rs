@@ -13,7 +13,7 @@ use crate::settings::{AppSettings, FRAME_SIZE, XRES, YRES};
 mod wgpu_state;
 use wgpu_state::WgpuState;
 
-const AUDIO_SAMPLES: usize = 1024;
+const AUDIO_SAMPLES: usize = 8192;
 
 struct DesktopAS {
     audio_input: CachingProd<Arc<StaticRb<(f32, f32), AUDIO_SAMPLES>>>,
@@ -22,9 +22,16 @@ struct DesktopAS {
 
 impl AudioSink for DesktopAS {
     fn push_sample(&mut self, left: f32, right: f32) {
-        while let Err(_) = self.audio_input.try_push((left, right)) {
-            let guard = self.sync.0.lock().unwrap();
-            let _ = self.sync.1.wait_timeout(guard, Duration::from_millis(5));
+        let mut spins = 0;
+        while self.audio_input.try_push((left, right)).is_err() {
+            if spins < 200 {
+                std::hint::spin_loop();
+                spins += 1;
+            } else {
+                let guard = self.sync.0.lock().unwrap();
+                let _ = self.sync.1.wait_timeout(guard, Duration::from_micros(500));
+                spins = 0;
+            }
         }
     }
 }
@@ -171,12 +178,12 @@ impl EmulationState {
             .find(|c| {
                 c.channels() == 2
                     && c.sample_format() == cpal::SampleFormat::F32
-                    && c.min_sample_rate() <= 44_100
-                    && c.max_sample_rate() >= 44_100
+                    && c.min_sample_rate() <= 48_000
+                    && c.max_sample_rate() >= 48_000
             })
-            .expect("Device does not support stereo float32 44.1kHz output");
+            .expect("Device does not support stereo float32 48 kHz output");
 
-        let config = supported_range.with_sample_rate(44_100).config();
+        let config = supported_range.with_sample_rate(48_000).config();
 
         let _audio_stream = device.build_output_stream(
             config, 

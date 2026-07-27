@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cpal = "0.18"
+cpal = { version = "0.18" }
 eframe = { version = "0.35", features = ["wgpu"] }
 bytemuck = "1.24"
 ringbuf = "0.5"
