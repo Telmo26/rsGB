@@ -1,4 +1,4 @@
-use crate::ColorMode;
+use crate::{ColorMode, interconnect::InterruptType};
 
 
 const COLORS_DEFAULT_ARGB : [u32; 4] = [0xFFFFFFFF, 0xFFAAAAAA, 0xFF555555, 0xFF000000];
@@ -69,14 +69,48 @@ impl LCD {
         }
     }
 
-    pub fn write(&mut self, address: u16, value: u8) {
+    pub fn write(&mut self, address: u16, value: u8) -> Option<InterruptType> {
         match address {
-            0xFF40 => self.lcdc = value,
+            0xFF40 => {
+                if self.lcdc & 0x80 > 0 && value & 0x80 == 0 { // When disabling the PPU, we reset LY to 0 and change the PPU mode to 0
+                    self.ly = 0;
+                    self.status &= !0x03;
+                } else if self.lcdc & 0x80 == 0 && value & 0x80 > 0 { // When re-enabling the PPU, we check if LY==LYC
+                    let ly_lyc_check = self.ly == self.ly_compare;
+                    let lyc_interrupt_pending = self.status & 0x04 > 0;
+                    if ly_lyc_check {
+                        self.status |= 0x04;
+                        if !lyc_interrupt_pending {
+                            self.lcdc = value;
+                            return Some(InterruptType::LcdStat);
+                        }
+                    } else {
+                        self.status &= !0x04;
+                    }
+                }
+                self.lcdc = value;
+            }
             0xFF41 => self.status = value | 0x80,
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
             0xFF44 => self.ly = value,
-            0xFF45 => self.ly_compare = value,
+            0xFF45 => {
+                self.ly_compare = value;
+
+                let enabled = self.lcdc & 0x80 > 0;
+                if enabled {
+                    let ly_lyc_check = self.ly == self.ly_compare;
+                    let lyc_interrupt_pending = self.status & 0x04 > 0;
+                    if ly_lyc_check {
+                        self.status |= 0x04;
+                        if !lyc_interrupt_pending {
+                            return Some(InterruptType::LcdStat)
+                        }
+                    } else {
+                        self.status &= !0x04;
+                    }
+                }
+            }
             0xFF46 => self.dma = value,
             0xFF47 => self.bg_palette = value,
             0xFF48 => self.obj_palette[0] = value,
@@ -93,6 +127,8 @@ impl LCD {
         } else if address == 0xFF49 {
             self.update_palette(value & 0b11111100, 2)
         }
+
+        return None
     }
 
     fn update_palette(&mut self, palette_data: u8, palette: u8) {

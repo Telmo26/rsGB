@@ -73,14 +73,17 @@ pub fn lcdc_win_map_area(bus: &mut Interconnect) -> u16 {
     }
 }
 
-pub fn _lcdc_lcd_enable(bus: &mut Interconnect) -> bool { (bus.read(0xFF40) & (1 << 7)) != 0 }
+pub fn _lcdc_lcd_enable(bus: &mut Interconnect) -> bool { 
+    (bus.read(0xFF40) & (1 << 7)) != 0 
+}
 
 pub fn status_mode(bus: &mut Interconnect) -> LCDMode {
     match bus.read(0xFF41) & 0b11 {
         0 => LCDMode::HBlank,
         1 => LCDMode::VBlank,
         2 => LCDMode::OAM,
-        _ => LCDMode::XFer,
+        3 => LCDMode::XFer,
+        _ => unreachable!()
     }
 }
 

@@ -91,7 +91,9 @@ impl IO {
             0xFF10..0xFF40 => self.apu.write(address, value),
             0xFF40..=0xFF4B => {
                 if address == 0xFF46 { self.dma.start(value) }
-                self.lcd.write(address, value);
+                if let Some(interrupt)= self.lcd.write(address, value) {
+                    self.request_interrupt(interrupt);
+                }
             }
             _ => eprintln!("Write at address {address:X} not implemented!"),
         }
