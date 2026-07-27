@@ -1,5 +1,6 @@
 use crate::interconnect::Interconnect;
 
+#[derive(Debug)]
 pub enum LCDMode {
     HBlank = 0,
     VBlank = 1,

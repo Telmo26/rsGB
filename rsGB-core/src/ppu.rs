@@ -16,8 +16,8 @@ const XRES: usize = 160;
 #[derive(Debug)]
 pub struct PPU {
     fetcher: Fetcher,
-    bgw_fifo: BoundedQueue<(u32, u8), 8>,
-    obj_fifo: BoundedQueue<(u32, u8, bool), 8>,
+    bgw_fifo: BoundedQueue<(u32, u8), 16>,
+    obj_fifo: BoundedQueue<(u32, u8, bool), 16>,
 
     visible_sprites: Vec<OAMEntry>,
     fetched_sprites: [bool; 10],

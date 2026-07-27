@@ -172,7 +172,7 @@ impl Fetcher {
                 self.state = FetchState::Push;
             }
 
-            FetchState::Push => { }
+            _ => { }
         }
     }
 

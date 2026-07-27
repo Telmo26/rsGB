@@ -33,16 +33,19 @@ impl PPU {
             } else {
                 return;
             }
-        } else if self.bgw_fifo.len() == 0 {
+        } else {
             self.fetcher.fetch(bus);
-            if let Some(pixels) = self.fetcher.push_bgw(bus) {
-                for pixel in pixels {
-                    self.bgw_fifo.push_back(pixel).unwrap();
+
+            if self.bgw_fifo.len() <= 8 {
+                if let Some(pixels) = self.fetcher.push_bgw(bus) {
+                    for pixel in pixels {
+                        self.bgw_fifo.push_back(pixel).unwrap();
+                    }
                 }
             }
         }
 
-        if !(self.bgw_fifo.len() == 0) {
+        if self.bgw_fifo.len() > 8 {
             let (bgw_pixel, bgw_index) = self.bgw_fifo.pop_front().unwrap();
 
             if !self.fetcher.is_window_mode() {
@@ -57,9 +60,7 @@ impl PPU {
 
             let (obj_pixel, obj_index, bg_priority) = self.obj_fifo.pop_front().unwrap_or((u32::MAX, 0, true));
 
-            let pixel = if obj_index == 0 {
-                bgw_pixel
-            } else if bg_priority && bgw_index != 0 {
+            let pixel = if obj_index == 0 || (bg_priority && bgw_index != 0) {
                 bgw_pixel
             } else {
                 obj_pixel
@@ -100,13 +101,9 @@ impl PPU {
 
         // Check if we've reached the window X position
         // WX=0-6 are off-screen, WX=7 is at screen position 0
-        if wx < 7 {
-            // Window starts before or at screen edge
-            if self.pushed_x == 0 {
-                self.switch_to_window_mode();
-            }
-        } else if self.pushed_x + 7 >= wx {
-            // Normal case: window starts mid-screen
+        if wx < 7 && self.pushed_x == 0     // Window starts before or at screen edge
+            || self.pushed_x + 7 >= wx      // Normal case: window starts mid-screen
+        {
             self.switch_to_window_mode();
         }
     }
@@ -140,9 +137,9 @@ impl PPU {
             // println!("Current OAM index: {index}");
             let obj = bus.oam_sprite(index);
 
-            if obj.x == 0 {
-                return;
-            }
+            // if obj.x == 0 {
+            //     return;
+            // }
 
             if obj.y <= ly + 16 && obj.y + sprite_height > ly + 16 {
                 // This sprite is on the current line
