@@ -216,5 +216,9 @@ impl Interconnect {
     pub fn apu_output(&self) -> Option<(f32, f32)> {
         self.io.apu_output()
     }
+
+    pub fn set_status(&mut self, status: u8) {
+        self.io.lcd.set_mode_bits(status);
+    }
 }
 

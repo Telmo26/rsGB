@@ -17,7 +17,9 @@ pub enum StatusSrc {
 
 pub fn lcd_read_ly(bus: &mut Interconnect) -> u8 { bus.read(0xFF44) }
 
-pub fn lcd_write_ly(bus: &mut Interconnect, value: u8) { bus.write(0xFF44, value) }
+pub fn lcd_write_ly(bus: &mut Interconnect, value: u8) { 
+    bus.write(0xFF44, value) 
+}
 
 pub fn lcd_read_scroll_x(bus: &mut Interconnect) -> u8 { bus.read(0xFF43) }
 
@@ -31,7 +33,7 @@ pub fn change_lcd_mode(bus: &mut Interconnect, mode: LCDMode) {
     let mut status = bus.read(0xFF41);
     status &= !0b11;
     status |= mode as u8;
-    bus.write(0xFF41, status);
+    bus.set_status(status);
 }
 
 pub fn lcdc_bgw_enable(bus: &mut Interconnect) -> bool { (bus.read(0xFF40) & 1) != 0 }
@@ -95,14 +97,26 @@ pub fn status_mode_set(bus: &mut Interconnect, mode: LCDMode) {
         LCDMode::OAM => status |= 0b10,
         LCDMode::XFer => status |= 0b11, 
     }
-    bus.write(0xFF41, status)
+    bus.set_status(status);
 }
 
 pub fn _status_lyc(bus: &mut Interconnect) -> bool { bus.read(0xFF41) & (1 << 2) != 0 }
 
-pub fn status_lyc_set(bus: &mut Interconnect, value: u8) {
-    let status = bus.read(0xFF41) | (value << 2);
-    bus.write(0xFF41, status) 
+pub fn status_lyc_set(bus: &mut Interconnect, set: bool) {
+    let previous = bus.read(0xFF41);
+    let status = if set {
+        previous | 1 << 2
+    } else {
+        previous & !(1 << 2)
+    };
+    bus.set_status(status); 
 } 
 
-pub fn status_stat_int(bus: &mut Interconnect, src: StatusSrc) -> bool { bus.read(0xFF41) & (src as u8) != 0 }
+pub fn stat_line(bus: &mut Interconnect) -> bool {
+    let status = bus.read(0xFF41);
+    let mode = status & 0b11;
+    (status & 0x08 != 0 && mode == 0)
+    || (status & 0x10 != 0 && mode == 1)
+    || (status & 0x20 != 0 && mode == 2)
+    || (status & 0x40 != 0 && status & 0x04 != 0)
+}

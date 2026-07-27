@@ -76,21 +76,29 @@ impl LCD {
                     self.ly = 0;
                     self.status &= !0x03;
                 } else if self.lcdc & 0x80 == 0 && value & 0x80 > 0 { // When re-enabling the PPU, we check if LY==LYC
+                    let was_high = self.stat_line();
+                    
                     let ly_lyc_check = self.ly == self.ly_compare;
-                    let lyc_interrupt_pending = self.status & 0x04 > 0;
                     if ly_lyc_check {
                         self.status |= 0x04;
-                        if !lyc_interrupt_pending {
-                            self.lcdc = value;
-                            return Some(InterruptType::LcdStat);
-                        }
                     } else {
                         self.status &= !0x04;
+                    }
+
+                    self.lcdc = value;
+                    if !was_high && self.stat_line() {
+                        return Some(InterruptType::LcdStat);
                     }
                 }
                 self.lcdc = value;
             }
-            0xFF41 => self.status = value | 0x80,
+            0xFF41 => {
+                let was_high = self.stat_line();
+                self.status = (value & 0x78) | (self.status & 0x07);
+                if !was_high && self.stat_line() {
+                    return Some(InterruptType::LcdStat)
+                }
+            }
             0xFF42 => self.scroll_y = value,
             0xFF43 => self.scroll_x = value,
             0xFF44 => self.ly = value,
@@ -99,15 +107,17 @@ impl LCD {
 
                 let enabled = self.lcdc & 0x80 > 0;
                 if enabled {
+                    let was_high = self.stat_line();
+
                     let ly_lyc_check = self.ly == self.ly_compare;
-                    let lyc_interrupt_pending = self.status & 0x04 > 0;
                     if ly_lyc_check {
                         self.status |= 0x04;
-                        if !lyc_interrupt_pending {
-                            return Some(InterruptType::LcdStat)
-                        }
                     } else {
                         self.status &= !0x04;
+                    }
+
+                    if !was_high && self.stat_line() {
+                        return Some(InterruptType::LcdStat);
                     }
                 }
             }
@@ -131,6 +141,10 @@ impl LCD {
         return None
     }
 
+    pub fn set_mode_bits(&mut self, status: u8) {
+        self.status = status;
+    }
+
     fn update_palette(&mut self, palette_data: u8, palette: u8) {
         let mut p_colors = &mut self.bg_colors;
         if palette == 1 {
@@ -148,5 +162,13 @@ impl LCD {
         p_colors[1] = colors[(palette_data >> 2) as usize & 0b11];
         p_colors[2] = colors[(palette_data >> 4) as usize & 0b11];
         p_colors[3] = colors[(palette_data >> 6) as usize & 0b11];
+    }
+
+    fn stat_line(&self) -> bool {
+        let mode = self.status & 0x03;
+        (self.status & 0x08 != 0 && mode == 0) // HBlank
+        || (self.status & 0x10 != 0 && mode == 1) // VBlank
+        || (self.status & 0x20 != 0 && mode == 2) // OAM
+        || (self.status & 0x40 != 0 && self.status & 0x04 != 0) // LYC
     }
 }

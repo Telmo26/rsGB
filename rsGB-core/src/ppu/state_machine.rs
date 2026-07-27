@@ -1,10 +1,10 @@
 use crate::{
-    interconnect::{Interconnect, InterruptType}, ppu::utils::{lcd_read_ly, lcd_write_ly}, 
+    interconnect::{Interconnect, InterruptType}, ppu::utils::{lcd_read_ly, lcd_write_ly, stat_line}, 
 };
 
 use super::{
     LINES_PER_FRAME, PPU, TICKS_PER_LINE, XRES, YRES,
-    utils::{LCDMode, StatusSrc, status_stat_int, status_lyc_set, change_lcd_mode, status_mode_set}
+    utils::{LCDMode, status_lyc_set, change_lcd_mode, status_mode_set}
 };
 
 impl PPU {
@@ -14,17 +14,23 @@ impl PPU {
             self.scanline_complete();
 
             if ly >= YRES as u8 {
+                let was_stat_line_high = stat_line(bus);
                 change_lcd_mode(bus, LCDMode::VBlank);
 
                 bus.request_interrupt(InterruptType::VBlank);
 
-                if status_stat_int(bus, StatusSrc::VBlank) {
+                if !was_stat_line_high && stat_line(bus) {
                     bus.request_interrupt(InterruptType::LcdStat);
                 }
+
                 self.current_frame += 1;
                 self.new_frame = true;
             } else {
+                let was_stat_line_high = stat_line(bus);
                 status_mode_set(bus, LCDMode::OAM);
+                if !was_stat_line_high && stat_line(bus) {
+                    bus.request_interrupt(InterruptType::LcdStat);
+                }
             }
             self.line_ticks = 0;
         }
@@ -36,8 +42,17 @@ impl PPU {
 
             if ly >= LINES_PER_FRAME {
                 self.frame_complete();
+
+                let was_stat_line_high = stat_line(bus);
+
                 change_lcd_mode(bus, LCDMode::OAM);
-                bus.write(0xFF44, 0);
+                lcd_write_ly(bus, 0);
+                let ly_lyc_match = 0 == bus.read(0xFF45);
+                status_lyc_set(bus, ly_lyc_match);
+
+                if !was_stat_line_high && stat_line(bus) {
+                    bus.request_interrupt(InterruptType::LcdStat);
+                }
             }
 
             self.line_ticks = 0;
@@ -58,9 +73,10 @@ impl PPU {
         self.process_fifo(bus, framebuffer, render);
 
         if self.pushed_x >= XRES as u8 {
+            let was_stat_line_high = stat_line(bus);
             change_lcd_mode(bus, LCDMode::HBlank);
 
-            if status_stat_int(bus, StatusSrc::HBlank) {
+            if !was_stat_line_high && stat_line(bus) {
                 bus.request_interrupt(InterruptType::LcdStat);
             }
         }
@@ -73,14 +89,13 @@ fn increment_ly(bus: &mut Interconnect) -> u8 {
     ly = ly.wrapping_add(1);
     lcd_write_ly(bus, ly);
 
-    if ly == bus.read(0xFF45) { // If LY == LYC
-        status_lyc_set(bus, 1);
+    let was_stat_line_high = stat_line(bus);
+    let ly_lyc_match = bus.read(0xFF44) == bus.read(0xFF45);
+    status_lyc_set(bus, ly_lyc_match);
 
-        if status_stat_int(bus, StatusSrc::LYC) {
-            bus.request_interrupt(crate::interconnect::InterruptType::LcdStat);
-        }
-    } else {
-        status_lyc_set(bus, 0);
+    if !was_stat_line_high && stat_line(bus) {
+        bus.request_interrupt(InterruptType::LcdStat);
     }
+
     ly
 }
