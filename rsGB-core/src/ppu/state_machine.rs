@@ -60,12 +60,12 @@ impl PPU {
     }
 
     pub fn oam(&mut self, bus: &mut Interconnect) {
+        self.oam_fetch(bus);
+
         if self.line_ticks >= 80 {
             change_lcd_mode(bus, LCDMode::XFer);
             self.pipeline_reset();
             self.visible_sprites.sort_by_key(|e| e.x);
-        } else {
-            self.oam_fetch(bus);
         }
     }
 
@@ -73,6 +73,7 @@ impl PPU {
         self.process_fifo(bus, framebuffer, render);
 
         if self.pushed_x >= XRES as u8 {
+            println!("Mode 3 length: {}", self.line_ticks - 80);
             let was_stat_line_high = stat_line(bus);
             change_lcd_mode(bus, LCDMode::HBlank);
 
@@ -90,7 +91,7 @@ fn increment_ly(bus: &mut Interconnect) -> u8 {
     lcd_write_ly(bus, ly);
 
     let was_stat_line_high = stat_line(bus);
-    let ly_lyc_match = bus.read(0xFF44) == bus.read(0xFF45);
+    let ly_lyc_match = ly == bus.read(0xFF45);
     status_lyc_set(bus, ly_lyc_match);
 
     if !was_stat_line_high && stat_line(bus) {

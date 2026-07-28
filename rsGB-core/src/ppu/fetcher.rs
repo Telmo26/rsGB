@@ -2,18 +2,19 @@ use std::u32;
 
 use crate::{interconnect::{Interconnect, OAMEntry}, ppu::utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_scroll_y, lcdc_bg_map_area, lcdc_bgw_data_area, lcdc_bgw_enable, lcdc_obj_height, lcdc_win_map_area}};
 
-#[derive(Debug)]
-enum Step {
+#[derive(Debug, PartialEq)]
+pub(super) enum Step {
     First,
     Second,
 }
 
-#[derive(Debug)]
-enum FetchState {
+#[derive(Debug, PartialEq)]
+pub(super) enum FetchState {
     TileID(Step),
     TileRowLow(Step),
     TileRowHigh(Step),
-    Push,
+    Sleep,
+    Push
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -24,18 +25,19 @@ enum FetchMode {
 
 #[derive(Debug)]
 pub(super) struct Fetcher {
-    state: FetchState,
+    pub bg_state: FetchState,
     mode: FetchMode,
 
     pub lx: u8,
     tile_address: u16,
     bgw_fetched_data: [u8; 3],
     data_address: u16,
-
     window_line: u8,
 
     fetching_sprite: bool,
+    sprite_state: u8,
     current_sprite: Option<OAMEntry>,
+    sprite_data_address: u16,
     sprite_data: [u8; 2],
 
     pub pushed_x: u8, // The position of the last pixel that was pushed to the FIFO
@@ -44,7 +46,7 @@ pub(super) struct Fetcher {
 impl Fetcher {
     pub fn new() -> Fetcher {
         Fetcher { 
-            state : FetchState::TileID(Step::First), 
+            bg_state : FetchState::TileID(Step::First), 
             mode: FetchMode::Background,
 
             lx: 0,
@@ -55,7 +57,9 @@ impl Fetcher {
             window_line: 0,
 
             fetching_sprite: false,
+            sprite_state: 0,
             current_sprite: None,
+            sprite_data_address: 0,
             sprite_data: [0; 2],
 
             pushed_x: 0,
@@ -63,7 +67,7 @@ impl Fetcher {
     }
 
     pub fn reset(&mut self) {
-        self.state = FetchState::TileID(Step::First);
+        self.bg_state = FetchState::TileID(Step::First);
         self.mode = FetchMode::Background;
         self.fetching_sprite = false;
 
@@ -79,7 +83,7 @@ impl Fetcher {
         // When switching to window mid-scanline, reset fetch position
         self.mode = FetchMode::Window;
         self.lx = 0;
-        self.state = FetchState::TileID(Step::First);
+        self.bg_state = FetchState::TileID(Step::First);
     }
 
     pub fn increment_window_line(&mut self) {
@@ -99,7 +103,7 @@ impl Fetcher {
     pub fn trigger_sprite_fetching(&mut self, sprite: OAMEntry) {
         self.fetching_sprite = true;
         self.current_sprite = Some(sprite);
-        self.state = FetchState::TileRowLow(Step::First);
+        self.sprite_state = 0;
     }
 
     pub fn fetch(&mut self, bus: &mut Interconnect) {
@@ -110,8 +114,8 @@ impl Fetcher {
         }
     }
 
-    fn fetch_bgw(&mut self, bus: &mut Interconnect) {
-        match self.state {
+    pub fn fetch_bgw(&mut self, bus: &mut Interconnect) {
+        match self.bg_state {
             FetchState::TileID(Step::First) => {                
                 self.tile_address = if self.mode == FetchMode::Background {
                     let (ly, scx, scy) = (lcd_read_ly(bus), lcd_read_scroll_x(bus), lcd_read_scroll_y(bus));
@@ -127,13 +131,13 @@ impl Fetcher {
                     (self.lx as u16 / 8)
                 };
                 
-                self.state = FetchState::TileID(Step::Second);
+                self.bg_state = FetchState::TileID(Step::Second);
                 self.lx += 8;
             }
 
             FetchState::TileID(Step::Second) => {
                 self.bgw_fetched_data[0] = bus.read(self.tile_address);
-                self.state = FetchState::TileRowLow(Step::First);
+                self.bg_state = FetchState::TileRowLow(Step::First);
             }
 
             FetchState::TileRowLow(Step::First) => {
@@ -154,31 +158,35 @@ impl Fetcher {
                     // Signed: 0x9000 base, tile_id as i8
                     0x9000_u16.wrapping_add_signed((tile_id as i8 as i16) << 4) + ((tile_row as u16) << 1)
                 };
-                self.state = FetchState::TileRowLow(Step::Second);
+                self.bg_state = FetchState::TileRowLow(Step::Second);
             }
 
             FetchState::TileRowLow(Step::Second) => {
                 self.bgw_fetched_data[1] = bus.read(self.data_address);
-                self.state = FetchState::TileRowHigh(Step::First);
+                self.bg_state = FetchState::TileRowHigh(Step::First);
             }
 
             FetchState::TileRowHigh(Step::First) => { 
                 self.data_address += 1;
-                self.state = FetchState::TileRowHigh(Step::Second);
+                self.bg_state = FetchState::TileRowHigh(Step::Second);
             }
 
             FetchState::TileRowHigh(Step::Second) => {
                 self.bgw_fetched_data[2] = bus.read(self.data_address);
-                self.state = FetchState::Push;
+                self.bg_state = FetchState::Sleep;
             }
 
-            _ => { }
+            FetchState::Sleep => {
+                self.bg_state = FetchState::Push;
+            }
+
+            FetchState::Push => { }
         }
     }
 
     fn fetch_sprite(&mut self, bus: &mut Interconnect) {
-        match self.state {
-            FetchState::TileRowLow(Step::First) => {
+        match self.sprite_state {
+            0 => {
                 let ly = lcd_read_ly(bus);
                 let sprite_height = lcdc_obj_height(bus);         
                 let sprite = self.current_sprite.unwrap();
@@ -194,24 +202,30 @@ impl Fetcher {
                     sprite.tile as u16
                 };
 
-                self.data_address = 0x8000 + (tile_index << 4) + ((tile_y as u16) << 1);
-                self.state = FetchState::TileRowLow(Step::Second);
+                self.sprite_data_address = 0x8000 + (tile_index << 4) + ((tile_y as u16) << 1);
+                self.sprite_state += 1;
             }
 
-            FetchState::TileRowLow(Step::Second) => {
-                self.sprite_data[0] = bus.read(self.data_address);
-                self.state = FetchState::TileRowHigh(Step::First);
+            1 => {
+                self.sprite_data[0] = bus.read(self.sprite_data_address);
+                self.sprite_state += 1;
             }
 
-            FetchState::TileRowHigh(Step::First) => { 
-                self.data_address += 1;
-                self.state = FetchState::TileRowHigh(Step::Second);
+            2 => { 
+                self.sprite_data_address += 1;
+                self.sprite_state += 1;
             }
 
-            FetchState::TileRowHigh(Step::Second) => {
-                self.sprite_data[1] = bus.read(self.data_address);
-                self.state = FetchState::Push;
+            3 => {
+                self.sprite_data[1] = bus.read(self.sprite_data_address);
+                self.sprite_state += 1;
             }
+
+            4 => { // Sleep
+                self.sprite_state += 1;
+            }
+
+            5 => { } // Push
 
             _ => { 
                 // println!("Fetcher: {:#?}", self);
@@ -222,7 +236,7 @@ impl Fetcher {
     // This function returns the color value for the background
     // and the index, to handle transparency
     pub fn push_bgw(&mut self, bus: &mut Interconnect) -> Option<[(u32, u8); 8]> {
-        if let FetchState::Push = self.state {
+        if self.bg_state == FetchState::Push {
             let mut pixels = [(0, 0); 8];
             for i in 0..8 {
                 let bit: u8 = 7 - i;
@@ -239,7 +253,7 @@ impl Fetcher {
                 pixels[i as usize] = (color, index);
             }
             self.pushed_x += 8;
-            self.state = FetchState::TileID(Step::First);
+            self.bg_state = FetchState::TileID(Step::First);
             Some(pixels)
         } else {
             None
@@ -249,7 +263,7 @@ impl Fetcher {
     // This function returns the pixel value, with the palette number
     // and the OBJ-to-BG priority flag
     pub fn push_obj(&mut self, bus: &mut Interconnect) -> Option<Vec<(u32, u8, bool)>> {
-        if let FetchState::Push = self.state {
+        if self.sprite_state == 5 {
             let mut pixels = Vec::with_capacity(8);
             let sprite = self.current_sprite.unwrap();
 
@@ -277,9 +291,10 @@ impl Fetcher {
                     pixels.push((color, index as u8, bg_priority));
                 }
             };
+
             self.fetching_sprite = false;
             self.current_sprite = None;
-            self.state = FetchState::TileID(Step::First);
+            
             while pixels.len() < 8 {
                 pixels.push((u32::MAX, 0, true));
             }

@@ -1,14 +1,26 @@
-use crate::{interconnect::Interconnect, ppu::{XRES, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_enable, lcdc_obj_height, lcdc_win_enable}}};
+use crate::{interconnect::Interconnect, ppu::{XRES, fetcher::{FetchState, Step}, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_enable, lcdc_obj_height, lcdc_win_enable}}};
 
 use super::PPU;
 
 impl PPU {
     pub(super) fn process_fifo(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) {
-        self.check_window_trigger(bus);
+        // self.check_window_trigger(bus);
 
-        self.check_sprite_displayed(bus);
+        // self.check_sprite_displayed(bus);
 
         if self.fetcher.is_fetching_sprite() {
+            if self.bgw_fifo.len() == 0 && self.fetcher.bg_state != FetchState::Push {
+                // We add dots until the bg fifo is not empty basically
+                self.fetcher.fetch_bgw(bus);
+                if let Some(pixels) = self.fetcher.push_bgw(bus) {
+                    for pixel in pixels {
+                        self.bgw_fifo.push_back(pixel).unwrap();
+                    }
+                }
+
+                return ;
+            }
+
             self.fetcher.fetch(bus);
             if let Some(data) = self.fetcher.push_obj(bus) {
                 while self.obj_fifo.len() < 8 {
@@ -30,22 +42,33 @@ impl PPU {
                         }
                     }
                 }
-            } else {
-                return;
             }
-        } else {
-            self.fetcher.fetch(bus);
 
-            if self.bgw_fifo.len() <= 8 {
-                if let Some(pixels) = self.fetcher.push_bgw(bus) {
-                    for pixel in pixels {
-                        self.bgw_fifo.push_back(pixel).unwrap();
-                    }
-                }
+            return ;
+        }
+
+        // println!("dot={} fetch={:?} fifo={} output={}",
+        //     self.line_ticks,
+        //     self.fetcher.bg_state,
+        //     self.bgw_fifo.len(),
+        //     self.bgw_fifo.len() > 0
+        // );
+
+        // Background/Window pixel fetcher
+        self.fetcher.fetch(bus);
+
+        // According to Pandocs, the FIFO tries to always hold at least 8 pixels
+        if self.bgw_fifo.len() < 8 
+            && let Some(pixels) = self.fetcher.push_bgw(bus) 
+        {
+            for pixel in pixels {
+                self.bgw_fifo.push_back(pixel).unwrap();
             }
         }
 
-        if self.bgw_fifo.len() > 8 {
+        // According to Pandocs, 8 pixels are required for the Pixel
+        // Rendering Operation to take place
+        if self.bgw_fifo.len() >= 8 {
             let (bgw_pixel, bgw_index) = self.bgw_fifo.pop_front().unwrap();
 
             if !self.fetcher.is_window_mode() {
@@ -58,7 +81,8 @@ impl PPU {
                 }
             }
 
-            let (obj_pixel, obj_index, bg_priority) = self.obj_fifo.pop_front().unwrap_or((u32::MAX, 0, true));
+            let (obj_pixel, obj_index, bg_priority) = self.obj_fifo.pop_front()
+                .unwrap_or((u32::MAX, 0, true));
 
             let pixel = if obj_index == 0 || (bg_priority && bgw_index != 0) {
                 bgw_pixel
@@ -153,7 +177,7 @@ impl PPU {
             for (index, sprite) in self.visible_sprites.iter().enumerate() {
                 let sprite_x = sprite.x.saturating_sub(8);
 
-                if !self.fetched_sprites[index] && self.pushed_x >= sprite_x && self.pushed_x < sprite_x + 8 {
+                if !self.fetched_sprites[index] && self.pushed_x == sprite_x {
                     self.fetcher.trigger_sprite_fetching(*sprite);
                     self.fetched_sprites[index] = true;
                     break;
