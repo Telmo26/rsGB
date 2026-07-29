@@ -10,6 +10,7 @@ use utils::{status_mode, LCDMode};
 
 const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;
+const OAM_DURATION: u32 = 80;
 const YRES: usize = 144;
 const XRES: usize = 160;
 
@@ -50,9 +51,9 @@ impl PPU {
     }
 
     pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) -> bool {
-        self.line_ticks += 1;
-
         let lcd_mode = status_mode(bus);
+
+        // println!("DOT: {} MODE: {lcd_mode:?}", self.line_ticks);
 
         match lcd_mode {
             LCDMode::HBlank => self.hblank(bus),
@@ -60,6 +61,8 @@ impl PPU {
             LCDMode::OAM => self.oam(bus),
             LCDMode::XFer => self.xfer(bus, framebuffer, render),
         };
+
+        self.line_ticks = (self.line_ticks + 1) % TICKS_PER_LINE;
 
         if self.new_frame {
             self.new_frame = false;

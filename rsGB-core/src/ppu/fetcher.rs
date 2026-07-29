@@ -35,6 +35,7 @@ pub(super) struct Fetcher {
     window_line: u8,
 
     fetching_sprite: bool,
+    
     sprite_state: u8,
     current_sprite: Option<OAMEntry>,
     sprite_data_address: u16,
@@ -173,7 +174,7 @@ impl Fetcher {
 
             FetchState::TileRowHigh(Step::Second) => {
                 self.bgw_fetched_data[2] = bus.read(self.data_address);
-                self.bg_state = FetchState::Sleep;
+                self.bg_state = FetchState::Push;
             }
 
             FetchState::Sleep => {
@@ -184,7 +185,7 @@ impl Fetcher {
         }
     }
 
-    fn fetch_sprite(&mut self, bus: &mut Interconnect) {
+    pub fn fetch_sprite(&mut self, bus: &mut Interconnect) {
         match self.sprite_state {
             0 => {
                 let ly = lcd_read_ly(bus);

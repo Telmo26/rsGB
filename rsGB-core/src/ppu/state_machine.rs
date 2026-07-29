@@ -1,5 +1,5 @@
 use crate::{
-    interconnect::{Interconnect, InterruptType}, ppu::utils::{lcd_read_ly, lcd_write_ly, stat_line}, 
+    interconnect::{Interconnect, InterruptType}, ppu::{OAM_DURATION, utils::{lcd_read_ly, lcd_write_ly, stat_line}}, 
 };
 
 use super::{
@@ -9,11 +9,11 @@ use super::{
 
 impl PPU {
     pub fn hblank(&mut self, bus: &mut Interconnect) {
-        if self.line_ticks >= TICKS_PER_LINE {
+        if self.line_ticks == TICKS_PER_LINE - 1 {
             let ly = increment_ly(bus);
             self.scanline_complete();
 
-            if ly >= YRES as u8 {
+            if ly == YRES as u8 {
                 let was_stat_line_high = stat_line(bus);
                 change_lcd_mode(bus, LCDMode::VBlank);
 
@@ -32,15 +32,14 @@ impl PPU {
                     bus.request_interrupt(InterruptType::LcdStat);
                 }
             }
-            self.line_ticks = 0;
         }
     }
 
     pub fn vblank(&mut self, bus: &mut Interconnect) {
-        if self.line_ticks >= TICKS_PER_LINE {
+        if self.line_ticks == TICKS_PER_LINE - 1 {
             let ly = increment_ly(bus);
 
-            if ly >= LINES_PER_FRAME {
+            if ly == LINES_PER_FRAME {
                 self.frame_complete();
 
                 let was_stat_line_high = stat_line(bus);
@@ -54,15 +53,13 @@ impl PPU {
                     bus.request_interrupt(InterruptType::LcdStat);
                 }
             }
-
-            self.line_ticks = 0;
         }
     }
 
     pub fn oam(&mut self, bus: &mut Interconnect) {
         self.oam_fetch(bus);
 
-        if self.line_ticks >= 80 {
+        if self.line_ticks == OAM_DURATION - 1 {
             change_lcd_mode(bus, LCDMode::XFer);
             self.pipeline_reset();
             self.visible_sprites.sort_by_key(|e| e.x);
@@ -72,8 +69,10 @@ impl PPU {
     pub fn xfer(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) {
         self.process_fifo(bus, framebuffer, render);
 
-        if self.screen_x >= XRES as u8 {
-            println!("Mode 3 length: {}", self.line_ticks - 80);
+        if self.screen_x == XRES as u8 {
+            #[cfg(debug_assertions)]
+            println!("Mode 3 length: {}", self.line_ticks - (OAM_DURATION - 1));
+            
             let was_stat_line_high = stat_line(bus);
             change_lcd_mode(bus, LCDMode::HBlank);
 

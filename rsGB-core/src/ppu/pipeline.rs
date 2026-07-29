@@ -4,6 +4,18 @@ use super::PPU;
 
 impl PPU {
     pub(super) fn process_fifo(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) {
+        // #[cfg(debug_assertions)]
+        // {
+        //     let output = self.bgw_fifo.len() > 0 && !self.fetcher.is_fetching_sprite();
+        //     println!("dot={} fetch={:?} fifo={} output={output} window={}",
+        //         self.line_ticks,
+        //         self.fetcher.bg_state,
+        //         self.bgw_fifo.len(),
+        //         self.fetcher.is_window_mode()
+        //     );
+        // }
+        
+        
         // Dummy fetch simulation: the dummy fetch lasts for 6 dots,
         // so instead of warming up the pipeline I just skip the first
         // few dots. This works since the pixels are discarded anyways.
@@ -17,69 +29,67 @@ impl PPU {
         // self.check_sprite_displayed(bus);
 
         if self.fetcher.is_fetching_sprite() {
-            if self.bgw_fifo.len() == 0 
-                && self.fetcher.bg_state != FetchState::Push 
-            {
-                // We add dots until the bg fifo is not empty basically
+            if self.bgw_fifo.len() == 0 {
+                // Background/Window pixel fetcher
                 self.fetcher.fetch_bgw(bus);
-                if let Some(pixels) = self.fetcher.push_bgw(bus) {
+
+                // According to Pandocs, the FIFO tries to always hold at least 8 pixels
+                if self.bgw_fifo.len() == 0 
+                    && let Some(pixels) = self.fetcher.push_bgw(bus) 
+                {
                     for pixel in pixels {
                         self.bgw_fifo.push_back(pixel).unwrap();
                     }
                 }
-
-                return ;
             }
 
-            self.fetcher.fetch(bus);
-            if let Some(data) = self.fetcher.push_obj(bus) {
-                while self.obj_fifo.len() < 8 {
-                    self.obj_fifo.push_back((u32::MAX, 0, true)).unwrap();
-                }
-                for i in 0..8 {
-                    let (new_pixel, new_index, new_bg_priority) = data[i];
+            // If the fetcher is available for the OBJ FIFO.
+            // Moreover, this allows overlapping the last tick of the BG
+            // fetcher with the first of the OBJ fetcher
+            if self.bgw_fifo.len() > 0 {
+                self.fetcher.fetch_sprite(bus);
+                if let Some(data) = self.fetcher.push_obj(bus) {
+                    while self.obj_fifo.len() < 8 {
+                        self.obj_fifo.push_back((u32::MAX, 0, true)).unwrap();
+                    }
+                    for i in 0..8 {
+                        let (new_pixel, new_index, new_bg_priority) = data[i];
 
-                    // Only merge non-transparent pixels
-                    if new_index != 0 {
-                        let (_old_pixel, old_index, _old_bg_priority) = self.obj_fifo[i];
+                        // Only merge non-transparent pixels
+                        if new_index != 0 {
+                            let (_old_pixel, old_index, _old_bg_priority) = self.obj_fifo[i];
 
-                        // X-Coordinate Priority:
-                        // If the FIFO slot is empty (old_index 0), this new sprite wins.
-                        // If the slot is *already* full, the old sprite (which had a
-                        // lower X-coordinate) wins, and this new pixel is discarded.
-                        if old_index == 0 {
-                            self.obj_fifo[i] = (new_pixel, new_index, new_bg_priority);
+                            // X-Coordinate Priority:
+                            // If the FIFO slot is empty (old_index 0), this new sprite wins.
+                            // If the slot is *already* full, the old sprite (which had a
+                            // lower X-coordinate) wins, and this new pixel is discarded.
+                            if old_index == 0 {
+                                self.obj_fifo[i] = (new_pixel, new_index, new_bg_priority);
+                            }
                         }
                     }
                 }
+                // println!("Returning early from sprite fetching");
+                return ;
             }
+        } else {
+            // Background/Window pixel fetcher
+            self.fetcher.fetch_bgw(bus);
 
-            return ;
-        }
-
-        // println!("dot={} fetch={:?} fifo={} output={} window={}",
-        //     self.line_ticks,
-        //     self.fetcher.bg_state,
-        //     self.bgw_fifo.len(),
-        //     self.bgw_fifo.len() > 0,
-        //     self.fetcher.is_window_mode()
-        // );
-
-        // Background/Window pixel fetcher
-        self.fetcher.fetch(bus);
-
-        // According to Pandocs, the FIFO tries to always hold at least 8 pixels
-        if self.bgw_fifo.len() < 8 
-            && let Some(pixels) = self.fetcher.push_bgw(bus) 
-        {
-            for pixel in pixels {
-                self.bgw_fifo.push_back(pixel).unwrap();
+            // According to Pandocs, the FIFO tries to always hold at least 8 pixels
+            if self.bgw_fifo.len() == 0 
+                && let Some(pixels) = self.fetcher.push_bgw(bus) 
+            {
+                for pixel in pixels {
+                    self.bgw_fifo.push_back(pixel).unwrap();
+                }
             }
         }
 
         // According to Pandocs, 8 pixels are required for the Pixel
         // Rendering Operation to take place
         if self.bgw_fifo.len() > 0 {
+            // println!("Rendering pixel: {}", self.screen_x);
             let (bgw_pixel, bgw_index) = self.bgw_fifo.pop_front().unwrap();
 
             if !self.fetcher.is_window_mode() {
@@ -87,6 +97,7 @@ impl PPU {
                 
                 // Discard the first (SCX % 8) pixels
                 if self.current_x < (scx % 8) {
+                    // println!("Discarding pixels since SCX % 8 = {}", scx % 8);
                     self.current_x += 1;
                     return;
                 }
@@ -169,12 +180,7 @@ impl PPU {
             let sprite_height = lcdc_obj_height(bus);
 
             let index = ((self.line_ticks - 1) / 2) as u8;
-            // println!("Current OAM index: {index}");
             let obj = bus.oam_sprite(index);
-
-            // if obj.x == 0 {
-            //     return;
-            // }
 
             if obj.y <= ly + 16 && obj.y + sprite_height > ly + 16 {
                 // This sprite is on the current line
@@ -189,8 +195,11 @@ impl PPU {
                 let sprite_x = sprite.x.saturating_sub(8);
 
                 if !self.fetched_sprites[index] 
-                    && self.screen_x == sprite_x 
+                    && self.screen_x == sprite_x
                 {
+                    // #[cfg(debug_assertions)]
+                    // println!("Object detected at X={}", sprite_x);
+
                     self.fetcher.trigger_sprite_fetching(*sprite);
                     self.fetched_sprites[index] = true;
                     break;
