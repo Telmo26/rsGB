@@ -72,7 +72,7 @@ impl PPU {
     pub fn xfer(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) {
         self.process_fifo(bus, framebuffer, render);
 
-        if self.pushed_x >= XRES as u8 {
+        if self.screen_x >= XRES as u8 {
             println!("Mode 3 length: {}", self.line_ticks - 80);
             let was_stat_line_high = stat_line(bus);
             change_lcd_mode(bus, LCDMode::HBlank);

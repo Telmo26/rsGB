@@ -22,7 +22,7 @@ pub struct PPU {
     visible_sprites: Vec<OAMEntry>,
     fetched_sprites: [bool; 10],
 
-    pushed_x: u8, // The pixel position to push in the framebuffer
+    screen_x: u8, // The pixel position to push in the framebuffer
     current_x: u8, // The current position we're dealing with on the screen
 
     current_frame: u32,
@@ -40,7 +40,7 @@ impl PPU {
             visible_sprites: Vec::with_capacity(10),
             fetched_sprites: [false; 10],
 
-            pushed_x: 0,
+            screen_x: 0,
             current_x: 0,
 
             current_frame: 0,

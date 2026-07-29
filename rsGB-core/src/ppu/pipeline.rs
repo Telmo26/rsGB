@@ -1,15 +1,25 @@
-use crate::{interconnect::Interconnect, ppu::{XRES, fetcher::{FetchState, Step}, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_enable, lcdc_obj_height, lcdc_win_enable}}};
+use crate::{interconnect::Interconnect, ppu::{XRES, fetcher::FetchState, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_enable, lcdc_obj_height, lcdc_win_enable}}};
 
 use super::PPU;
 
 impl PPU {
     pub(super) fn process_fifo(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) {
-        // self.check_window_trigger(bus);
+        // Dummy fetch simulation: the dummy fetch lasts for 6 dots,
+        // so instead of warming up the pipeline I just skip the first
+        // few dots. This works since the pixels are discarded anyways.
+        // The first Mode 3 dot is 81 so I want to skip until 87 
+        if self.line_ticks < 87 { 
+            return ;
+        }
+
+        self.check_window_trigger(bus);
 
         // self.check_sprite_displayed(bus);
 
         if self.fetcher.is_fetching_sprite() {
-            if self.bgw_fifo.len() == 0 && self.fetcher.bg_state != FetchState::Push {
+            if self.bgw_fifo.len() == 0 
+                && self.fetcher.bg_state != FetchState::Push 
+            {
                 // We add dots until the bg fifo is not empty basically
                 self.fetcher.fetch_bgw(bus);
                 if let Some(pixels) = self.fetcher.push_bgw(bus) {
@@ -47,11 +57,12 @@ impl PPU {
             return ;
         }
 
-        // println!("dot={} fetch={:?} fifo={} output={}",
+        // println!("dot={} fetch={:?} fifo={} output={} window={}",
         //     self.line_ticks,
         //     self.fetcher.bg_state,
         //     self.bgw_fifo.len(),
-        //     self.bgw_fifo.len() > 0
+        //     self.bgw_fifo.len() > 0,
+        //     self.fetcher.is_window_mode()
         // );
 
         // Background/Window pixel fetcher
@@ -68,7 +79,7 @@ impl PPU {
 
         // According to Pandocs, 8 pixels are required for the Pixel
         // Rendering Operation to take place
-        if self.bgw_fifo.len() >= 8 {
+        if self.bgw_fifo.len() > 0 {
             let (bgw_pixel, bgw_index) = self.bgw_fifo.pop_front().unwrap();
 
             if !self.fetcher.is_window_mode() {
@@ -90,17 +101,17 @@ impl PPU {
                 obj_pixel
             };
 
-            let x = self.pushed_x as usize + lcd_read_ly(bus) as usize * XRES;
+            let x = self.screen_x as usize + lcd_read_ly(bus) as usize * XRES;
             
             if render {
                 framebuffer[x] = pixel;
             }
-            self.pushed_x += 1;
+            self.screen_x += 1;
         }
     }
 
     pub fn pipeline_reset(&mut self) {
-        self.pushed_x = 0;
+        self.screen_x = 0;
         self.current_x = 0;
 
         self.bgw_fifo.clear();
@@ -125,8 +136,8 @@ impl PPU {
 
         // Check if we've reached the window X position
         // WX=0-6 are off-screen, WX=7 is at screen position 0
-        if wx < 7 && self.pushed_x == 0     // Window starts before or at screen edge
-            || self.pushed_x + 7 >= wx      // Normal case: window starts mid-screen
+        if wx < 7 && self.screen_x == 0     // Window starts before or at screen edge
+            || self.screen_x + 7 >= wx      // Normal case: window starts mid-screen
         {
             self.switch_to_window_mode();
         }
@@ -177,7 +188,9 @@ impl PPU {
             for (index, sprite) in self.visible_sprites.iter().enumerate() {
                 let sprite_x = sprite.x.saturating_sub(8);
 
-                if !self.fetched_sprites[index] && self.pushed_x == sprite_x {
+                if !self.fetched_sprites[index] 
+                    && self.screen_x == sprite_x 
+                {
                     self.fetcher.trigger_sprite_fetching(*sprite);
                     self.fetched_sprites[index] = true;
                     break;
