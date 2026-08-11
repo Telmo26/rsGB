@@ -8,14 +8,6 @@ pub enum LCDMode {
     XFer = 3,
 }
 
-#[allow(dead_code)]
-pub enum StatusSrc {
-    HBlank = (1 << 3),
-    VBlank = (1 << 4),
-    OAM = (1 << 5),
-    LYC = (1 << 6),
-}
-
 pub fn lcd_read_ly(bus: &mut Interconnect) -> u8 { bus.read(0xFF44) }
 
 pub fn lcd_write_ly(bus: &mut Interconnect, value: u8) { 

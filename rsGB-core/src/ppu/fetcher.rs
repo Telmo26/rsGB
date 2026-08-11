@@ -174,7 +174,7 @@ impl Fetcher {
 
             FetchState::TileRowHigh(Step::Second) => {
                 self.bgw_fetched_data[2] = bus.read(self.data_address);
-                self.bg_state = FetchState::Push;
+                self.bg_state = FetchState::Sleep;
             }
 
             FetchState::Sleep => {

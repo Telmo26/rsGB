@@ -10,6 +10,7 @@ use super::{
 impl PPU {
     pub fn hblank(&mut self, bus: &mut Interconnect) {
         if self.line_ticks == TICKS_PER_LINE - 1 {
+            // println!("LY increase on dot {}", self.line_ticks);
             let ly = increment_ly(bus);
             self.scanline_complete();
 
@@ -70,8 +71,8 @@ impl PPU {
         self.process_fifo(bus, framebuffer, render);
 
         if self.screen_x == XRES as u8 {
-            #[cfg(debug_assertions)]
-            println!("Mode 3 length: {}", self.line_ticks - (OAM_DURATION - 1));
+            // #[cfg(debug_assertions)]
+            // println!("Mode 3 length: {}", self.line_ticks - (OAM_DURATION - 1));
             
             let was_stat_line_high = stat_line(bus);
             change_lcd_mode(bus, LCDMode::HBlank);

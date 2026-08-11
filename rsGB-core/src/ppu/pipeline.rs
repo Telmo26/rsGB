@@ -19,14 +19,14 @@ impl PPU {
         // Dummy fetch simulation: the dummy fetch lasts for 6 dots,
         // so instead of warming up the pipeline I just skip the first
         // few dots. This works since the pixels are discarded anyways.
-        // The first Mode 3 dot is 81 so I want to skip until 87 
-        if self.line_ticks < 87 { 
+        // The first Mode 3 dot is 80 so I want to skip until 86 
+        if self.line_ticks < 85 { 
             return ;
         }
 
         self.check_window_trigger(bus);
 
-        // self.check_sprite_displayed(bus);
+        self.check_sprite_displayed(bus);
 
         if self.fetcher.is_fetching_sprite() {
             if self.bgw_fifo.len() == 0 {

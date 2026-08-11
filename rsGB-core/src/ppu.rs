@@ -53,8 +53,6 @@ impl PPU {
     pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) -> bool {
         let lcd_mode = status_mode(bus);
 
-        // println!("DOT: {} MODE: {lcd_mode:?}", self.line_ticks);
-
         match lcd_mode {
             LCDMode::HBlank => self.hblank(bus),
             LCDMode::VBlank => self.vblank(bus),
