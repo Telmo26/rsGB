@@ -56,13 +56,13 @@ impl CPU {
 
         if !self.halted {
             self.fetch_instruction(dev);
-            dev.incr_cycle();
+            
             self.fetch_data(dev);
 
-            self.execute(dev, self.curr_inst.in_type);
+            self.execute(dev);
             
         } else {
-            dev.incr_cycle();
+            dev.tick_m();
             if dev.ie_register() & self.get_int_flags(dev) & 0x1F != 0 {
                 self.halted = false;
             }
@@ -85,6 +85,8 @@ impl CPU {
 
     fn fetch_instruction(&mut self, dev: &mut impl Peripherals) {
         self.curr_opcode = dev.read8(self.registers.pc);
+        dev.tick_m();
+
         self.curr_inst = Instruction::from_opcode(self.curr_opcode);
 
         if self.halt_bug_triggered {

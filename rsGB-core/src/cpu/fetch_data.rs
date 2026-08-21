@@ -12,16 +12,16 @@ impl CPU {
             AddrMode::R_R => self.fetched_data = self.registers.read(self.curr_inst.reg_2),
             AddrMode::R_D8 => {
                 self.fetched_data = dev.read8(self.registers.pc) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.pc += 1;
             },
             AddrMode::D16 | AddrMode::R_D16 => {
                 let low: u8 = dev.read8(self.registers.pc);
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.pc += 1;
 
                 let high: u8 = dev.read8(self.registers.pc);
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.pc += 1;
 
                 self.fetched_data = (high as u16) << 8 | low as u16;
@@ -42,17 +42,18 @@ impl CPU {
                     addr |= 0xFF00;
                 }
 
+                
                 self.fetched_data = dev.read8(addr) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
             }
             AddrMode::R_HLD => {
                 self.fetched_data = dev.read8(self.registers.read(self.curr_inst.reg_2)) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.set(RegType::HL, self.registers.read(RegType::HL).wrapping_sub(1));
             }
             AddrMode::R_HLI => {
                 self.fetched_data = dev.read8(self.registers.read(self.curr_inst.reg_2)) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.set(RegType::HL, self.registers.read(RegType::HL).wrapping_add(1));
             }
             AddrMode::HLD_R => {
@@ -69,34 +70,34 @@ impl CPU {
             }
             AddrMode::R_A8 => {
                 let address = dev.read8(self.registers.pc) as u16 | 0xFF00;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.fetched_data = dev.read8(address) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.pc += 1;
             }
             AddrMode::A8_R => {
                 self.fetched_data = self.registers.read(self.curr_inst.reg_2);
                 self.mem_dest = dev.read8(self.registers.pc) as u16 | 0xFF00;
                 self.dest_is_mem = true;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.pc += 1;
             }
             AddrMode::HL_SP => {
                 self.fetched_data = dev.read8(self.registers.pc) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.pc += 1;
             }
             AddrMode::D8 => {
                 self.fetched_data = dev.read8(self.registers.pc) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.pc += 1;
             }
             AddrMode::A16_R => {
                 let low: u8 = dev.read8(self.registers.pc);
-                dev.incr_cycle();
+                dev.tick_m();
 
                 let high: u8 = dev.read8(self.registers.pc + 1);
-                dev.incr_cycle();
+                dev.tick_m();
 
                 self.mem_dest = (high as u16) << 8 | low as u16;
                 self.dest_is_mem = true;
@@ -106,7 +107,7 @@ impl CPU {
             }
             AddrMode::MR_D8 => {
                 self.fetched_data = dev.read8(self.registers.pc) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
                 self.registers.pc += 1;
                 self.mem_dest = self.registers.read(self.curr_inst.reg_1);
                 self.dest_is_mem = true;
@@ -115,20 +116,20 @@ impl CPU {
                 self.mem_dest = self.registers.read(self.curr_inst.reg_1);
                 self.dest_is_mem = true;
                 self.fetched_data = dev.read8(self.mem_dest) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
             }
             AddrMode::R_A16 => {
                 let low: u8 = dev.read8(self.registers.pc);
-                dev.incr_cycle();
+                dev.tick_m();
 
                 let high: u8 = dev.read8(self.registers.pc + 1);
-                dev.incr_cycle();
+                dev.tick_m();
 
                 let addr = (high as u16) << 8 | low as u16;
 
                 self.registers.pc += 2;
                 self.fetched_data = dev.read8(addr) as u16;
-                dev.incr_cycle();
+                dev.tick_m();
             }
         }
     }

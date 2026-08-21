@@ -107,14 +107,6 @@ impl Fetcher {
         self.sprite_state = 0;
     }
 
-    pub fn fetch(&mut self, bus: &mut Interconnect) {
-        if self.fetching_sprite {
-            self.fetch_sprite(bus);
-        } else {
-            self.fetch_bgw(bus);
-        }
-    }
-
     pub fn fetch_bgw(&mut self, bus: &mut Interconnect) {
         match self.bg_state {
             FetchState::TileID(Step::First) => {                
@@ -137,7 +129,7 @@ impl Fetcher {
             }
 
             FetchState::TileID(Step::Second) => {
-                self.bgw_fetched_data[0] = bus.read(self.tile_address);
+                self.bgw_fetched_data[0] = bus.ppu_read(self.tile_address);
                 self.bg_state = FetchState::TileRowLow(Step::First);
             }
 
@@ -163,7 +155,7 @@ impl Fetcher {
             }
 
             FetchState::TileRowLow(Step::Second) => {
-                self.bgw_fetched_data[1] = bus.read(self.data_address);
+                self.bgw_fetched_data[1] = bus.ppu_read(self.data_address);
                 self.bg_state = FetchState::TileRowHigh(Step::First);
             }
 
@@ -173,7 +165,7 @@ impl Fetcher {
             }
 
             FetchState::TileRowHigh(Step::Second) => {
-                self.bgw_fetched_data[2] = bus.read(self.data_address);
+                self.bgw_fetched_data[2] = bus.ppu_read(self.data_address);
                 self.bg_state = FetchState::Sleep;
             }
 
@@ -208,7 +200,7 @@ impl Fetcher {
             }
 
             1 => {
-                self.sprite_data[0] = bus.read(self.sprite_data_address);
+                self.sprite_data[0] = bus.ppu_read(self.sprite_data_address);
                 self.sprite_state += 1;
             }
 
@@ -218,7 +210,7 @@ impl Fetcher {
             }
 
             3 => {
-                self.sprite_data[1] = bus.read(self.sprite_data_address);
+                self.sprite_data[1] = bus.ppu_read(self.sprite_data_address);
                 self.sprite_state += 1;
             }
 

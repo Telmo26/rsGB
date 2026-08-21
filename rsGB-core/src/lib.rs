@@ -41,7 +41,8 @@ pub trait AudioSink {
 /// This trait is used to abstract away the various peripherals and only expose
 /// the required reading and writing functions
 trait Peripherals {
-    fn incr_cycle(&mut self);
+    fn tick_m(&mut self);
+    fn tick_t(&mut self);
     
     fn read8(&self, address: u16) -> u8;
     fn write8(&mut self, address: u16, value: u8);
@@ -105,30 +106,37 @@ where
     A: AudioSink,
     V: VideoSink,
 {
-    fn incr_cycle(&mut self) {
-        for _ in 0..4 {
-            self.ticks += 1;
-            self.bus.tick_t();
+    fn tick_t(&mut self) {
+        self.ticks += 1;
+        self.bus.tick_t();
 
-            let is_real_frame = self.frames == self.speed - 1;
-            let framebuffer = self.video_sink.get_mut();
+        let is_real_frame = self.frames == self.speed - 1;
+        let framebuffer = self.video_sink.get_mut();
 
-            if self.ppu.tick(&mut self.bus, framebuffer, is_real_frame) { // Frame updated
-                self.frames += 1;
-                if is_real_frame {
-                    self.video_sink.present();
-                }
-            }
-
-            self.audio_accumulator += AUDIO_FREQUENCY;
-            if self.audio_accumulator >= CPU_FREQUENCY * self.speed as u32 {
-                self.audio_accumulator -= CPU_FREQUENCY * self.speed as u32;
-                if let Some((left, right)) = self.bus.apu_output() {
-                    self.audio_sink.push_sample(left, right);
-                }
+        if self.ppu.tick(&mut self.bus, framebuffer, is_real_frame) { // Frame updated
+            self.frames += 1;
+            if is_real_frame {
+                self.video_sink.present();
             }
         }
-        self.bus.tick_m();
+
+        self.audio_accumulator += AUDIO_FREQUENCY;
+        if self.audio_accumulator >= CPU_FREQUENCY * self.speed as u32 {
+            self.audio_accumulator -= CPU_FREQUENCY * self.speed as u32;
+            if let Some((left, right)) = self.bus.apu_output() {
+                self.audio_sink.push_sample(left, right);
+            }
+        }
+
+        if self.ticks % 4 == 0 {
+            self.bus.tick_m();
+        }
+    }
+
+    fn tick_m(&mut self) {
+        for _ in 0..4 {
+            self.tick_t();
+        }
     }
 
     fn read8(&self, address: u16) -> u8 {

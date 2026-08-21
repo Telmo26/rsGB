@@ -3,8 +3,8 @@ use super::{instruction::*, CPU};
 use crate::{Peripherals, cpu::EnableInterrupt, utils::*};
 
 impl CPU {
-    pub(super) fn execute(&mut self, dev: &mut impl Peripherals, instruction: InType) { // -> impl FnMut(&mut CPU, &mut Interconnect, &mut EmuContext) {
-        match instruction {
+    pub(super) fn execute(&mut self, dev: &mut impl Peripherals) { // -> impl FnMut(&mut CPU, &mut Interconnect, &mut EmuContext) {
+        match self.curr_inst.in_type {
             InType::NOP => proc_nop(self, dev),
             InType::LD => proc_ld(self, dev),
             InType::LDH => proc_ldh(self, dev),
@@ -73,19 +73,19 @@ fn proc_ld(cpu: &mut CPU, dev: &mut impl Peripherals) {
         let e: i16 = (cpu.fetched_data as u8).cast_signed() as i16;
         cpu.registers.set(cpu.curr_inst.reg_1,
             cpu.registers.read(cpu.curr_inst.reg_2).wrapping_add_signed(e));
-        dev.incr_cycle();
+        dev.tick_m();
     } else if cpu.dest_is_mem {
         if cpu.curr_inst.reg_2.is_16bit() {
-            dev.incr_cycle();
+            dev.tick_m();
             dev.write16(cpu.mem_dest, cpu.fetched_data);
         } else {
             dev.write8(cpu.mem_dest, cpu.fetched_data as u8);
         }
-        dev.incr_cycle();
+        dev.tick_m();
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, cpu.fetched_data);
         if cpu.curr_inst.reg_1.is_16bit() && cpu.curr_inst.reg_2.is_16bit() {
-            dev.incr_cycle();
+            dev.tick_m();
         }
     }
 }
@@ -97,7 +97,7 @@ fn proc_ldh(cpu: &mut CPU, dev: &mut impl Peripherals) {
     } else {
         // Loading A into a memory region
         dev.write8(cpu.mem_dest, cpu.fetched_data as u8);
-        dev.incr_cycle();
+        dev.tick_m();
     }
 }
 
@@ -105,13 +105,13 @@ fn goto_addr(cpu: &mut CPU, dev: &mut impl Peripherals, address: u16, push_pc: b
     if cpu.check_cond() {
         if cpu.curr_inst.mode != AddrMode::R {
             // We want to avoid increasing cycles for 0xE9 : JP HL
-            dev.incr_cycle();
+            dev.tick_m();
         }
         if push_pc {
             cpu.push(dev, (cpu.registers.pc >> 8) as u8);
-            dev.incr_cycle();
+            dev.tick_m();
             cpu.push(dev, cpu.registers.pc as u8);
-            dev.incr_cycle();
+            dev.tick_m();
         }
         cpu.registers.pc = address;
     }
@@ -137,19 +137,19 @@ fn proc_rst(cpu: &mut CPU, dev: &mut impl Peripherals) {
 
 fn proc_ret(cpu: &mut CPU, dev: &mut impl Peripherals) {
     if cpu.curr_inst.cond != CondType::NONE {
-        dev.incr_cycle();
+        dev.tick_m();
     }
 
     if cpu.check_cond() {
         let low: u16 = cpu.pop(dev) as u16;
-        dev.incr_cycle();
+        dev.tick_m();
 
         let high: u16 = cpu.pop(dev) as u16;
-        dev.incr_cycle();
+        dev.tick_m();
 
         cpu.registers.pc = (high << 8) | low;
 
-        dev.incr_cycle();
+        dev.tick_m();
     }
 }
 
@@ -165,10 +165,10 @@ fn proc_di(cpu: &mut CPU, _dev: &mut impl Peripherals) {
 
 fn proc_pop(cpu: &mut CPU, dev: &mut impl Peripherals) {
     let low = cpu.pop(dev) as u16;
-    dev.incr_cycle();
+    dev.tick_m();
 
     let high = cpu.pop(dev) as u16;
-    dev.incr_cycle();
+    dev.tick_m();
 
     let data = (high << 8) | low;
 
@@ -181,21 +181,21 @@ fn proc_pop(cpu: &mut CPU, dev: &mut impl Peripherals) {
 
 fn proc_push(cpu: &mut CPU, dev: &mut impl Peripherals) {
     let high = (cpu.registers.read(cpu.curr_inst.reg_1) >> 8) as u8;
-    dev.incr_cycle();
+    dev.tick_m();
     cpu.push(dev, high);
 
     let low = cpu.registers.read(cpu.curr_inst.reg_1) as u8;
-    dev.incr_cycle();
+    dev.tick_m();
     cpu.push(dev, low);
 
-    dev.incr_cycle();
+    dev.tick_m();
 }
 
 fn proc_inc(cpu: &mut CPU, dev: &mut impl Peripherals) {
     let mut val = cpu.fetched_data;
     
     if cpu.curr_inst.reg_1.is_16bit() && !cpu.dest_is_mem {
-        dev.incr_cycle();
+        dev.tick_m();
         val = val.wrapping_add(1);
     } else {
         val = (cpu.fetched_data as u8).wrapping_add(1) as u16;
@@ -203,7 +203,7 @@ fn proc_inc(cpu: &mut CPU, dev: &mut impl Peripherals) {
 
     if cpu.dest_is_mem {
         dev.write8(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
-        dev.incr_cycle();
+        dev.tick_m();
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
@@ -217,7 +217,7 @@ fn proc_dec(cpu: &mut CPU, dev: &mut impl Peripherals) {
     let mut val = cpu.fetched_data;
 
     if cpu.curr_inst.reg_1.is_16bit() && !cpu.dest_is_mem {
-        dev.incr_cycle();
+        dev.tick_m();
         val = val.wrapping_sub(1);
     } else {
         val = (cpu.fetched_data as u8).wrapping_sub(1) as u16;
@@ -225,7 +225,7 @@ fn proc_dec(cpu: &mut CPU, dev: &mut impl Peripherals) {
 
     if cpu.dest_is_mem {
         dev.write8(cpu.registers.read(cpu.curr_inst.reg_1), val as u8);
-        dev.incr_cycle();
+        dev.tick_m();
     } else {
         cpu.registers.set(cpu.curr_inst.reg_1, val);
     }
@@ -240,7 +240,7 @@ fn proc_add(cpu: &mut CPU, dev: &mut impl Peripherals) {
 
     if cpu.curr_inst.reg_1.is_16bit() {
         value = cpu.registers.read(cpu.curr_inst.reg_1).wrapping_add(cpu.fetched_data);
-        dev.incr_cycle();
+        dev.tick_m();
     } else {
         value = (cpu.registers.read(cpu.curr_inst.reg_1) as u8).wrapping_add(cpu.fetched_data as u8) as u16;
     }
@@ -248,7 +248,7 @@ fn proc_add(cpu: &mut CPU, dev: &mut impl Peripherals) {
     if cpu.curr_inst.reg_1 == RegType::SP {
         let e = (cpu.fetched_data as u8).cast_signed();
         value = cpu.registers.read(cpu.curr_inst.reg_1).wrapping_add_signed(e as i16);
-        dev.incr_cycle();
+        dev.tick_m();
     }
 
     let mut z = (value == 0) as u8;
@@ -339,7 +339,7 @@ fn proc_cb(cpu: &mut CPU, dev: &mut impl Peripherals) {
     let mut reg_val = cpu.registers.read_reg8(dev, register);
 
     if register == RegType::HL {
-        dev.incr_cycle();
+        dev.tick_m();
     }
 
     match bit_op {
@@ -425,7 +425,7 @@ fn proc_cb(cpu: &mut CPU, dev: &mut impl Peripherals) {
     }
 
     if register == RegType::HL && bit_op != 1 {
-        dev.incr_cycle();
+        dev.tick_m();
     }
 }
 

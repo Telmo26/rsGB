@@ -1,7 +1,7 @@
 use std::{cell::Cell, path::PathBuf};
 
 use crate::{
-    ColorMode, InputState, cart::Cartridge
+    ColorMode, InputState, cart::Cartridge, ppu::LCDMode
 };
 
 pub use crate::{
@@ -58,7 +58,107 @@ impl Interconnect {
     }
 
     pub fn read(&self, address: u16) -> u8 {
+        let mode = match self.io.read(0xFF41) & 0b11 {
+            0 => LCDMode::HBlank,
+            1 => LCDMode::VBlank,
+            2 => LCDMode::OAM,
+            3 => LCDMode::XFer,
+            _ => unreachable!()
+        };
+
+        match address {
+            // ROM Data
+            0x0000..0x8000 => self.cart.as_ref().unwrap().read(address),
+
+            // Char/Map Data
+            0x8000..0xA000 => {
+                if mode == LCDMode::XFer {
+                    0xFF
+                } else {
+                    self.vram[(address - 0x8000) as usize]
+                }
+            }
+
+            // Cartridge RAM
+            0xA000..0xC000 => self.cart.as_ref().unwrap().read(address),
+
+            // WRAM (Working RAM)
+            0xC000..0xE000 => self.ram.wram_read(address),
+
+            // Reserved echo RAM
+            0xE000..0xFE00 => self.ram.wram_read(address - 0x2000),
+
+            // OAM
+            0xFE00..0xFEA0 => {
+                if self.io.dma_transferring() || mode == LCDMode::OAM || mode == LCDMode::XFer {
+                    0xFF
+                } else {
+                    let sprite_index = ((address - 0xFE00)/4) as usize;
+                    let byte = (address % 4) as u8;
+                    self.oam_ram[sprite_index].read(byte)
+                } 
+            },
+
+            // Reserved - Unusable
+            0xFEA0..0xFF00 => 0,
+
+            // I/O Registers
+            0xFF00..0xFF80 => self.io.read(address), // panic!("Read at address {address:X} not implemented!"),
+
+            // HRAM (High RAM) / Zero Page
+            0xFF80..0xFFFF => self.ram.hram_read(address),
+
+            // CPU Enable Register
+            0xFFFF => self.ie_register,
+        }
+    }
+
+    pub fn write(&mut self, address: u16, value: u8) {
         // ROM only for now
+        match address {
+            0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),
+
+           // Char/Map Data
+            0x8000..0xA000 => {
+                self.vram_updated.replace(true);
+                self.vram[(address - 0x8000) as usize] = value;
+            }
+
+            // Cartridge RAM
+            0xA000..0xC000 => self.cart.as_mut().unwrap().write(address, value),
+
+            // WRAM (Working RAM)
+            0xC000..0xE000 => self.ram.wram_write(address, value),
+
+            // Reserved echo RAM
+            0xE000..0xFE00 => self.ram.wram_write(address - 0x2000, value),
+
+            // OAM
+            0xFE00..0xFEA0 => {
+                if self.io.dma_transferring() {
+                    return
+                } else {
+                    let sprite_index = ((address - 0xFE00)/4) as usize;
+                    let byte = (address % 4) as u8;
+                    self.oam_ram[sprite_index].write(byte, value);
+                }
+            },
+
+            // Reserved - Unusable
+            0xFEA0..0xFF00 => (),
+
+            // I/O Registers
+            0xFF00..0xFF80 => self.io.write(address, value),
+
+            // HRAM (High RAM) / Zero Page
+            0xFF80..0xFFFF => self.ram.hram_write(address, value),
+
+            // CPU Enable Register
+            0xFFFF => self.ie_register = value,
+        }
+    }
+
+    pub fn ppu_read(&self, address: u16) -> u8 {
         match address {
             // ROM Data
             0x0000..0x8000 => self.cart.as_ref().unwrap().read(address),
@@ -100,7 +200,7 @@ impl Interconnect {
         }
     }
 
-    pub fn write(&mut self, address: u16, value: u8) {
+    pub fn ppu_write(&mut self, address: u16, value: u8) {
         // ROM only for now
         match address {
             0x0000..0x8000 => self.cart.as_mut().unwrap().write(address, value),

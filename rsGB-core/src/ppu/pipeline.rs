@@ -1,4 +1,4 @@
-use crate::{interconnect::Interconnect, ppu::{XRES, fetcher::FetchState, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_enable, lcdc_obj_height, lcdc_win_enable}}};
+use crate::{interconnect::Interconnect, ppu::{XRES, utils::{lcd_read_ly, lcd_read_scroll_x, lcd_read_win_x, lcd_read_win_y, lcdc_obj_enable, lcdc_obj_height, lcdc_win_enable}}};
 
 use super::PPU;
 
@@ -20,7 +20,7 @@ impl PPU {
         // so instead of warming up the pipeline I just skip the first
         // few dots. This works since the pixels are discarded anyways.
         // The first Mode 3 dot is 80 so I want to skip until 86 
-        if self.line_ticks < 85 { 
+        if self.line_ticks < 86 { 
             return ;
         }
 
@@ -171,6 +171,8 @@ impl PPU {
     pub fn frame_complete(&mut self) {
         // Reset window line counter at the start of each frame
         self.fetcher.reset_window_line();
+        self.current_frame += 1;
+        self.new_frame = true;
     }
 
     pub fn oam_fetch(&mut self, bus: &mut Interconnect) {

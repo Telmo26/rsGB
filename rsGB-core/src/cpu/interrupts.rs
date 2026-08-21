@@ -14,12 +14,12 @@ pub enum InterruptType {
 impl CPU {
     fn interrupt_handle(&mut self, dev: &mut impl Peripherals, address: u16, interrupt_type: InterruptType) -> bool {
         // Two internal NOPs
-        dev.incr_cycle();
-        dev.incr_cycle();
+        dev.tick_m();
+        dev.tick_m();
 
         // The two push operations
         self.push(dev, (self.registers.pc >> 8) as u8);
-        dev.incr_cycle();
+        dev.tick_m();
 
         let ie_register = dev.ie_register();
         let it = interrupt_type as u8;
@@ -30,7 +30,7 @@ impl CPU {
         }
 
         self.push(dev, self.registers.pc as u8);
-        dev.incr_cycle();
+        dev.tick_m();
 
         if (ie_register & it) == 0 { // The interrupt was cancelled
             self.registers.pc = 0;
@@ -39,7 +39,7 @@ impl CPU {
 
         // Final jump
         self.registers.pc = address;
-        dev.incr_cycle();
+        dev.tick_m();
         return false
     }
 

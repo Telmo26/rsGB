@@ -1,4 +1,4 @@
-use crate::{interconnect::{Interconnect, OAMEntry}, utils::BoundedQueue};
+use crate::{interconnect::{Interconnect, InterruptType, OAMEntry}, ppu::utils::{stat_line, status_mode_set}, utils::BoundedQueue};
 
 mod state_machine;
 mod pipeline;
@@ -6,7 +6,7 @@ mod utils;
 mod fetcher;
 
 use fetcher::Fetcher;
-use utils::{status_mode, LCDMode};
+pub use utils::LCDMode;
 
 const LINES_PER_FRAME: u8 = 154;
 const TICKS_PER_LINE: u32 = 456;
@@ -26,6 +26,11 @@ pub struct PPU {
     screen_x: u8, // The pixel position to push in the framebuffer
     current_x: u8, // The current position we're dealing with on the screen
 
+    
+    stat_delay: u8,
+    stat_line: bool,
+    stat_mode: LCDMode,
+
     current_frame: u32,
     line_ticks: u32,
     new_frame: bool,
@@ -44,6 +49,10 @@ impl PPU {
             screen_x: 0,
             current_x: 0,
 
+            stat_delay: 0,
+            stat_line: false,
+            stat_mode: LCDMode::HBlank,
+
             current_frame: 0,
             line_ticks: 0,
             new_frame: false,
@@ -51,9 +60,23 @@ impl PPU {
     }
 
     pub fn tick(&mut self, bus: &mut Interconnect, framebuffer: &mut [u32], render: bool) -> bool {
-        let lcd_mode = status_mode(bus);
+        if self.stat_delay > 0 {
+            self.stat_delay -= 1;
 
-        match lcd_mode {
+            if self.stat_delay == 0 {
+                status_mode_set(bus, self.stat_mode);
+
+                let new_line = stat_line(bus);
+
+                if new_line && !self.stat_line {
+                    bus.request_interrupt(InterruptType::LcdStat);
+                }
+
+                self.stat_line = new_line;
+            }
+        }
+        
+        match self.stat_mode {
             LCDMode::HBlank => self.hblank(bus),
             LCDMode::VBlank => self.vblank(bus),
             LCDMode::OAM => self.oam(bus),
